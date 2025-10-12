@@ -1,0 +1,7 @@
+[project]
+name = "job-market-analysis"
+version = "0.1.0"
+description = "Scrapes and analyzes jobs from Moldova across all domains"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
