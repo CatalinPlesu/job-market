@@ -5,7 +5,6 @@ description = "Scrapes and analyzes jobs from Moldova across all domains"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "textual",
 	"openai",
 	"dotenv",
 ]
