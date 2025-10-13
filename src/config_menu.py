@@ -25,10 +25,10 @@ class ConfigMenu(BaseMenu):
 
         console.print("\nContents of scraper_rules.json:", style="bold cyan")
         try:
-            with open('config/scraper_rules.json', 'r') as f:
+            with open(Config.scraper_rules, 'r') as f:
                 data = json.load(f)
                 console.print_json(data=data)  # Use the data parameter
         except FileNotFoundError:
-            console.print("scraper_rules.json not found", style="red")
+            console.print(f"{Config.scraper_rules} not found", style="red")
 
         self.wait_for_input()

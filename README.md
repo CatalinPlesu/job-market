@@ -20,21 +20,27 @@ Single `jobs` table in SQLite with standardized fields:
 ```sql
 CREATE TABLE jobs (
     id INTEGER PRIMARY KEY,
+    scraped_at TIMESTAMP,
     site_name TEXT NOT NULL,
     url TEXT UNIQUE NOT NULL,
-    scraped_at TIMESTAMP,
+    posted_date TEXT,
+    email TEXT,
+    phone TEXT,
     
     -- Standard fields (mapped from all sites)
     title TEXT,
     company TEXT,
-    location TEXT,
-    posted_date TEXT,
-    salary_text TEXT,
-    job_type TEXT,
+    employment_type TEXT, --full time, part time, internship , etc
+
+    -- Location
+    adress TEXT,
+    -- 
+    salary TEXT,
+    -- 
+    education TEXT,
+    experience TEXT,
     
-    -- Raw content
-    description TEXT,        -- Full job description
-    extra_data JSON         -- Site-specific fields
+    descriptino TEXT,
 );
 ```
 
