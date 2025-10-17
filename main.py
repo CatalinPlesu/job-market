@@ -1,6 +1,5 @@
 from rich.console import Console
 from src.config_menu import ConfigMenu
-from src.scraper_menu import ScraperMenu
 from src.debug_menu import DebugMenu
 from src.scrape_menu import ScrapeMenu
 from src.filter_menu import FilterMenu
@@ -14,7 +13,6 @@ class MenuManager:
         # Single source of truth for menu options
         self.menu_options = [
             {"key": "1", "label": "Print Config", "handler": ConfigMenu()},
-            {"key": "2", "label": "Generate Scraper Rules", "handler": ScraperMenu()},
             {"key": "3", "label": "Generate Debug JavaScript", "handler": DebugMenu()},
             {"key": "4", "label": "Scrape Data", "handler": ScrapeMenu()},
             {"key": "5", "label": "Filter & Export", "handler": FilterMenu()},
