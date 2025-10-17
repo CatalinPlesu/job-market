@@ -2,16 +2,16 @@
     {
         "name": "jobber.md",
         "pagination": "https://jobber.md/jobs/page-{page}/",
-        "job-url-class-selector": "a.mui-8ugpds",
+        "job-url-class-selector": "a.mui-8ugpds"
     },
     {
         "name": "rabota.md",
         "pagination": "https://www.rabota.md/ro/jobs-moldova/{page}",
-        "job-url-class-selector": "a.vacancyShowPopup",
+        "job-url-class-selector": "a.vacancyShowPopup"
     },
     {
         "name": "delucru.md",
         "pagination": "https://www.delucru.md/jobs?page={page}",
-        "job-url-class-selector": "a.link-job",
-    },
+        "job-url-class-selector": "a.link-job"
+    }
 ]
