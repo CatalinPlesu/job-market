@@ -1,17 +1,40 @@
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
 class Config:
+    # Job sites configuration
     job_sites = [
         "https://jobber.md/jobs/",
-        "https://www.rabota.md/ro/jobs-moldova",
-        "https://www.delucru.md/jobs"
+        "https://www.rabota.md/ro/jobs-moldova/",
+        "https://www.delucru.md/jobs",
     ]
+
+    # LLM Configuration
     llm_api = "https://openrouter.ai/api/v1"
     llm_api_key = os.getenv("LLM_API_KEY")
     llm_model = "deepseek/deepseek-chat-v3.1:free"
+
+    # Scraper Configuration
+    scraper_rules = "config/scraper_rules.json"
+    raw_db_path = "raw.db"
+    scraper_state_path = "scraper_state.json"
+
+    # Scraper Timeouts and Limits
+    request_timeout = 10  # seconds
+    max_page_search = 500  # Maximum pages to search in binary search
+    default_crawl_delay = 1.0  # seconds
+    min_crawl_delay = 0.5  # seconds
+    max_crawl_delay = 5.0  # seconds
+
+    # Async Configuration
+    max_concurrent_requests = 10
+    request_batch_delay = 0.1  # seconds between batches
+
+    # Text Processing
+    max_body_text_length = 5000  # characters
 
     prompt_pagination_and_job_url = """
     You are an expert web scraping specialist. Analyze the provided HTML from a job listing page and return a JSON object with the following structure:
@@ -36,6 +59,7 @@ class Config:
 
     Return ONLY valid JSON with no additional text or explanation.
     """
+
     prompt_job_fields_selector = """
     You are an expert web scraping specialist. Analyze the provided HTML from a job detail page and return a JSON array of CSS selectors that target meaningful text content related to the job posting.
 
@@ -52,5 +76,3 @@ class Config:
 
     Return ONLY valid JSON array with no additional text or explanation.
     """
-
-    scraper_rules = "config/scraper_rules.json"

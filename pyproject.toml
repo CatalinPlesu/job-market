@@ -5,10 +5,26 @@ description = "Scrapes and analyzes jobs from Moldova across all domains"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-	"rich",
-	"openai",
-	"dotenv",
-	"requests",
-	"beautifulsoup4",
-	"tinydb",
+	"rich>=13.0.0",
+	"openai>=1.0.0",
+	"python-dotenv>=1.0.0",
+	"requests>=2.31.0",
+	"beautifulsoup4>=4.12.0",
+	"tinydb>=4.8.0",
+	"aiohttp>=3.9.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["src", "config"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
