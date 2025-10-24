@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+raw.db
+scraper_state.json
