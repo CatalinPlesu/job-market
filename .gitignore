@@ -10,5 +10,5 @@ wheels/
 .venv
 .env
 
-raw.db
-scraper_state.json
+data.db
+state.json

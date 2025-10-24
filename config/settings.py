@@ -26,8 +26,8 @@ class Config:
     llm_model = "deepseek/deepseek-chat-v3.1:free"
 
     # Scraper Configuration
-    raw_db_path = "raw.db"
-    scraper_state_path = "scraper_state.json"
+    db_path = "data.db"
+    scraper_state_path = "state.json"
 
     # Text Processing
     max_body_text_length = 10000  # characters
