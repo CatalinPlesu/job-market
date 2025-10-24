@@ -1,55 +1,53 @@
-from rich.console import Console
-from src.config_menu import ConfigMenu
-from src.debug_menu import DebugMenu
-from src.scrape_menu import ScrapeMenu
-from src.filter_menu import FilterMenu
-from src.results_menu import ResultsMenu
-
-console = Console()
+from src.scrape_data import scrape_data
+from src.structure_data_with_llm import structure_data_with_llm
+from src.process_data import process_data
+from src.generate_html_page import generate_html_page
 
 
-class MenuManager:
-    def __init__(self):
-        # Single source of truth for menu options
-        self.menu_options = [
-            {"key": "1", "label": "Print Config", "handler": ConfigMenu()},
-            {"key": "3", "label": "Generate Debug JavaScript", "handler": DebugMenu()},
-            {"key": "4", "label": "Scrape Data", "handler": ScrapeMenu()},
-            {"key": "5", "label": "Filter & Export", "handler": FilterMenu()},
-            {"key": "6", "label": "View Results", "handler": ResultsMenu()},
-        ]
+def exit_app():
+    print("Exiting...")
+    exit()
 
-        # Create menu dictionary from the list
-        self.menus = {opt["key"]: opt["handler"] for opt in self.menu_options}
 
-    def print_menu(self):
-        console.clear()
-        console.print("="*50, style="bold blue")
-        console.print("JOB SCRAPER CONSOLE APP", style="bold yellow")
-        console.print("="*50, style="bold blue")
+def print_menu():
+    print("\033c", end="")  # Clear screen
+    print("="*50)
+    print("DATA PROCESSING CONSOLE APP")
+    print("="*50)
 
-        for option in self.menu_options:
-            console.print(f"{option['key']}. {option['label']}", style="green")
+    functions = [
+        ("Scrape Data", scrape_data),
+        ("Structure Data with LLM", structure_data_with_llm),
+        ("Process Data", process_data),
+        ("Generate HTML Page", generate_html_page),
+        ("Exit", exit_app)
+    ]
 
-        console.print("0. Exit", style="red")
-        console.print("-"*50, style="bold blue")
+    for i, (label, _) in enumerate(functions, 1):
+        print(f"{i}. {label}")
 
-    def run(self):
-        while True:
-            self.print_menu()
-            choice = input("Select an option (0-6): ").strip()
+    print("-"*50)
+    return functions
 
-            if choice in self.menus:
-                self.menus[choice].execute()
-            elif choice == '0':
-                console.print("Exiting...", style="bold red")
-                break
+
+def run():
+    while True:
+        functions = print_menu()
+        try:
+            choice = int(input("Select an option (1-5): ").strip())
+            if 1 <= choice <= len(functions):
+                _, func = functions[choice - 1]
+                func()
+                input("Press Enter to continue...")
             else:
-                console.print("Invalid option. Please try again.", style="red")
+                print("Invalid option. Please try again.")
                 import time
                 time.sleep(1)
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+            import time
+            time.sleep(1)
 
 
 if __name__ == "__main__":
-    app = MenuManager()
-    app.run()
+    run()
