@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import json
+import time
 
 
 def scrape_data():
@@ -10,10 +11,20 @@ def scrape_data():
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
 
+    # Stage 0 binary search for page numbers
+
+    # Stage 1 get job cards from paginated pages
     for rules in ruless:
+        start_time = time.time()
+        print(rules[Config.scraper_pagination])
         paginatin = rules[Config.scraper_pagination]
         url = paginatin.replace("{page}", str(1))
         print(scrape_jobs(url, rules))
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"Execution time: {execution_time:.4f} seconds")
+
+    # Stage 2 get job details and status
 
 
 def scrape_jobs(url, rules):

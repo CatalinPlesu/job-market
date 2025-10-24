@@ -19,8 +19,8 @@
         "name": "delucru.md",
         "pagination": "https://www.delucru.md/jobs?page={page}",
 		"job-card": "div.job-item",
-		"job-url": "a.link-job",
-		"job-title": "a.link-job",
+		"job-url": "a.link-job[title]",
+		"job-title": "a.link-job[title]",
 		"company-name": "img[alt]"
     }
 ]
