@@ -1,43 +1,189 @@
 from config.settings import Config
+from src.database import SessionLocal, Job, JobCheck
 import requests
 from bs4 import BeautifulSoup
-import json
 import json
 import time
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
-import requests  # used only to check HTTP status if you want
-
+from datetime import datetime, date
+from sqlalchemy import and_
 
 def scrape_data():
     print("Scraping data...")
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
 
-    for rules in ruless:
-        # Stage 0 binary search for page numbers
-        pages = find_max_pages(rules)
+    # Create database session
+    db = SessionLocal()
+    
+    try:
+        for rules in ruless:
+            # Stage 0 binary search for page numbers
+            pages = find_max_pages(rules)
+            print(f"Total pages to scrape: {pages}")
 
-        # Stage 0.5 read delay from robots.txt
-        delay = get_crawl_delay_with_robotparser(rules[Config.scraper_name], user_agent="JobTaker") 
-        print(delay)
+            # Stage 0.5 read delay from robots.txt
+            delay = get_crawl_delay_with_robotparser(rules[Config.scraper_name], user_agent="JobTaker") 
+            print(f"Crawl delay from robots.txt: {delay}s")
 
-        # Stage 1 get job cards from paginated pages
-        # start_time = time.time()
-        # print(rules[Config.scraper_pagination])
-        # paginatin = rules[Config.scraper_pagination]
-        # url = paginatin.replace("{page}", str(1))
-        # print(scrape_jobs(url, rules))
-        # end_time = time.time()
-        # execution_time = end_time - start_time
-        # print(f"Execution time: {execution_time:.4f} seconds")
+            # Stage 1 get job cards from paginated pages
+            total_start_time = time.time()
+            loop_times = []
+            
+            for i in range(1, pages+1):
+                loop_start_time = time.time()
+                
+                pagination = rules[Config.scraper_pagination]
+                url = pagination.replace("{page}", str(i))
+                
+                # Calculate adjusted delay based on last loop time
+                adjusted_delay = delay
+                if loop_times:
+                    last_loop_time = loop_times[-1]
+                    adjusted_delay = max(0, delay - last_loop_time)
+                
+                jobs = scrape_jobs(url, rules, adjusted_delay)
+                print(f"Found {len(jobs)} jobs on page {i}/{pages}")
+                
+                # Store jobs in database
+                store_jobs(db, jobs)
+                
+                loop_end_time = time.time()
+                loop_duration = loop_end_time - loop_start_time
+                loop_times.append(loop_duration)
+                
+                # Calculate statistics
+                elapsed_time = loop_end_time - total_start_time
+                avg_loop_time = sum(loop_times) / len(loop_times)
+                remaining_pages = pages - i
+                estimated_remaining_time = avg_loop_time * remaining_pages
+                estimated_total_time = elapsed_time + estimated_remaining_time
+                
+                print(f"Loop time: {loop_duration:.2f}s | "
+                      f"Avg: {avg_loop_time:.2f}s | "
+                      f"Elapsed: {format_time(elapsed_time)} | "
+                      f"ETA: {format_time(estimated_remaining_time)} | "
+                      f"Total est: {format_time(estimated_total_time)}")
+                print(f"Adjusted delay for next loop: {adjusted_delay:.2f}s")
+                print("-" * 80)
+            
+            total_end_time = time.time()
+            total_duration = total_end_time - total_start_time
+            print(f"\n{'='*80}")
+            print(f"Completed scraping {pages} pages in {format_time(total_duration)}")
+            print(f"Average time per page: {sum(loop_times)/len(loop_times):.2f}s")
+            print(f"{'='*80}\n")
+    
+    finally:
+        db.close()
 
-    # Stage 2 get job details and status
+def format_time(seconds):
+    """Format seconds into human-readable time string"""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{minutes}m {secs}s"
+    else:
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"{hours}h {minutes}m"
+
+def store_jobs(db, jobs_data):
+    """
+    Store scraped jobs in the database, identifying by company + title.
+    Add job check record for today if not already checked.
+    
+    Args:
+        db: SQLAlchemy database session
+        jobs_data: List of job dictionaries from scrape_jobs()
+    """
+    added_count = 0
+    existing_count = 0
+    checked_count = 0
+    today = date.today()
+    
+    for job_data in jobs_data:
+        try:
+            # Find existing job by company + title
+            existing_job = db.query(Job).filter(
+                and_(
+                    Job.job_title == job_data['title'],
+                    Job.company_name == job_data['company']
+                )
+            ).first()
+            
+            if existing_job:
+                existing_count += 1
+                
+                # Check if we've already checked this job today
+                today_check = db.query(JobCheck).filter(
+                    and_(
+                        JobCheck.job_url == existing_job.job_url,
+                        JobCheck.check_date == today
+                    )
+                ).first()
+                
+                if not today_check:
+                    # Add check record for today
+                    new_check = JobCheck(
+                        job_url=existing_job.job_url,
+                        check_date=today,
+                        http_status=200,  # Assuming success since we scraped it
+                        checked_at=datetime.utcnow()
+                    )
+                    db.add(new_check)
+                    checked_count += 1
+                
+                # Update the job URL if it changed
+                if existing_job.job_url != job_data['url']:
+                    existing_job.job_url = job_data['url']
+                    existing_job.updated_at = datetime.utcnow()
+                
+            else:
+                # Create new job entry
+                new_job = Job(
+                    job_title=job_data['title'],
+                    company_name=job_data['company'],
+                    job_url=job_data['url'],
+                    job_description=None,  # Will be populated in stage 2
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                
+                db.add(new_job)
+                db.flush()  # Get the ID without committing
+                
+                # Add initial check record
+                initial_check = JobCheck(
+                    job_url=new_job.job_url,
+                    check_date=today,
+                    http_status=200,
+                    checked_at=datetime.utcnow()
+                )
+                db.add(initial_check)
+                
+                added_count += 1
+            
+        except Exception as e:
+            print(f"Error processing job {job_data.get('title', 'Unknown')}: {e}")
+            db.rollback()
+            continue
+    
+    # Commit all changes at once
+    try:
+        db.commit()
+        print(f"✓ {added_count} new | {existing_count} existing | {checked_count} checks added")
+    except Exception as e:
+        print(f"✗ Error committing to database: {e}")
+        db.rollback()
 
 def get_robots_url(site_url):
     parts = urlparse(site_url)
     scheme = parts.scheme or "http"
-    netloc = parts.netloc or parts.path  # handle if user passed "example.com"
+    netloc = parts.netloc or parts.path
     return f"{scheme}://{netloc}/robots.txt"
 
 def get_crawl_delay_with_robotparser(site_url, user_agent="*"):
@@ -45,19 +191,15 @@ def get_crawl_delay_with_robotparser(site_url, user_agent="*"):
     rp = RobotFileParser()
     rp.set_url(robots_url)
     try:
-        rp.read()       # fetches and parses robots.txt
+        rp.read()
     except Exception:
-        # could not read robots.txt (network error) -> treat as no rules
         return Config.default_crawl_delay
 
-    # RobotFileParser provides crawl_delay(useragent) which may return None
     delay = rp.crawl_delay(user_agent)
     if delay != None:
         return delay
     else:
         return Config.default_crawl_delay
-
-
 
 def find_max_pages(rules):
     """
@@ -66,26 +208,22 @@ def find_max_pages(rules):
     """
     pagination_url = rules[Config.scraper_pagination]
     max_page = Config.max_page
-    print(pagination_url)
+    print(f"Finding max pages for: {pagination_url}")
 
     high = Config.max_page
     low = 1
     while True:
         url = pagination_url.replace("{page}", str(high))
-        print(url)
-        # use jobs on page as indicator this page is existing, not to be deceived by sites who dont know to send back 404 - delucru.md
         jobs = scrape_jobs(url, rules)
         if len(jobs) > 0:
-            # we are not sure yet what is the max mage
             low = high
             high *= 2
-            print(f"Double l:{low} h:{high}")
+            print(f"Expanding search - Low: {low}, High: {high}")
         else:
-            print("Leave")
             break
+    
     while low <= high:
         mid = low + (high - low) // 2
-        print(f"mid: {mid}")
         jobs = len(scrape_jobs(
             pagination_url.replace("{page}", str(mid)), rules))
 
@@ -95,31 +233,35 @@ def find_max_pages(rules):
             if jobs2 > 0:
                 low = mid + 1
             else:
-                print(pagination_url.replace("{page}", str(mid)))
+                print(f"Max page found: {mid}")
                 return mid
         else:
             high = mid - 1
+    
+    return low
 
-
-def scrape_jobs(url, rules, delay = Config.default_crawl_delay):
+def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
     """
     Scrapes job listings from a given URL using configurable CSS selectors.
 
     Args:
         url (str): The URL of the page containing job listings.
         rules (dict): A dictionary containing CSS selectors for scraping.
+        delay (float): Time to wait before making the request (in seconds).
 
     Returns:
-        list: A list of dictionaries containing job data (index, url, title, company).
+        list: A list of dictionaries containing job data (url, title, company).
     """
-    # Send a GET request to the URL
-    time.sleep(delay)
+    # Apply delay before request
+    if delay > 0:
+        time.sleep(delay)
+    
     response = requests.get(url)
     try:
-        response.raise_for_status()  # Raise an exception for bad status codes
+        response.raise_for_status()
     except:
         return []
-    # Parse the HTML content
+    
     soup = BeautifulSoup(response.content, 'html.parser')
 
     # Extract selectors from rules
@@ -128,39 +270,30 @@ def scrape_jobs(url, rules, delay = Config.default_crawl_delay):
     job_title_selector = rules[Config.scraper_job_title]
     company_name_selector = rules[Config.scraper_company_name]
 
-    # Find all job card elements
     job_cards = soup.select(job_card_selector)
-
-    # List to hold the extracted job data
     jobs_data = []
 
     for index, card in enumerate(job_cards):
-        # Initialize a dictionary for the current job
         job_data = {
             'url': None,
             'title': None,
             'company': None
         }
 
-        # Extract data using the selectors within the current card's scope
         url_element = card.select_one(job_url_selector)
         title_element = card.select_one(job_title_selector)
         company_element = card.select_one(company_name_selector)
 
         if url_element:
-            job_data['url'] = url_element.get(
-                'href')  # Get the 'href' attribute
+            job_data['url'] = url_element.get('href')
 
         if title_element:
-            job_data['title'] = title_element.get_text(
-                strip=True)  # Get the text content (job title)
+            job_data['title'] = title_element.get_text(strip=True)
 
         if company_element:
-            job_data['company'] = company_element.get_text(
-                strip=True)  # Get the text content (company name)
+            job_data['company'] = company_element.get_text(strip=True)
 
-        # Add the structured data dictionary for this job to the list
-        if job_data['title'] != '' and job_data['url'] != '' and job_data['company'] != '':
+        if job_data['title'] and job_data['url'] and job_data['company']:
             jobs_data.append(job_data)
 
     return jobs_data
