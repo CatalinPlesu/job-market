@@ -17,6 +17,7 @@ class Job(Base):
     __tablename__ = 'jobs'
 
     id = Column(Integer, primary_key=True)
+    site = Column(String(200), nullable=False)
     job_title = Column(String(200), nullable=False)
     company_name = Column(String(200), nullable=False)
     job_url = Column(String(500), unique=True, nullable=False)
