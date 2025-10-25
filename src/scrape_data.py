@@ -4,10 +4,10 @@ from bs4 import BeautifulSoup
 import json
 import json
 import time
-import tinydb
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
 import requests  # used only to check HTTP status if you want
+
 
 def scrape_data():
     print("Scraping data...")
@@ -16,12 +16,12 @@ def scrape_data():
 
     for rules in ruless:
         # Stage 0 binary search for page numbers
-        # pages = find_max_pages(rules)
+        pages = find_max_pages(rules)
 
         # Stage 0.5 read delay from robots.txt
-
         delay = get_crawl_delay_with_robotparser(rules[Config.scraper_name], user_agent="JobTaker") 
         print(delay)
+
         # Stage 1 get job cards from paginated pages
         # start_time = time.time()
         # print(rules[Config.scraper_pagination])

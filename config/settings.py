@@ -28,7 +28,6 @@ class Config:
 
     # Scraper Configuration
     db_path = "data.db"
-    scraper_state_path = "state.json"
 
     # Text Processing
     max_body_text_length = 10000  # characters
