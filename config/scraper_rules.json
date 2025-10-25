@@ -5,7 +5,10 @@
 		"job-card": "div.MuiStack-root.mui-1dps4qt",
 		"job-url": "a.mui-8ugpds",
 		"job-title": "a.mui-8ugpds",
-		"company-name": "a.mui-14nesz"
+		"company-name": "a.mui-14nesz",
+		"details": [
+			".MuiContainer-root"
+		]
     },
     {
         "name": "rabota.md",
@@ -13,7 +16,10 @@
 		"job-card": ".previewCardContent",
 		"job-url": "a.vacancyShowPopup",
 		"job-title": "a.vacancyShowPopup span",
-		"company-name": ".text-black.flex.items-center span"
+		"company-name": ".text-black.flex.items-center span",
+		"details": [
+			"#main .content_wr"
+		]
     },
     {
         "name": "delucru.md",
@@ -21,6 +27,13 @@
 		"job-card": "div.job-item",
 		"job-url": "a.link-job[title]",
 		"job-title": "a.link-job[title]",
-		"company-name": "img[alt]"
+		"company-name": "img[alt]",
+		"details": [
+			".employer-details-page .detail-page-head",
+			".employer-details-page .lead",
+			"#job-description",
+			"advantages",
+			"#about"
+		]
     }
 ]

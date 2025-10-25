@@ -13,6 +13,7 @@ class Config:
     scraper_job_url = "job-url"
     scraper_job_title = "job-title"
     scraper_company_name = "company-name"
+    scraper_details = "details"
 
     # Scraper Timeouts and Limits
     request_timeout = 10  # seconds

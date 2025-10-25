@@ -17,7 +17,7 @@ def print_menu():
     print("="*50)
 
     functions = [
-        ("Scrape Job Listings (Stage 1)", scrape_data),
+        ("Scrape Job Listings (Stage 1)", scrape_jobs_list),
         ("Scrape Job Details (Stage 2)", scrape_job_details),
         ("Structure Data with LLM", structure_data_with_llm),
         ("Process Data", process_data),
