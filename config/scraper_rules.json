@@ -13,7 +13,7 @@
 		"job-card": ".previewCardContent",
 		"job-url": "a.vacancyShowPopup",
 		"job-title": "a.vacancyShowPopup span",
-		"company-name": ".text-black.flex.items-center.gap-2 span"
+		"company-name": ".text-black.flex.items-center span"
     },
     {
         "name": "delucru.md",
