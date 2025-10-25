@@ -11,20 +11,63 @@ def scrape_data():
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
 
-    # Stage 0 binary search for page numbers
-
-    # Stage 1 get job cards from paginated pages
     for rules in ruless:
-        start_time = time.time()
-        print(rules[Config.scraper_pagination])
-        paginatin = rules[Config.scraper_pagination]
-        url = paginatin.replace("{page}", str(1))
-        print(scrape_jobs(url, rules))
-        end_time = time.time()
-        execution_time = end_time - start_time
-        print(f"Execution time: {execution_time:.4f} seconds")
+        # Stage 0 binary search for page numbers
+        find_max_pages(rules)
+
+        # Stage 1 get job cards from paginated pages
+        # start_time = time.time()
+        # print(rules[Config.scraper_pagination])
+        # paginatin = rules[Config.scraper_pagination]
+        # url = paginatin.replace("{page}", str(1))
+        # print(scrape_jobs(url, rules))
+        # end_time = time.time()
+        # execution_time = end_time - start_time
+        # print(f"Execution time: {execution_time:.4f} seconds")
 
     # Stage 2 get job details and status
+
+
+def find_max_pages(rules):
+    """
+    On a given domain with pagination url, and start page,
+    will find the number of pages that can be accessed from 1 to x
+    """
+    pagination_url = rules[Config.scraper_pagination]
+    max_page = Config.max_page
+    print(pagination_url)
+
+    high = Config.max_page
+    low = 1
+    while True:
+        url = pagination_url.replace("{page}", str(high))
+        print(url)
+        # use jobs on page as indicator this page is existing, not to be deceived by sites who dont know to send back 404 - delucru.md
+        jobs = scrape_jobs(url, rules)
+        if len(jobs) > 0:
+            # we are not sure yet what is the max mage
+            low = high
+            high *= 2
+            print(f"Double l:{low} h:{high}")
+        else:
+            print("Leave")
+            break
+    while low <= high:
+        mid = low + (high - low) // 2
+        print(f"mid: {mid}")
+        jobs = len(scrape_jobs(
+            pagination_url.replace("{page}", str(mid)), rules))
+
+        if jobs > 0:
+            jobs2 = len(scrape_jobs(
+                pagination_url.replace("{page}", str(mid+1)), rules))
+            if jobs2 > 0:
+                low = mid + 1
+            else:
+                print(pagination_url.replace("{page}", str(mid)))
+                return mid
+        else:
+            high = mid - 1
 
 
 def scrape_jobs(url, rules):
@@ -40,8 +83,10 @@ def scrape_jobs(url, rules):
     """
     # Send a GET request to the URL
     response = requests.get(url)
-    response.raise_for_status()  # Raise an exception for bad status codes
-
+    try:
+        response.raise_for_status()  # Raise an exception for bad status codes
+    except:
+        return []
     # Parse the HTML content
     soup = BeautifulSoup(response.content, 'html.parser')
 
