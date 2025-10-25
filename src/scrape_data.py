@@ -19,15 +19,17 @@ def scrape_data():
     
     try:
         for rules in ruless:
-            if rules[Config.scraper_name] != "rabota.md":
+            if rules[Config.scraper_name] == "jobber.md":
                 continue
-            # Stage 0 binary search for page numbers
-            pages = find_max_pages(rules)
-            print(f"Total pages to scrape: {pages}")
 
-            # Stage 0.5 read delay from robots.txt
+            # Stage 0 read delay from robots.txt
             delay = get_crawl_delay_with_robotparser(rules[Config.scraper_name], user_agent="JobTaker") 
             print(f"Crawl delay from robots.txt: {delay}s")
+
+            # Stage 0 binary search for page numbers
+            pages = find_max_pages(rules, delay)
+            print(f"Total pages to scrape: {pages}")
+
 
             # Stage 1 get job cards from paginated pages
             total_start_time = time.time()
@@ -203,7 +205,7 @@ def get_crawl_delay_with_robotparser(site_url, user_agent="*"):
     else:
         return Config.default_crawl_delay
 
-def find_max_pages(rules):
+def find_max_pages(rules, delay):
     """
     On a given domain with pagination url, and start page,
     will find the number of pages that can be accessed from 1 to x
@@ -225,7 +227,7 @@ def find_max_pages(rules):
         page_url = pagination_url.replace("{page}", str(mid))
         print(f"Testing URL: {page_url}")
         
-        jobs = len(scrape_jobs(page_url, rules))
+        jobs = len(scrape_jobs(page_url, rules, delay))
         print(f"Found {jobs} jobs on page {mid}")
 
         if jobs > 0:
