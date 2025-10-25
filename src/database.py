@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, Index
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, Index, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 from config.settings import Config
 
@@ -26,6 +26,8 @@ class Job(Base):
     updated_at = Column(DateTime, default=datetime.utcnow,
                         onupdate=datetime.utcnow)
 
+    checks = relationship("JobCheck", back_populates="job")
+
 
 class JobCheck(Base):
     """
@@ -34,10 +36,13 @@ class JobCheck(Base):
     __tablename__ = 'job_checks'
 
     id = Column(Integer, primary_key=True)
-    job_url = Column(String(500), nullable=False)  # Links to jobs table
-    check_date = Column(DateTime, nullable=False)  # Date of check
+    job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)  # Link to Job table
+    check_date = Column(DateTime, nullable=False)  # Date of check (without time)
     http_status = Column(Integer)  # HTTP status code
-    checked_at = Column(DateTime, default=datetime.utcnow)
+
+    job = relationship("Job", back_populates="checks")
+
+    __table_args__ = (Index('idx_job_check_unique', 'job_id', 'check_date', unique=True),)
 
 
 # Create composite unique index: same title + same company + same date created = same job
