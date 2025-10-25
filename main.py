@@ -1,4 +1,4 @@
-from src.scrape_data import scrape_data
+from src.scrape_jobs_list import scrape_jobs_list
 from src.structure_data_with_llm import structure_data_with_llm
 from src.process_data import process_data
 from src.generate_html_page import generate_html_page
@@ -16,7 +16,7 @@ def print_menu():
     print("="*50)
 
     functions = [
-        ("Scrape Data", scrape_data),
+        ("Scrape Data", scrape_jobs_list),
         ("Structure Data with LLM", structure_data_with_llm),
         ("Process Data", process_data),
         ("Generate HTML Page", generate_html_page),

@@ -9,7 +9,7 @@ from urllib.robotparser import RobotFileParser
 from datetime import datetime, date
 from sqlalchemy import and_
 
-def scrape_data():
+def scrape_jobs_list():
     print("Scraping data...")
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
