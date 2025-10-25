@@ -131,7 +131,6 @@ def store_jobs(db, jobs_data):
                     new_check = JobCheck(
                         job_url=existing_job.job_url,
                         check_date=today,
-                        http_status=200,  # Assuming success since we scraped it
                         checked_at=datetime.utcnow()
                     )
                     db.add(new_check)
@@ -148,19 +147,18 @@ def store_jobs(db, jobs_data):
                     job_title=job_data['title'],
                     company_name=job_data['company'],
                     job_url=job_data['url'],
-                    job_description=None,  # Will be populated in stage 2
+                    site=job_data['site'],  # Add site field
+                    job_description=None,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
                 )
                 
                 db.add(new_job)
-                db.flush()  # Get the ID without committing
+                db.flush()
                 
                 # Add initial check record
                 initial_check = JobCheck(
-                    job_url=new_job.job_url,
                     check_date=today,
-                    http_status=200,
                     checked_at=datetime.utcnow()
                 )
                 db.add(initial_check)
@@ -250,7 +248,7 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
         delay (float): Time to wait before making the request (in seconds).
 
     Returns:
-        list: A list of dictionaries containing job data (url, title, company).
+        list: A list of dictionaries containing job data (url, title, company, site).
     """
     # Apply delay before request
     if delay > 0:
@@ -270,6 +268,10 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
     job_title_selector = rules[Config.scraper_job_title]
     company_name_selector = rules[Config.scraper_company_name]
 
+    # Extract site domain for storing and building absolute URLs
+    parsed_url = urlparse(url)
+    site_domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
     job_cards = soup.select(job_card_selector)
     jobs_data = []
 
@@ -277,7 +279,8 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
         job_data = {
             'url': None,
             'title': None,
-            'company': None
+            'company': None,
+            'site': site_domain  # Add site domain
         }
 
         url_element = card.select_one(job_url_selector)
@@ -285,7 +288,9 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
         company_element = card.select_one(company_name_selector)
 
         if url_element:
-            job_data['url'] = url_element.get('href')
+            relative_url = url_element.get('href')
+            # Convert to absolute URL
+            job_data['url'] = urljoin(site_domain, relative_url)
 
         if title_element:
             job_data['title'] = title_element.get_text(strip=True)
