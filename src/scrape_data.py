@@ -19,9 +19,6 @@ def scrape_data():
     
     try:
         for rules in ruless:
-            if rules[Config.scraper_name] == "jobber.md":
-                continue
-
             # Stage 0 read delay from robots.txt
             delay = get_crawl_delay_with_robotparser(rules[Config.scraper_name], user_agent="JobTaker") 
             print(f"Crawl delay from robots.txt: {delay}s")
