@@ -82,6 +82,7 @@ def scrape_jobs(url, rules):
         list: A list of dictionaries containing job data (index, url, title, company).
     """
     # Send a GET request to the URL
+    time.sleep(Config.default_crawl_delay)
     response = requests.get(url)
     try:
         response.raise_for_status()  # Raise an exception for bad status codes
