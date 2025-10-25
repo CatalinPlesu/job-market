@@ -16,7 +16,7 @@ class Config:
 
     # Scraper Timeouts and Limits
     request_timeout = 10  # seconds
-    max_page = 50  # Maximum pages to search in binary search
+    max_page = 2000  # Maximum pages to search in binary search
     default_crawl_delay = 1.0  # seconds
     min_crawl_delay = 0.5  # seconds
     max_crawl_delay = 5.0  # seconds

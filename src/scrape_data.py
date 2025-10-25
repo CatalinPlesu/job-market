@@ -19,6 +19,8 @@ def scrape_data():
     
     try:
         for rules in ruless:
+            if rules[Config.scraper_name] != "rabota.md":
+                continue
             # Stage 0 binary search for page numbers
             pages = find_max_pages(rules)
             print(f"Total pages to scrape: {pages}")
@@ -122,7 +124,7 @@ def store_jobs(db, jobs_data):
                 # Check if we've already checked this job today
                 today_check = db.query(JobCheck).filter(
                     and_(
-                        JobCheck.job_id == existing_job.id,  # Link by job ID
+                        JobCheck.job_id == existing_job.id,
                         JobCheck.check_date == today
                     )
                 ).first()
@@ -130,9 +132,9 @@ def store_jobs(db, jobs_data):
                 if not today_check:
                     # Add check record for today linked to the job ID
                     new_check = JobCheck(
-                        job_id=existing_job.id,  # Link to the job's primary key
+                        job_id=existing_job.id,
                         check_date=today,
-                        http_status=None  # Will be updated in stage 2
+                        http_status=None
                     )
                     db.add(new_check)
                     checked_count += 1
@@ -155,13 +157,13 @@ def store_jobs(db, jobs_data):
                 )
                 
                 db.add(new_job)
-                db.flush()  # Flush to get the new job's ID
+                db.flush()
                 
                 # Add initial check record linked to the new job
                 initial_check = JobCheck(
-                    job_id=new_job.id,  # Link to the new job's primary key
+                    job_id=new_job.id,
                     check_date=today,
-                    http_status=None  # Will be updated in stage 2
+                    http_status=None
                 )
                 db.add(initial_check)
                 
@@ -209,35 +211,41 @@ def find_max_pages(rules):
     pagination_url = rules[Config.scraper_pagination]
     max_page = Config.max_page
     print(f"Finding max pages for: {pagination_url}")
+    print(f"Initial range: low={1}, high={Config.max_page}")
 
     high = Config.max_page
     low = 1
-    while True:
-        url = pagination_url.replace("{page}", str(high))
-        jobs = scrape_jobs(url, rules)
-        if len(jobs) > 0:
-            low = high
-            high *= 2
-            print(f"Expanding search - Low: {low}, High: {high}")
-        else:
-            break
+    iteration = 0
     
     while low <= high:
+        iteration += 1
         mid = low + (high - low) // 2
-        jobs = len(scrape_jobs(
-            pagination_url.replace("{page}", str(mid)), rules))
+        print(f"Iteration {iteration}: Testing page {mid} (current range: {low} to {high})")
+        
+        page_url = pagination_url.replace("{page}", str(mid))
+        print(f"Testing URL: {page_url}")
+        
+        jobs = len(scrape_jobs(page_url, rules))
+        print(f"Found {jobs} jobs on page {mid}")
 
         if jobs > 0:
-            jobs2 = len(scrape_jobs(
-                pagination_url.replace("{page}", str(mid+1)), rules))
+            next_page_url = pagination_url.replace("{page}", str(mid+1))
+            print(f"Testing next page {mid+1} at URL: {next_page_url}")
+            
+            jobs2 = len(scrape_jobs(next_page_url, rules, delay = 3))
+            print(f"Found {jobs2} jobs on page {mid+1}")
+            
             if jobs2 > 0:
+                print(f"Page {mid+1} exists with jobs, moving low to {mid + 1}")
                 low = mid + 1
             else:
-                print(f"Max page found: {mid}")
+                print(f"Page {mid+1} has no jobs, max page found: {mid}")
                 return mid
         else:
+            print(f"Page {mid} has no jobs, moving high to {mid - 1}")
             high = mid - 1
     
+    print(f"Binary search completed. Returning low value: {low}")
     return low
 
 def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
@@ -282,7 +290,7 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
             'url': None,
             'title': None,
             'company': None,
-            'site': site_domain  # Add site domain
+            'site': site_domain
         }
 
         url_element = card.select_one(job_url_selector)
@@ -291,14 +299,17 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
 
         if url_element:
             relative_url = url_element.get('href')
-            # Convert to absolute URL
             job_data['url'] = urljoin(site_domain, relative_url)
 
         if title_element:
             job_data['title'] = title_element.get_text(strip=True)
 
         if company_element:
-            job_data['company'] = company_element.get_text(strip=True)
+            # Check if this is an img tag with alt attribute
+            if company_element.name == 'img' and company_element.get('alt'):
+                job_data['company'] = company_element.get('alt').strip()
+            else:
+                job_data['company'] = company_element.get_text(strip=True)
 
         if job_data['title'] and job_data['url'] and job_data['company']:
             jobs_data.append(job_data)
