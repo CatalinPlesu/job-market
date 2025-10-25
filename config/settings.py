@@ -7,6 +7,7 @@ load_dotenv()
 class Config:
     # Scraper config
     scraper_rules = "config/scraper_rules.json"
+    scraper_name = "name"
     scraper_pagination = "pagination"
     scraper_job_card = "job-card"
     scraper_job_url = "job-url"

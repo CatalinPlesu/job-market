@@ -4,7 +4,10 @@ from bs4 import BeautifulSoup
 import json
 import json
 import time
-
+import tinydb
+from urllib.parse import urlparse, urljoin
+from urllib.robotparser import RobotFileParser
+import requests  # used only to check HTTP status if you want
 
 def scrape_data():
     print("Scraping data...")
@@ -13,8 +16,12 @@ def scrape_data():
 
     for rules in ruless:
         # Stage 0 binary search for page numbers
-        find_max_pages(rules)
+        # pages = find_max_pages(rules)
 
+        # Stage 0.5 read delay from robots.txt
+
+        delay = get_crawl_delay_with_robotparser(rules[Config.scraper_name], user_agent="JobTaker") 
+        print(delay)
         # Stage 1 get job cards from paginated pages
         # start_time = time.time()
         # print(rules[Config.scraper_pagination])
@@ -26,6 +33,30 @@ def scrape_data():
         # print(f"Execution time: {execution_time:.4f} seconds")
 
     # Stage 2 get job details and status
+
+def get_robots_url(site_url):
+    parts = urlparse(site_url)
+    scheme = parts.scheme or "http"
+    netloc = parts.netloc or parts.path  # handle if user passed "example.com"
+    return f"{scheme}://{netloc}/robots.txt"
+
+def get_crawl_delay_with_robotparser(site_url, user_agent="*"):
+    robots_url = get_robots_url(site_url)
+    rp = RobotFileParser()
+    rp.set_url(robots_url)
+    try:
+        rp.read()       # fetches and parses robots.txt
+    except Exception:
+        # could not read robots.txt (network error) -> treat as no rules
+        return Config.default_crawl_delay
+
+    # RobotFileParser provides crawl_delay(useragent) which may return None
+    delay = rp.crawl_delay(user_agent)
+    if delay != None:
+        return delay
+    else:
+        return Config.default_crawl_delay
+
 
 
 def find_max_pages(rules):
@@ -70,7 +101,7 @@ def find_max_pages(rules):
             high = mid - 1
 
 
-def scrape_jobs(url, rules):
+def scrape_jobs(url, rules, delay = Config.default_crawl_delay):
     """
     Scrapes job listings from a given URL using configurable CSS selectors.
 
@@ -82,7 +113,7 @@ def scrape_jobs(url, rules):
         list: A list of dictionaries containing job data (index, url, title, company).
     """
     # Send a GET request to the URL
-    time.sleep(Config.default_crawl_delay)
+    time.sleep(delay)
     response = requests.get(url)
     try:
         response.raise_for_status()  # Raise an exception for bad status codes
