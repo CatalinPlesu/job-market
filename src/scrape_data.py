@@ -93,7 +93,7 @@ def format_time(seconds):
 
 def store_jobs(db, jobs_data):
     """
-    Store scraped jobs in the database, identifying by company + title.
+    Store scraped jobs in the database, identifying by company + title + site.
     Add job check record for today if not already checked.
     
     Args:
@@ -107,11 +107,12 @@ def store_jobs(db, jobs_data):
     
     for job_data in jobs_data:
         try:
-            # Find existing job by company + title
+            # Find existing job by company + title + site
             existing_job = db.query(Job).filter(
                 and_(
                     Job.job_title == job_data['title'],
-                    Job.company_name == job_data['company']
+                    Job.company_name == job_data['company'],
+                    Job.site == job_data['site']
                 )
             ).first()
             
@@ -121,17 +122,17 @@ def store_jobs(db, jobs_data):
                 # Check if we've already checked this job today
                 today_check = db.query(JobCheck).filter(
                     and_(
-                        JobCheck.job_url == existing_job.job_url,
+                        JobCheck.job_id == existing_job.id,  # Link by job ID
                         JobCheck.check_date == today
                     )
                 ).first()
                 
                 if not today_check:
-                    # Add check record for today
+                    # Add check record for today linked to the job ID
                     new_check = JobCheck(
-                        job_url=existing_job.job_url,
+                        job_id=existing_job.id,  # Link to the job's primary key
                         check_date=today,
-                        checked_at=datetime.utcnow()
+                        http_status=None  # Will be updated in stage 2
                     )
                     db.add(new_check)
                     checked_count += 1
@@ -147,19 +148,20 @@ def store_jobs(db, jobs_data):
                     job_title=job_data['title'],
                     company_name=job_data['company'],
                     job_url=job_data['url'],
-                    site=job_data['site'],  # Add site field
+                    site=job_data['site'],
                     job_description=None,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
                 )
                 
                 db.add(new_job)
-                db.flush()
+                db.flush()  # Flush to get the new job's ID
                 
-                # Add initial check record
+                # Add initial check record linked to the new job
                 initial_check = JobCheck(
+                    job_id=new_job.id,  # Link to the new job's primary key
                     check_date=today,
-                    checked_at=datetime.utcnow()
+                    http_status=None  # Will be updated in stage 2
                 )
                 db.add(initial_check)
                 
