@@ -276,6 +276,10 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
     job_url_selector = rules[Config.scraper_job_url]
     job_title_selector = rules[Config.scraper_job_title]
     company_name_selector = rules[Config.scraper_company_name]
+ 
+    # Extract site domain for storing and building absolute URLs
+    parsed_url = urlparse(url)
+    site_domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
     job_cards = soup.select(job_card_selector)
     jobs_data = []
