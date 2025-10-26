@@ -91,10 +91,11 @@ def scrape_site_details(rules):
         delay = get_crawl_delay_with_robotparser(site, user_agent="JobTaker")
         print(f"[{site:15}] Crawl delay: {delay}s")
         
-        # Get all jobs from this site that don't have descriptions yet
+        # IMPORTANT: Only get jobs with NULL descriptions (not blank strings)
+        # Blank strings mean we already scraped them and found nothing
         jobs_without_description = db.query(Job).filter(
             Job.site == site,
-            Job.job_description == None
+            Job.job_description == None  # SQL NULL only, not empty string
         ).all()
         
         total_jobs = len(jobs_without_description)
@@ -113,7 +114,8 @@ def scrape_site_details(rules):
         loop_times = []
         work_times = []  # Track time spent on work (excluding delay)
         success_count = 0
-        failed_count = 0
+        empty_count = 0  # Found page but selectors returned nothing
+        failed_count = 0  # HTTP errors or other failures
         
         for i, job in enumerate(jobs_without_description, 1):
             loop_start_time = time.time()
@@ -134,17 +136,26 @@ def scrape_site_details(rules):
             work_end_time = time.time()
             work_duration = work_end_time - work_start_time - adjusted_delay  # Subtract delay from work time
             
-            if description:
-                # Update job with description
+            # Always update job with description (even if empty string)
+            # NULL = not scraped yet, "" = scraped but found nothing
+            if description is not None:
                 job.job_description = description
                 job.updated_at = datetime.utcnow()
-                success_count += 1
-                status_symbol = "✓"
-                desc_length = len(description)
+                
+                if description:  # Non-empty description
+                    success_count += 1
+                    status_symbol = "✓"
+                    desc_length = len(description)
+                else:  # Empty string - page loaded but selectors found nothing
+                    empty_count += 1
+                    status_symbol = "○"  # Different symbol for empty
+                    desc_length = 0
             else:
+                # None = failed to fetch (HTTP error, timeout, etc.)
                 failed_count += 1
                 status_symbol = "✗"
                 desc_length = 0
+                # Don't update job_description - leave as NULL for retry
             
             # Create or update JobCheck for today
             update_job_check(db, job.id, today, http_status)
@@ -185,7 +196,7 @@ def scrape_site_details(rules):
         
         print(f"\n[{site:15}] {'='*80}")
         print(f"[{site:15}] Completed scraping {total_jobs} jobs in {format_time(total_duration)}")
-        print(f"[{site:15}] Success: {success_count} | Failed: {failed_count}")
+        print(f"[{site:15}] Success: {success_count} | Empty: {empty_count} | Failed: {failed_count}")
         print(f"[{site:15}] Average time per job: {sum(loop_times)/len(loop_times):.2f}s")
         print(f"[{site:15}] {'='*80}\n")
     
@@ -196,6 +207,7 @@ def scrape_site_details(rules):
 def fetch_job_description(url, selectors, delay=Config.default_crawl_delay):
     """
     Fetch job description from URL using CSS selectors.
+    Falls back to simplified selector, then body content if selectors don't find anything.
     
     Args:
         url (str): The URL to fetch
@@ -204,7 +216,7 @@ def fetch_job_description(url, selectors, delay=Config.default_crawl_delay):
     
     Returns:
         tuple: (description_text, http_status_code)
-            - description_text: Combined text from selectors, or None if failed
+            - description_text: Combined text from selectors or body, empty string if page has no content, None if failed
             - http_status_code: HTTP status code from the request
     """
     # Apply delay before request
@@ -222,7 +234,7 @@ def fetch_job_description(url, selectors, delay=Config.default_crawl_delay):
     
     soup = BeautifulSoup(response.content, 'html.parser')
     
-    # Extract text from all matching selectors
+    # Try to extract text from all matching selectors
     all_text = []
     for selector in selectors:
         elements = soup.select(selector)
@@ -232,10 +244,41 @@ def fetch_job_description(url, selectors, delay=Config.default_crawl_delay):
                 all_text.append(text)
     
     if all_text:
+        # Found content with selectors
         description = '\n\n'.join(all_text)
         return description, http_status
-    else:
-        return None, http_status
+    
+    # FALLBACK 1: Try simplified version of first selector
+    # Split on spaces and take first part (e.g., ".MuiContainer-root" from ".MuiContainer-root .someClass")
+    if selectors:
+        first_selector = selectors[0]
+        # Split on common CSS selector separators: space, >, +, ~
+        simplified = first_selector.split()[0].split('>')[0].split('+')[0].split('~')[0].strip()
+        
+        if simplified != first_selector:  # Only try if it's actually different
+            elements = soup.select(simplified)
+            for element in elements:
+                text = element.get_text(separator='\n', strip=True)
+                if text:
+                    all_text.append(text)
+            
+            if all_text:
+                description = '\n\n'.join(all_text)
+                return description, http_status
+    
+    # FALLBACK 2: Try body content
+    body = soup.find('body')
+    if body:
+        body_text = body.get_text(separator='\n', strip=True)
+        if body_text and len(body_text) > 100:  # Only use body if it has substantial content
+            # Clean up the body text a bit
+            lines = [line.strip() for line in body_text.split('\n') if line.strip()]
+            body_text = '\n'.join(lines)
+            return body_text, http_status
+    
+    # Page loaded but has no meaningful content - return empty string (not None)
+    # This marks it as "scraped" so we don't try again
+    return "", http_status
 
 
 def update_job_check(db, job_id, check_date, http_status):
