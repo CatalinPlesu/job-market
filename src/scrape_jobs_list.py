@@ -285,7 +285,7 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
             'url': None,
             'title': None,
             'company': None,
-            'site': ruless[Config.scraper_name]
+            'site': rules[Config.scraper_name]
         }
 
         url_element = card.select_one(job_url_selector)
