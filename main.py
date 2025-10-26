@@ -1,5 +1,6 @@
 from src.scrape_jobs_list import scrape_jobs_list
 from src.scrape_job_details import scrape_job_details
+from src.scrape_job_recheck import recheck_alive_jobs, recheck_all_jobs
 from src.structure_data_with_llm import structure_data_with_llm
 from src.process_data import process_data
 from src.generate_html_page import generate_html_page
@@ -19,6 +20,8 @@ def print_menu():
     functions = [
         ("Scrape Job Listings (Stage 1)", scrape_jobs_list),
         ("Scrape Job Details (Stage 2)", scrape_job_details),
+        ("Re-check Alive Jobs", recheck_alive_jobs),
+        ("Re-check All (Including Rotten) Jobs", recheck_all_jobs),
         ("Structure Data with LLM", structure_data_with_llm),
         ("Process Data", process_data),
         ("Generate HTML Page", generate_html_page),
