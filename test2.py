@@ -9,11 +9,47 @@ import random
 import matplotlib.pyplot as plt
 
 # ============================================
+# HELPER FUNCTIONS
+# ============================================
+def clean_json_response(content: str) -> str:
+    """Remove markdown code blocks and extra text from LLM response"""
+    content = content.strip()
+    
+    # Remove markdown code blocks
+    if content.startswith("```"):
+        # Find the actual JSON content
+        lines = content.split('\n')
+        start_idx = 0
+        end_idx = len(lines)
+        
+        for i, line in enumerate(lines):
+            if line.strip().startswith('{'):
+                start_idx = i
+                break
+        
+        for i in range(len(lines) - 1, -1, -1):
+            if lines[i].strip().endswith('}'):
+                end_idx = i + 1
+                break
+        
+        content = '\n'.join(lines[start_idx:end_idx])
+    
+    # Remove any text before first {
+    if '{' in content:
+        content = content[content.index('{'):]
+    
+    # Remove any text after last }
+    if '}' in content:
+        content = content[:content.rindex('}') + 1]
+    
+    return content
+
+# ============================================
 # CONFIGURATION - CHANGE THIS
 # ============================================
 # Job IDs to test (specific ones or random selection)
-SPECIFIC_JOB_IDS = [12, 432, 832, 11230, 16832]
-RANDOM_JOB_COUNT = 5
+SPECIFIC_JOB_IDS = []
+RANDOM_JOB_COUNT = 3
 MAX_JOB_ID = 19000
 
 # Generate random job IDs if needed
@@ -25,12 +61,12 @@ else:
 # List of models to test
 MODELS_TO_TEST = [
     "openai/gpt-oss-safeguard-20b",
-    "qwen/qwen-turbo",
-    "deepseek/deepseek-r1-distill-llama-70b",
+    # "qwen/qwen-turbo",
+    # "deepseek/deepseek-r1-distill-llama-70b",
 ]
 
 # Create comparison folder structure
-BASE_CMP_DIR = Path("cmp3")
+BASE_CMP_DIR = Path("cmp9")
 BASE_CMP_DIR.mkdir(exist_ok=True)
 
 print("="*80)
@@ -84,23 +120,39 @@ for job_id in JOB_IDS:
     # ============================================
     # PREPARE LLM REQUEST
     # ============================================
-
-    # Extract structured information from this job posting and return it as JSON matching this schema:
+    
+    # Check if description is truncated
+    desc_truncated = len(job.job_description) > Config.max_body_text_length
+    truncated_desc = job.job_description[:Config.max_body_text_length]
+    
     user_message = f"""
-{Config.job_to_db_prompt_2}
+Extract information from this job posting:
 
-Job Posting:
+POSTING DETAILS:
 Title: {job.job_title}
 Company: {job.company_name}
-URL: '{job.job_url}'
+Source URL: {job.job_url}
 
-Description:
-{job.job_description[:Config.max_body_text_length]}
+JOB DESCRIPTION{' (first ' + str(Config.max_body_text_length) + ' characters)' if desc_truncated else ''}:
+{truncated_desc}
+{"... [description truncated]" if desc_truncated else ""}
 
-Return ONLY valid JSON, no additional text.
+---
+
+{Config.job_to_db_prompt2}
+
+CRITICAL OUTPUT RULES:
+1. Return ONLY the JSON object
+2. No markdown (no ```json or ```)
+3. No explanations before or after
+4. Start immediately with {{
+5. End immediately with }}
+6. Ensure all string values use double quotes
+
+Begin JSON:
 """
-
-    system_message = "You are a job posting parser. Extract structured information and return only valid JSON. IMPORTANT: All extracted text fields must be in English, regardless of the input language. Translate all content (job titles, skills, responsibilities, locations, etc.) to English for consistency."
+    
+    system_message = "You are a precise job posting data extractor. Follow the schema and rules exactly as provided."
 
     # Estimate token count
     system_prompt_chars = len(system_message)
@@ -112,6 +164,7 @@ Return ONLY valid JSON, no additional text.
     print(f"   System prompt: ~{system_prompt_chars:,} chars (~{int(system_prompt_chars/4):,} tokens)")
     print(f"   User prompt: ~{user_prompt_chars:,} chars (~{int(user_prompt_chars/4):,} tokens)")
     print(f"   Total input: ~{total_chars:,} chars (~{int(estimated_tokens):,} tokens)")
+    print(f"   Description truncated: {'Yes' if desc_truncated else 'No'}")
 
     # Initialize execution times for this job
     execution_times[job_id] = {}
@@ -154,7 +207,7 @@ Return ONLY valid JSON, no additional text.
                     "content": user_message
                 }
             ],
-            "temperature": 0.1,
+            "temperature": 0.2,  # Slightly higher for edge case handling
             "response_format": {"type": "json_object"}
         }
         
@@ -187,24 +240,58 @@ Return ONLY valid JSON, no additional text.
                 if "choices" in result and len(result["choices"]) > 0:
                     content = result["choices"][0]["message"]["content"]
                     
+                    # Save raw response for debugging
+                    with open(model_dir / "response_raw.txt", "w", encoding="utf-8") as f:
+                        f.write(content)
+                    
                     # Try to parse as JSON
+                    parsed_data = None
+                    parse_error = None
+                    
+                    # Attempt 1: Direct parse
                     try:
                         parsed_data = json.loads(content)
+                        print(f"✅ Valid JSON response (direct parse)")
+                    except json.JSONDecodeError as e:
+                        parse_error = str(e)
+                        print(f"⚠️  Direct parse failed: {e}")
                         
+                        # Attempt 2: Clean and parse
+                        try:
+                            cleaned_content = clean_json_response(content)
+                            parsed_data = json.loads(cleaned_content)
+                            print(f"✅ Valid JSON response (after cleaning)")
+                            
+                            # Save cleaned version
+                            with open(model_dir / "response_cleaned.txt", "w", encoding="utf-8") as f:
+                                f.write(cleaned_content)
+                        except json.JSONDecodeError as e2:
+                            parse_error = f"Direct: {parse_error}\nCleaned: {str(e2)}"
+                            print(f"❌ Cleaned parse also failed: {e2}")
+                    
+                    # Save results
+                    if parsed_data:
                         # Save as valid JSON
                         with open(model_dir / "response.json", "w", encoding="utf-8") as f:
                             json.dump(parsed_data, f, indent=2, ensure_ascii=False)
                         
-                        print(f"✅ Valid JSON response saved")
                         print(f"   Fields extracted: {len(parsed_data.keys())}")
                         
-                    except json.JSONDecodeError as e:
-                        # Save as text if not valid JSON
-                        with open(model_dir / "response.txt", "w", encoding="utf-8") as f:
-                            f.write(content)
+                        # Save field summary
+                        with open(model_dir / "field_summary.txt", "w", encoding="utf-8") as f:
+                            f.write(f"Total fields: {len(parsed_data.keys())}\n\n")
+                            f.write("Non-null fields:\n")
+                            for key, value in parsed_data.items():
+                                if value is not None and value != [] and value != {} and value != "":
+                                    f.write(f"  - {key}: {type(value).__name__}\n")
+                    else:
+                        # Save parse error details
+                        with open(model_dir / "parse_error.txt", "w", encoding="utf-8") as f:
+                            f.write("Failed to parse JSON\n\n")
+                            f.write(f"Error details:\n{parse_error}\n\n")
+                            f.write("Raw content saved in response_raw.txt")
                         
-                        print(f"❌ Invalid JSON response (saved as .txt)")
-                        print(f"   Parse error: {e}")
+                        print(f"❌ Invalid JSON response (saved details in parse_error.txt)")
                 else:
                     with open(model_dir / "error.txt", "w", encoding="utf-8") as f:
                         f.write("No choices in response\n")
@@ -268,6 +355,50 @@ if execution_times:
             models = list(execution_times[job_id].keys())
             times = list(execution_times[job_id].values())
             
-            plt.plot(models, times, marker='o', linewidth=2, markersize=6, color='blue')
+            bars = plt.bar(models, times, color='steelblue', alpha=0.7)
+            
+            # Add value labels on bars
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height,
+                        f'{height:.2f}s',
+                        ha='center', va='bottom', fontsize=10)
+            
             plt.title(f'Model Execution Time - Job {job_id}', fontsize=14, fontweight='bold')
-         
+            plt.xlabel('Models', fontsize=12)
+            plt.ylabel('Execution Time (seconds)', fontsize=12)
+            plt.xticks(rotation=45, ha='right')
+            plt.grid(True, alpha=0.3, axis='y')
+            plt.tight_layout()
+            
+            job_chart_path = job_dir / "execution_time.png"
+            plt.savefig(job_chart_path, dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    print(f"✅ Individual job charts saved in respective job folders")
+    
+    # Print summary statistics
+    print(f"\n{'='*80}")
+    print("EXECUTION TIME SUMMARY")
+    print("="*80)
+    
+    for model_name in MODELS_TO_TEST:
+        model_times = [execution_times[job_id].get(model_name, None) 
+                      for job_id in execution_times 
+                      if model_name in execution_times[job_id]]
+        
+        if model_times:
+            avg_time = sum(model_times) / len(model_times)
+            min_time = min(model_times)
+            max_time = max(model_times)
+            
+            print(f"\n{model_name}:")
+            print(f"  Average: {avg_time:.2f}s")
+            print(f"  Min: {min_time:.2f}s")
+            print(f"  Max: {max_time:.2f}s")
+            print(f"  Jobs tested: {len(model_times)}")
+
+print(f"\n{'='*80}")
+print("TESTING COMPLETE")
+print(f"Results saved in: {BASE_CMP_DIR}")
+print("="*80)
