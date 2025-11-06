@@ -293,7 +293,18 @@ class JobRepository:
                 
                 obj = self.session.query(model_class).filter(model_class.id == id_val).first()
                 if obj:
-                    field_name = 'code' if attr_name == 'salary_currency' else 'name'
+                    # Determine the correct field name for each model
+                    if attr_name == 'salary_currency':
+                        field_name = 'code'
+                    elif attr_name == 'full_address':
+                        field_name = 'address'
+                    elif attr_name in ['benefits', 'work_environment', 'professional_development', 
+                                     'work_life_balance', 'physical_requirements', 'work_conditions', 
+                                     'special_requirements']:
+                        field_name = 'description'
+                    else:
+                        field_name = 'name'
+                    
                     related_data[attr_name] = getattr(obj, field_name)
                 else:
                     related_data[attr_name] = None
@@ -333,7 +344,7 @@ class JobRepository:
             
             # Work arrangement
             'employment_type': related_data['employment_type'],
-            'contract_type': related_data['contract_type'],
+            'contract_type': detail.contract_type,
             'work_schedule': related_data['work_schedule'],
             'shift_details': related_data['shift_details'],
             'remote_work': related_data['remote_work'],
