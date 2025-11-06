@@ -25,9 +25,7 @@ class Config:
     # LLM Configuration
     llm_api = "https://openrouter.ai/api/v1"
     llm_api_key = os.getenv("LLM_API_KEY")
-    # llm_model = "deepseek/deepseek-chat-v3.1:free"
-    # llm_model = "nvidia/nemotron-nano-12b-v2-vl:free"
-    llm_model = "minimax/minimax-m2:free"
+    llm_model = "openai/gpt-oss-safeguard-20b"
 
     # Scraper Configuration
     db_path = "data.db"
