@@ -26,6 +26,7 @@ class Config:
     llm_api = "https://openrouter.ai/api/v1"
     llm_api_key = os.getenv("LLM_API_KEY")
     llm_model = "openai/gpt-oss-safeguard-20b"
+    llm_request_timeout = 30
 
     # Scraper Configuration
     db_path = "data.db"
