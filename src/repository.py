@@ -75,28 +75,6 @@ class JobRepository:
         
         Returns:
             Job object with all relationships loaded
-        
-        Example:
-            job_data = {
-                'site': 'rabota.md',
-                'job_title': 'Python Developer',
-                'company_name': 'TechCorp',
-                'job_url': 'https://example.com/job/123  ',
-                'job_description': 'Full job description...'
-            }
-            
-            extracted_data = {
-                'title': 'Senior Python Developer',
-                'hard_skills': ['Python', 'Django', 'PostgreSQL'],
-                'soft_skills': ['Communication', 'Teamwork'],
-                'min_salary': 50000,
-                'max_salary': 70000,
-                'salary_currency': 'usd',
-                'salary_period': 'year',
-                ...
-            }
-            
-            job = repo.save_job_from_json(job_data, extracted_data)
         """
         
         # Create Job record
@@ -172,46 +150,64 @@ class JobRepository:
         ]
         
         for json_key, model, field_name, relationship_name in m2m_mappings:
-            items = extracted_data.get(json_key, [])
+            items = extracted_data.get(json_key)
+            # FIX: Check if items is not None before processing
             if items:
                 m2m_items = self._get_or_create_m2m_items(model, field_name, items)
                 setattr(detail, relationship_name, m2m_items)
         
         # Handle responsibilities
-        for i, resp in enumerate(extracted_data.get('responsibilities', [])):
-            if resp:
-                self.session.add(Responsibility(
-                    job_detail_id=detail.id,
-                    description=resp,
-                    order=i
-                ))
+        responsibilities = extracted_data.get('responsibilities')
+        # FIX: Check if responsibilities is not None
+        if responsibilities:
+            for i, resp in enumerate(responsibilities):
+                if resp:
+                    self.session.add(Responsibility(
+                        job_detail_id=detail.id,
+                        description=resp,
+                        order=i
+                    ))
         
         # Handle languages
-        languages = extracted_data.get('languages', [])
-        proficiencies = extracted_data.get('language_proficiency', {})
-        for lang in languages:
-            if lang:
-                self.session.add(JobLanguage(
-                    job_detail_id=detail.id,
-                    language=lang,
-                    proficiency=proficiencies.get(lang)
-                ))
+        languages = extracted_data.get('languages')
+        proficiencies = extracted_data.get('language_proficiency')
+        
+        # FIX: Check if languages is not None before iterating
+        if languages:
+            for lang in languages:
+                if lang:
+                    # FIX: Safely get proficiency, handle None case
+                    proficiency = None
+                    if proficiencies and isinstance(proficiencies, dict):
+                        proficiency = proficiencies.get(lang)
+                    
+                    self.session.add(JobLanguage(
+                        job_detail_id=detail.id,
+                        language=lang,
+                        proficiency=proficiency
+                    ))
         
         # Handle contact emails
-        for email in extracted_data.get('contact_emails', []):
-            if email:
-                self.session.add(ContactEmail(
-                    job_detail_id=detail.id,
-                    email=email
-                ))
+        contact_emails = extracted_data.get('contact_emails')
+        # FIX: Check if contact_emails is not None
+        if contact_emails:
+            for email in contact_emails:
+                if email:
+                    self.session.add(ContactEmail(
+                        job_detail_id=detail.id,
+                        email=email
+                    ))
         
         # Handle contact phones
-        for phone in extracted_data.get('contact_phones', []):
-            if phone:
-                self.session.add(ContactPhone(
-                    job_detail_id=detail.id,
-                    phone=phone
-                ))
+        contact_phones = extracted_data.get('contact_phones')
+        # FIX: Check if contact_phones is not None
+        if contact_phones:
+            for phone in contact_phones:
+                if phone:
+                    self.session.add(ContactPhone(
+                        job_detail_id=detail.id,
+                        phone=phone
+                    ))
         
         self.session.commit()
         return job
