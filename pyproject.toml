@@ -13,6 +13,8 @@ dependencies = [
 	"aiohttp>=3.9.0",
 	"ipykernel",
 	"matplotlib",
+	"pandas",
+	"jinja2",
 	"sqlalchemy"
 ]
 
