@@ -11,6 +11,5 @@ wheels/
 .venv
 .env
 
-data.db
+data.db*
 state.json
-data.db.bak

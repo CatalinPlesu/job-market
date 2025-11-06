@@ -1,459 +1,475 @@
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from typing import Dict, Any, Optional, List
+from typing import Dict, List, Any, Optional
 from datetime import datetime, date
-
-# Use relative import since both files are in src/
 from .database import (
-    JobDetail, Title, JobFunction, SeniorityLevel, Industry, Department,
-    JobFamily, Specialization, EducationLevel, EmploymentType, ContractType,
-    WorkSchedule, ShiftDetail, RemoteWork, TravelRequirement, Currency,
-    SalaryPeriod, City, Region, Country, FullAddress, Company, CompanySize,
-    ContactPerson, HardSkill, SoftSkill, Certification, License, Benefit,
-    WorkEnvironment, ProfessionalDevelopment, WorkLifeBalance,
-    PhysicalRequirement, WorkCondition, SpecialRequirement, Responsibility,
-    JobLanguage, ContactEmail, ContactPhone, SessionLocal, Job
+    Job, JobDetail, Responsibility, JobLanguage, ContactEmail, ContactPhone,
+    Titles, JobFunctions, SeniorityLevels, Industries, Departments, JobFamilies,
+    Specializations, EducationLevels, EmploymentTypes, ContractTypes, WorkSchedules,
+    ShiftDetails, RemoteWorkOptions, TravelRequirements, Currencies, SalaryPeriods,
+    Cities, Regions, Countries, FullAddresses, Companies, CompanySizes, ContactPersons,
+    HardSkills, SoftSkills, Certifications, Licenses, Benefits, WorkEnvironment,
+    ProfessionalDevelopment, WorkLifeBalance, PhysicalRequirements, WorkConditions,
+    SpecialRequirements, SessionLocal
 )
 
 
-def get_or_create(db: Session, model, **kwargs):
-    """
-    Get existing record or create new one.
-    Returns the record instance.
-    """
-    # Try to find existing
-    instance = db.query(model).filter_by(**kwargs).first()
+class JobRepository:
+    """Repository for job data operations"""
     
-    if instance:
+    def __init__(self, session: Optional[Session] = None):
+        self.session = session or SessionLocal()
+        self._should_close = session is None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._should_close:
+            self.session.close()
+    
+    # ============ PRIVATE HELPERS ============
+    
+    def _get_or_create_lookup(self, model, field_name: str, value: str):
+        """Get existing lookup record or create new one"""
+        if not value:
+            return None
+        
+        instance = self.session.query(model).filter(
+            getattr(model, field_name) == value
+        ).first()
+        
+        if not instance:
+            instance = model(**{field_name: value})
+            self.session.add(instance)
+            self.session.flush()
+        
         return instance
     
-    # Create new
-    instance = model(**kwargs)
-    db.add(instance)
-    db.flush()  # Get the ID without committing
-    return instance
+    def _get_or_create_m2m_items(self, model, field_name: str, values: List[str]) -> List:
+        """Get or create multiple many-to-many items"""
+        items = []
+        for value in values:
+            if value:
+                item = self._get_or_create_lookup(model, field_name, value)
+                if item:
+                    items.append(item)
+        return items
+    
+    def _handle_fk_field(self, detail: JobDetail, json_data: Dict, 
+                         json_key: str, model, field_name: str = 'name'):
+        """Handle foreign key field lookup and assignment"""
+        value = json_data.get(json_key)
+        if value:
+            instance = self._get_or_create_lookup(model, field_name, value)
+            setattr(detail, f'{json_key}_id', instance.id)
+    
+    # ============ PUBLIC API ============
+    
+    def save_job_from_json(self, job_data: Dict, extracted_data: Dict) -> Job:
+        """
+        Save job posting with extracted details from JSON.
+        
+        Args:
+            job_data: Basic job info (site, job_title, company_name, job_url, job_description)
+            extracted_data: Extracted/processed job details (as per your JSON schema)
+        
+        Returns:
+            Job object with all relationships loaded
+        
+        Example:
+            job_data = {
+                'site': 'rabota.md',
+                'job_title': 'Python Developer',
+                'company_name': 'TechCorp',
+                'job_url': 'https://example.com/job/123  ',
+                'job_description': 'Full job description...'
+            }
+            
+            extracted_data = {
+                'title': 'Senior Python Developer',
+                'hard_skills': ['Python', 'Django', 'PostgreSQL'],
+                'soft_skills': ['Communication', 'Teamwork'],
+                'min_salary': 50000,
+                'max_salary': 70000,
+                'salary_currency': 'usd',
+                'salary_period': 'year',
+                ...
+            }
+            
+            job = repo.save_job_from_json(job_data, extracted_data)
+        """
+        
+        # Create Job record
+        job = Job(**job_data)
+        self.session.add(job)
+        self.session.flush()
+        
+        # Create JobDetail record
+        detail = JobDetail(job_id=job.id)
+        
+        # Handle simple foreign key fields
+        fk_mappings = [
+            ('title', Titles, 'name'),
+            ('job_function', JobFunctions, 'name'),
+            ('seniority_level', SeniorityLevels, 'name'),
+            ('industry', Industries, 'name'),
+            ('department', Departments, 'name'),
+            ('job_family', JobFamilies, 'name'),
+            ('specialization', Specializations, 'name'),
+            ('required_education', EducationLevels, 'name'),
+            ('employment_type', EmploymentTypes, 'name'),
+            ('contract_type', ContractTypes, 'name'),
+            ('work_schedule', WorkSchedules, 'name'),
+            ('shift_details', ShiftDetails, 'name'),
+            ('remote_work', RemoteWorkOptions, 'name'),
+            ('travel_required', TravelRequirements, 'name'),
+            ('salary_currency', Currencies, 'code'),
+            ('salary_period', SalaryPeriods, 'name'),
+            ('city', Cities, 'name'),
+            ('region', Regions, 'name'),
+            ('country', Countries, 'name'),
+            ('company_name', Companies, 'name'),
+            ('company_size', CompanySizes, 'name'),
+            ('contact_person', ContactPersons, 'name'),
+        ]
+        
+        for json_key, model, field_name in fk_mappings:
+            self._handle_fk_field(detail, extracted_data, json_key, model, field_name)
+        
+        # Handle full address separately
+        if extracted_data.get('full_address'):
+            addr = self._get_or_create_lookup(FullAddresses, 'address', extracted_data['full_address'])
+            detail.full_address_id = addr.id
+        
+        # Handle direct numeric/date fields
+        for field in ['min_salary', 'max_salary', 'experience_years', 'original_language']:
+            if field in extracted_data and extracted_data[field] is not None:
+                setattr(detail, field, extracted_data[field])
+        
+        # Handle posting_date (convert string to date if needed)
+        if extracted_data.get('posting_date'):
+            posting_date = extracted_data['posting_date']
+            if isinstance(posting_date, str):
+                posting_date = datetime.strptime(posting_date, '%Y-%m-%d').date()
+            detail.posting_date = posting_date
+        
+        self.session.add(detail)
+        self.session.flush()
+        
+        # Handle many-to-many relationships
+        m2m_mappings = [
+            ('hard_skills', HardSkills, 'name', 'hard_skills'),
+            ('soft_skills', SoftSkills, 'name', 'soft_skills'),
+            ('certifications', Certifications, 'name', 'certifications'),
+            ('licenses_required', Licenses, 'name', 'licenses'),
+            ('benefits', Benefits, 'description', 'benefits'),
+            ('work_environment', WorkEnvironment, 'description', 'work_environment'),
+            ('professional_development', ProfessionalDevelopment, 'description', 'professional_development'),
+            ('work_life_balance', WorkLifeBalance, 'description', 'work_life_balance'),
+            ('physical_requirements', PhysicalRequirements, 'description', 'physical_requirements'),
+            ('work_conditions', WorkConditions, 'description', 'work_conditions'),
+            ('special_requirements', SpecialRequirements, 'description', 'special_requirements'),
+        ]
+        
+        for json_key, model, field_name, relationship_name in m2m_mappings:
+            items = extracted_data.get(json_key, [])
+            if items:
+                m2m_items = self._get_or_create_m2m_items(model, field_name, items)
+                setattr(detail, relationship_name, m2m_items)
+        
+        # Handle responsibilities
+        for i, resp in enumerate(extracted_data.get('responsibilities', [])):
+            if resp:
+                self.session.add(Responsibility(
+                    job_detail_id=detail.id,
+                    description=resp,
+                    order=i
+                ))
+        
+        # Handle languages
+        languages = extracted_data.get('languages', [])
+        proficiencies = extracted_data.get('language_proficiency', {})
+        for lang in languages:
+            if lang:
+                self.session.add(JobLanguage(
+                    job_detail_id=detail.id,
+                    language=lang,
+                    proficiency=proficiencies.get(lang)
+                ))
+        
+        # Handle contact emails
+        for email in extracted_data.get('contact_emails', []):
+            if email:
+                self.session.add(ContactEmail(
+                    job_detail_id=detail.id,
+                    email=email
+                ))
+        
+        # Handle contact phones
+        for phone in extracted_data.get('contact_phones', []):
+            if phone:
+                self.session.add(ContactPhone(
+                    job_detail_id=detail.id,
+                    phone=phone
+                ))
+        
+        self.session.commit()
+        return job
+    
+    def get_job_as_dict(self, job_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve job with all details as a dictionary with actual values (not IDs).
+        
+        Args:
+            job_id: ID of the job to retrieve
+        
+        Returns:
+            Dictionary with complete job information, or None if not found
+        
+        Example:
+            job_dict = repo.get_job_as_dict(1)
+            print(job_dict['title'])  # "Senior Python Developer" (not an ID)
+            print(job_dict['hard_skills'])  # ["Python", "Django", "PostgreSQL"]
+        """
+        
+        job = self.session.query(Job).filter(Job.id == job_id).first()
+        if not job or not job.detail:
+            return None
+        
+        detail = job.detail
+        
+        # Query related objects separately since relationships might not be loaded
+        fk_lookups = {
+            'title': detail.title_id,
+            'job_function': detail.job_function_id,
+            'seniority_level': detail.seniority_level_id,
+            'industry': detail.industry_id,
+            'department': detail.department_id,
+            'job_family': detail.job_family_id,
+            'specialization': detail.specialization_id,
+            'required_education': detail.required_education_id,
+            'employment_type': detail.employment_type_id,
+            'contract_type': detail.contract_type_id,
+            'work_schedule': detail.work_schedule_id,
+            'shift_details': detail.shift_details_id,
+            'remote_work': detail.remote_work_id,
+            'travel_required': detail.travel_required_id,
+            'salary_currency': detail.salary_currency_id,
+            'salary_period': detail.salary_period_id,
+            'city': detail.city_id,
+            'region': detail.region_id,
+            'country': detail.country_id,
+            'company_name_extracted': detail.company_name_id,
+            'company_size': detail.company_size_id,
+            'contact_person': detail.contact_person_id,
+            'full_address': detail.full_address_id,
+        }
+        
+        related_data = {}
+        for attr_name, id_val in fk_lookups.items():
+            if id_val:
+                # Determine which model to query based on attribute name
+                model_class = {
+                    'title': Titles,
+                    'job_function': JobFunctions,
+                    'seniority_level': SeniorityLevels,
+                    'industry': Industries,
+                    'department': Departments,
+                    'job_family': JobFamilies,
+                    'specialization': Specializations,
+                    'required_education': EducationLevels,
+                    'employment_type': EmploymentTypes,
+                    'contract_type': ContractTypes,
+                    'work_schedule': WorkSchedules,
+                    'shift_details': ShiftDetails,
+                    'remote_work': RemoteWorkOptions,
+                    'travel_required': TravelRequirements,
+                    'salary_currency': Currencies,
+                    'salary_period': SalaryPeriods,
+                    'city': Cities,
+                    'region': Regions,
+                    'country': Countries,
+                    'company_name_extracted': Companies,
+                    'company_size': CompanySizes,
+                    'contact_person': ContactPersons,
+                    'full_address': FullAddresses,
+                }[attr_name]
+                
+                obj = self.session.query(model_class).filter(model_class.id == id_val).first()
+                if obj:
+                    field_name = 'code' if attr_name == 'salary_currency' else 'name'
+                    related_data[attr_name] = getattr(obj, field_name)
+                else:
+                    related_data[attr_name] = None
+            else:
+                related_data[attr_name] = None
+        
+        # Build result dictionary
+        result = {
+            # Original job data
+            'id': job.id,
+            'site': job.site,
+            'job_title': job.job_title,
+            'company_name': job.company_name,
+            'job_url': job.job_url,
+            'job_description': job.job_description,
+            'created_at': job.created_at.isoformat() if job.created_at else None,
+            'updated_at': job.updated_at.isoformat() if job.updated_at else None,
+            
+            # Job classification
+            'title': related_data['title'],
+            'job_function': related_data['job_function'],
+            'seniority_level': related_data['seniority_level'],
+            'industry': related_data['industry'],
+            'department': related_data['department'],
+            'job_family': related_data['job_family'],
+            'specialization': related_data['specialization'],
+            
+            # Compensation
+            'min_salary': float(detail.min_salary) if detail.min_salary else None,
+            'max_salary': float(detail.max_salary) if detail.max_salary else None,
+            'salary_currency': related_data['salary_currency'],
+            'salary_period': related_data['salary_period'],
+            
+            # Requirements
+            'required_education': related_data['required_education'],
+            'experience_years': detail.experience_years,
+            
+            # Work arrangement
+            'employment_type': related_data['employment_type'],
+            'contract_type': related_data['contract_type'],
+            'work_schedule': related_data['work_schedule'],
+            'shift_details': related_data['shift_details'],
+            'remote_work': related_data['remote_work'],
+            'travel_required': related_data['travel_required'],
+            
+            # Location
+            'city': related_data['city'],
+            'region': related_data['region'],
+            'country': related_data['country'],
+            'full_address': related_data['full_address'],
+            
+            # Company information
+            'company_name_extracted': related_data['company_name_extracted'],
+            'company_size': related_data['company_size'],
+            'contact_person': related_data['contact_person'],
+            
+            # Lists - Responsibilities
+            'responsibilities': [
+                {'description': r.description, 'order': r.order} 
+                for r in sorted(detail.responsibilities, key=lambda x: x.order)
+            ],
+            
+            # Lists - Languages
+            'languages': [
+                {'language': l.language, 'proficiency': l.proficiency}
+                for l in detail.languages
+            ],
+            
+            # Lists - Contact info
+            'contact_emails': [e.email for e in detail.contact_emails],
+            'contact_phones': [p.phone for p in detail.contact_phones],
+            
+            # Lists - Many-to-many (skills, certifications, etc.)
+            'hard_skills': [s.name for s in detail.hard_skills],
+            'soft_skills': [s.name for s in detail.soft_skills],
+            'certifications': [c.name for c in detail.certifications],
+            'licenses': [l.name for l in detail.licenses],
+            'benefits': [b.description for b in detail.benefits],
+            'work_environment': [w.description for w in detail.work_environment],
+            'professional_development': [p.description for p in detail.professional_development],
+            'work_life_balance': [w.description for w in detail.work_life_balance],
+            'physical_requirements': [p.description for p in detail.physical_requirements],
+            'work_conditions': [w.description for w in detail.work_conditions],
+            'special_requirements': [s.description for s in detail.special_requirements],
+            
+            # Metadata
+            'posting_date': detail.posting_date.isoformat() if detail.posting_date else None,
+            'original_language': detail.original_language,
+            'processed_at': detail.processed_at.isoformat() if detail.processed_at else None,
+        }
+        
+        return result
+    
+    def get_all_jobs(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get multiple jobs as dictionaries"""
+        jobs = self.session.query(Job).limit(limit).offset(offset).all()
+        return [self.get_job_as_dict(job.id) for job in jobs if job.detail]
+    
+    def find_jobs_by_skill(self, skill_name: str) -> List[Dict[str, Any]]:
+        """Find all jobs requiring a specific skill"""
+        jobs = (
+            self.session.query(Job)
+            .join(JobDetail)
+            .join(JobDetail.hard_skills)
+            .filter(HardSkills.name == skill_name)
+            .all()
+        )
+        return [self.get_job_as_dict(job.id) for job in jobs]
+    
+    def find_jobs_by_location(self, city: str = None, country: str = None) -> List[Dict[str, Any]]:
+        """Find jobs by location"""
+        query = self.session.query(Job).join(JobDetail)
+        
+        if city:
+            query = query.join(JobDetail.city).filter(Cities.name == city)
+        if country:
+            query = query.join(JobDetail.country).filter(Countries.name == country)
+        
+        jobs = query.all()
+        return [self.get_job_as_dict(job.id) for job in jobs]
 
 
-def parse_date(date_str: Optional[str]) -> Optional[date]:
-    """Parse date string to date object"""
-    if not date_str:
-        return None
-    
-    try:
-        return datetime.strptime(date_str, '%Y-%m-%d').date()
-    except (ValueError, TypeError):
-        return None
+# ============ USAGE EXAMPLES ============
 
-
-def insert_job_detail(db: Session, job_id: int, parsed_json: Dict[str, Any]) -> JobDetail:
-    """
-    Insert parsed job JSON into normalized database structure.
-    
-    Args:
-        db: SQLAlchemy session
-        job_id: ID of the raw Job record
-        parsed_json: Dictionary from AI parsing (matching your JSON schema)
-    
-    Returns:
-        JobDetail: The created JobDetail instance
-    
-    Raises:
-        ValueError: If job_id doesn't exist or JobDetail already exists for this job
-    """
-    
-    # Check if JobDetail already exists for this job
-    existing = db.query(JobDetail).filter_by(job_id=job_id).first()
-    if existing:
-        raise ValueError(f"JobDetail already exists for job_id {job_id}")
-    
-    # Create JobDetail instance
-    job_detail = JobDetail(job_id=job_id)
-    
-    # === Handle single-value normalized fields ===
-    
-    if parsed_json.get('title'):
-        title = get_or_create(db, Title, name=parsed_json['title'])
-        job_detail.title_id = title.id
-    
-    if parsed_json.get('job_function'):
-        job_function = get_or_create(db, JobFunction, name=parsed_json['job_function'])
-        job_detail.job_function_id = job_function.id
-    
-    if parsed_json.get('seniority_level'):
-        seniority = get_or_create(db, SeniorityLevel, name=parsed_json['seniority_level'])
-        job_detail.seniority_level_id = seniority.id
-    
-    if parsed_json.get('industry'):
-        industry = get_or_create(db, Industry, name=parsed_json['industry'])
-        job_detail.industry_id = industry.id
-    
-    if parsed_json.get('department'):
-        department = get_or_create(db, Department, name=parsed_json['department'])
-        job_detail.department_id = department.id
-    
-    if parsed_json.get('job_family'):
-        job_family = get_or_create(db, JobFamily, name=parsed_json['job_family'])
-        job_detail.job_family_id = job_family.id
-    
-    if parsed_json.get('specialization'):
-        specialization = get_or_create(db, Specialization, name=parsed_json['specialization'])
-        job_detail.specialization_id = specialization.id
-    
-    if parsed_json.get('required_education'):
-        education = get_or_create(db, EducationLevel, name=parsed_json['required_education'])
-        job_detail.required_education_id = education.id
-    
-    if parsed_json.get('employment_type'):
-        employment = get_or_create(db, EmploymentType, name=parsed_json['employment_type'])
-        job_detail.employment_type_id = employment.id
-    
-    if parsed_json.get('contract_type'):
-        contract = get_or_create(db, ContractType, name=parsed_json['contract_type'])
-        job_detail.contract_type_id = contract.id
-    
-    if parsed_json.get('work_schedule'):
-        schedule = get_or_create(db, WorkSchedule, name=parsed_json['work_schedule'])
-        job_detail.work_schedule_id = schedule.id
-    
-    if parsed_json.get('shift_details'):
-        shift = get_or_create(db, ShiftDetail, name=parsed_json['shift_details'])
-        job_detail.shift_details_id = shift.id
-    
-    if parsed_json.get('remote_work'):
-        remote = get_or_create(db, RemoteWork, name=parsed_json['remote_work'])
-        job_detail.remote_work_id = remote.id
-    
-    if parsed_json.get('travel_required'):
-        travel = get_or_create(db, TravelRequirement, name=parsed_json['travel_required'])
-        job_detail.travel_required_id = travel.id
-    
-    if parsed_json.get('salary_currency'):
-        currency = get_or_create(db, Currency, code=parsed_json['salary_currency'])
-        job_detail.salary_currency_id = currency.id
-    
-    if parsed_json.get('salary_period'):
-        period = get_or_create(db, SalaryPeriod, name=parsed_json['salary_period'])
-        job_detail.salary_period_id = period.id
-    
-    # Location fields
-    if parsed_json.get('city'):
-        city = get_or_create(db, City, name=parsed_json['city'])
-        job_detail.city_id = city.id
-    
-    if parsed_json.get('region'):
-        region = get_or_create(db, Region, name=parsed_json['region'])
-        job_detail.region_id = region.id
-    
-    if parsed_json.get('country'):
-        country = get_or_create(db, Country, name=parsed_json['country'])
-        job_detail.country_id = country.id
-    
-    if parsed_json.get('full_address'):
-        address = get_or_create(db, FullAddress, address=parsed_json['full_address'])
-        job_detail.full_address_id = address.id
-    
-    # Company
-    if parsed_json.get('company_name'):
-        company = get_or_create(db, Company, name=parsed_json['company_name'])
-        job_detail.company_name_id = company.id
-    
-    if parsed_json.get('company_size'):
-        size = get_or_create(db, CompanySize, name=parsed_json['company_size'])
-        job_detail.company_size_id = size.id
-    
-    if parsed_json.get('contact_person'):
-        person = get_or_create(db, ContactPerson, name=parsed_json['contact_person'])
-        job_detail.contact_person_id = person.id
-    
-    # === Direct numeric/scalar fields ===
-    
-    job_detail.min_salary = parsed_json.get('min_salary')
-    job_detail.max_salary = parsed_json.get('max_salary')
-    job_detail.experience_years = parsed_json.get('experience_years')
-    job_detail.original_language = parsed_json.get('original_language')
-    job_detail.posting_date = parse_date(parsed_json.get('posting_date'))
-    job_detail.processed_at = datetime.utcnow()
-    
-    # Add to session
-    db.add(job_detail)
-    db.flush()  # Get job_detail.id
-    
-    # === Handle many-to-many relationships ===
-    
-    # Hard skills
-    if parsed_json.get('hard_skills'):
-        for skill_name in parsed_json['hard_skills']:
-            skill = get_or_create(db, HardSkill, name=skill_name)
-            job_detail.hard_skills.append(skill)
-    
-    # Soft skills
-    if parsed_json.get('soft_skills'):
-        for skill_name in parsed_json['soft_skills']:
-            skill = get_or_create(db, SoftSkill, name=skill_name)
-            job_detail.soft_skills.append(skill)
-    
-    # Certifications
-    if parsed_json.get('certifications'):
-        for cert_name in parsed_json['certifications']:
-            cert = get_or_create(db, Certification, name=cert_name)
-            job_detail.certifications.append(cert)
-    
-    # Licenses
-    if parsed_json.get('licenses_required'):
-        for license_name in parsed_json['licenses_required']:
-            lic = get_or_create(db, License, name=license_name)
-            job_detail.licenses.append(lic)
-    
-    # Benefits
-    if parsed_json.get('benefits'):
-        for benefit_desc in parsed_json['benefits']:
-            benefit = get_or_create(db, Benefit, description=benefit_desc)
-            job_detail.benefits.append(benefit)
-    
-    # Work environment
-    if parsed_json.get('work_environment'):
-        for env_desc in parsed_json['work_environment']:
-            env = get_or_create(db, WorkEnvironment, description=env_desc)
-            job_detail.work_environment.append(env)
-    
-    # Professional development
-    if parsed_json.get('professional_development'):
-        for dev_desc in parsed_json['professional_development']:
-            dev = get_or_create(db, ProfessionalDevelopment, description=dev_desc)
-            job_detail.professional_development.append(dev)
-    
-    # Work-life balance
-    if parsed_json.get('work_life_balance'):
-        for balance_desc in parsed_json['work_life_balance']:
-            balance = get_or_create(db, WorkLifeBalance, description=balance_desc)
-            job_detail.work_life_balance.append(balance)
-    
-    # Physical requirements
-    if parsed_json.get('physical_requirements'):
-        for req_desc in parsed_json['physical_requirements']:
-            req = get_or_create(db, PhysicalRequirement, description=req_desc)
-            job_detail.physical_requirements.append(req)
-    
-    # Work conditions
-    if parsed_json.get('work_conditions'):
-        for cond_desc in parsed_json['work_conditions']:
-            cond = get_or_create(db, WorkCondition, description=cond_desc)
-            job_detail.work_conditions.append(cond)
-    
-    # Special requirements
-    if parsed_json.get('special_requirements'):
-        for spec_desc in parsed_json['special_requirements']:
-            spec = get_or_create(db, SpecialRequirement, description=spec_desc)
-            job_detail.special_requirements.append(spec)
-    
-    # === Handle one-to-many relationships ===
-    
-    # Responsibilities
-    if parsed_json.get('responsibilities'):
-        for idx, resp_desc in enumerate(parsed_json['responsibilities']):
-            responsibility = Responsibility(
-                job_detail_id=job_detail.id,
-                description=resp_desc,
-                order=idx
-            )
-            db.add(responsibility)
-    
-    # Languages with proficiency
-    if parsed_json.get('languages'):
-        lang_proficiency = parsed_json.get('language_proficiency', {})
-        for lang in parsed_json['languages']:
-            job_lang = JobLanguage(
-                job_detail_id=job_detail.id,
-                language=lang,
-                proficiency=lang_proficiency.get(lang)
-            )
-            db.add(job_lang)
-    
-    # Contact emails
-    if parsed_json.get('contact_emails'):
-        for email in parsed_json['contact_emails']:
-            contact_email = ContactEmail(
-                job_detail_id=job_detail.id,
-                email=email
-            )
-            db.add(contact_email)
-    
-    # Contact phones
-    if parsed_json.get('contact_phones'):
-        for phone in parsed_json['contact_phones']:
-            contact_phone = ContactPhone(
-                job_detail_id=job_detail.id,
-                phone=phone
-            )
-            db.add(contact_phone)
-    
-    # Commit all changes
-    db.commit()
-    db.refresh(job_detail)
-    
-    return job_detail
-
-def job_detail_to_dict(db: Session, job_id: int) -> Optional[Dict[str, Any]]:
-    """
-    Reconstruct the parsed JSON object from a JobDetail record.
-    
-    Args:
-        db: SQLAlchemy session
-        job_id: ID of the Job record
-    
-    Returns:
-        Dictionary matching the original JSON schema, or None if not found
-    """
-    
-    # Fetch JobDetail with all relationships loaded
-    job_detail = db.query(JobDetail).filter_by(job_id=job_id).first()
-    
-    if not job_detail:
-        return None
-    
-    # Helper to convert date to string
-    def date_to_str(d: Optional[date]) -> Optional[str]:
-        return d.strftime('%Y-%m-%d') if d else None
-    
-    # Build the dictionary
-    result = {
-        # Basic info
-        "title": job_detail.title.name if job_detail.title else None,
-        "job_function": job_detail.job_function.name if job_detail.job_function else None,
-        "seniority_level": job_detail.seniority_level.name if job_detail.seniority_level else None,
-        "industry": job_detail.industry.name if job_detail.industry else None,
-        "department": job_detail.department.name if job_detail.department else None,
-        "job_family": job_detail.job_family.name if job_detail.job_family else None,
-        "specialization": job_detail.specialization.name if job_detail.specialization else None,
-        
-        # Salary
-        "min_salary": float(job_detail.min_salary) if job_detail.min_salary else None,
-        "max_salary": float(job_detail.max_salary) if job_detail.max_salary else None,
-        "salary_currency": job_detail.salary_currency.code if job_detail.salary_currency else None,
-        "salary_period": job_detail.salary_period.name if job_detail.salary_period else None,
-        
-        # Requirements
-        "required_education": job_detail.required_education.name if job_detail.required_education else None,
-        "experience_years": job_detail.experience_years,
-        
-        # Languages - reconstruct list and proficiency dict
-        "languages": [jl.language for jl in job_detail.languages] if job_detail.languages else None,
-        "language_proficiency": {jl.language: jl.proficiency for jl in job_detail.languages if jl.proficiency} if job_detail.languages else None,
-        
-        # Skills (many-to-many)
-        "hard_skills": [skill.name for skill in job_detail.hard_skills] if job_detail.hard_skills else None,
-        "soft_skills": [skill.name for skill in job_detail.soft_skills] if job_detail.soft_skills else None,
-        
-        # Certifications and licenses
-        "certifications": [cert.name for cert in job_detail.certifications] if job_detail.certifications else None,
-        "licenses_required": [lic.name for lic in job_detail.licenses] if job_detail.licenses else None,
-        
-        # Responsibilities (ordered)
-        "responsibilities": [resp.description for resp in sorted(job_detail.responsibilities, key=lambda r: r.order)] if job_detail.responsibilities else None,
-        
-        # Work arrangement
-        "employment_type": job_detail.employment_type.name if job_detail.employment_type else None,
-        "contract_type": job_detail.contract_type.name if job_detail.contract_type else None,
-        "work_schedule": job_detail.work_schedule.name if job_detail.work_schedule else None,
-        "shift_details": job_detail.shift_details.name if job_detail.shift_details else None,
-        "remote_work": job_detail.remote_work.name if job_detail.remote_work else None,
-        "travel_required": job_detail.travel_required.name if job_detail.travel_required else None,
-        
-        # Location
-        "city": job_detail.city.name if job_detail.city else None,
-        "region": job_detail.region.name if job_detail.region else None,
-        "country": job_detail.country.name if job_detail.country else None,
-        "full_address": job_detail.full_address.address if job_detail.full_address else None,
-        
-        # Company
-        "company_name": job_detail.company_name.name if job_detail.company_name else None,
-        "company_size": job_detail.company_size.name if job_detail.company_size else None,
-        
-        # Contact info
-        "contact_emails": [email.email for email in job_detail.contact_emails] if job_detail.contact_emails else None,
-        "contact_phones": [phone.phone for phone in job_detail.contact_phones] if job_detail.contact_phones else None,
-        "contact_person": job_detail.contact_person.name if job_detail.contact_person else None,
-        
-        # Benefits and perks
-        "benefits": [benefit.description for benefit in job_detail.benefits] if job_detail.benefits else None,
-        "work_environment": [env.description for env in job_detail.work_environment] if job_detail.work_environment else None,
-        "professional_development": [dev.description for dev in job_detail.professional_development] if job_detail.professional_development else None,
-        "work_life_balance": [balance.description for balance in job_detail.work_life_balance] if job_detail.work_life_balance else None,
-        
-        # Requirements and conditions
-        "physical_requirements": [req.description for req in job_detail.physical_requirements] if job_detail.physical_requirements else None,
-        "work_conditions": [cond.description for cond in job_detail.work_conditions] if job_detail.work_conditions else None,
-        "special_requirements": [spec.description for spec in job_detail.special_requirements] if job_detail.special_requirements else None,
-        
-        # Metadata
-        "posting_date": date_to_str(job_detail.posting_date),
-        "original_language": job_detail.original_language
+if __name__ == '__main__':
+    # Example 1: Save a job
+    job_data = {
+        'site': 'rabota.md',
+        'job_title': 'Senior Python Developer',
+        'company_name': 'TechCorp SRL',
+        'job_url': 'https://rabota.md/job/12345  ',
+        'job_description': 'We are looking for...'
     }
     
-    return result
-
-
-# === Usage example ===
-if __name__ == "__main__":
-    # Example parsed JSON from AI
-    example_json = {
-        "title": "Senior Python Developer",
-        "job_function": "Software Development",
-        "seniority_level": "senior",
-        "industry": "Technology",
-        "department": "Engineering",
-        "job_family": "Software Engineering",
-        "specialization": "Backend Development",
-        "min_salary": 50000,
-        "max_salary": 80000,
-        "salary_currency": "eur",
-        "salary_period": "year",
-        "required_education": "bachelor",
-        "experience_years": 5,
-        "languages": ["English", "Romanian"],
-        "language_proficiency": {"English": "fluent", "Romanian": "native"},
-        "hard_skills": ["Python", "Django", "PostgreSQL", "Docker"],
-        "soft_skills": ["Communication", "Teamwork", "Problem Solving"],
-        "certifications": ["AWS Certified Developer"],
-        "licenses_required": None,
-        "responsibilities": [
-            "Design and implement backend services",
-            "Collaborate with frontend team",
-            "Write technical documentation"
+    extracted_data = {
+        'title': 'Senior Python Developer',
+        'seniority_level': 'senior',
+        'hard_skills': ['Python', 'Django', 'PostgreSQL', 'Docker'],
+        'soft_skills': ['Communication', 'Teamwork', 'Problem Solving'],
+        'min_salary': 50000,
+        'max_salary': 70000,
+        'salary_currency': 'usd',
+        'salary_period': 'year',
+        'required_education': 'bachelor',
+        'experience_years': 5,
+        'employment_type': 'full-time',
+        'remote_work': 'hybrid',
+        'city': 'Chisinau',
+        'country': 'Moldova',
+        'languages': ['English', 'Romanian'],
+        'language_proficiency': {'English': 'fluent', 'Romanian': 'native'},
+        'responsibilities': [
+            'Design and implement scalable web applications',
+            'Mentor junior developers',
+            'Participate in code reviews'
         ],
-        "employment_type": "full-time",
-        "contract_type": "permanent",
-        "work_schedule": "flexible",
-        "shift_details": None,
-        "remote_work": "hybrid",
-        "travel_required": "occasional",
-        "city": "Chisinau",
-        "region": "Chișinău Municipality",
-        "country": "Moldova",
-        "full_address": "123 Main St, Chisinau, Moldova",
-        "company_name": "TechCorp SRL",
-        "company_size": "medium",
-        "contact_emails": ["hr@techcorp.md"],
-        "contact_phones": ["+373 22 123456"],
-        "contact_person": "John Doe",
-        "benefits": ["Health insurance", "Meal tickets", "Training budget"],
-        "work_environment": ["Modern office", "Collaborative team"],
-        "professional_development": ["Conferences", "Online courses"],
-        "work_life_balance": ["Flexible hours", "Remote work option"],
-        "physical_requirements": None,
-        "work_conditions": ["Office environment"],
-        "special_requirements": ["Must have work permit"],
-        "posting_date": "2025-11-05",
-        "original_language": "ro"
+        'benefits': ['Health insurance', 'Flexible schedule', 'Remote work'],
+        'posting_date': '2025-11-05',
+        'original_language': 'ro'
     }
     
-    db = SessionLocal()
-    try:
-        # Assuming job_id 1 exists in jobs table
-        job_detail = insert_job_detail(db, job_id=1, parsed_json=example_json)
-        print(f"Successfully created JobDetail with id: {job_detail.id}")
-    except Exception as e:
-        db.rollback()
-        print(f"Error: {e}")
-    finally:
-        db.close()
+    with JobRepository() as repo:
+        # Save job
+        job = repo.save_job_from_json(job_data, extracted_data)
+        print(f"Saved job with ID: {job.id}")
+        
+        # Retrieve job as dictionary
+        job_dict = repo.get_job_as_dict(job.id)
+        print(f"\nJob title: {job_dict['title']}")
+        print(f"Skills: {', '.join(job_dict['hard_skills'])}")
+        print(f"Location: {job_dict['city']}, {job_dict['country']}")
+        
+        # Find jobs by skill
+        python_jobs = repo.find_jobs_by_skill('Python')
+        print(f"\nFound {len(python_jobs)} jobs requiring Python")
