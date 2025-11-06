@@ -14,14 +14,16 @@ from config.settings import Config
 
 # Constants
 DEBUG = True
-BATCH_SIZE = 3  # Per site in debug mode
-NUM_THREADS = 4
+BATCH_SIZE = 3 
+NUM_THREADS = 3
 DISPLAY_REFRESH_INTERVAL = 1.0  # seconds
 
-# Initialize OpenAI client
+# Initialize OpenAI client with proper timeout handling
 client = OpenAI(
     api_key=Config.llm_api_key,
-    base_url=Config.llm_api
+    base_url=Config.llm_api,
+    timeout=Config.llm_request_timeout,
+    max_retries=2
 )
 
 
@@ -29,7 +31,9 @@ def get_unprocessed_job_ids_for_site(session, site, limit=None):
     """Fetch unprocessed job IDs for a specific site."""
     query = session.query(Job.id).outerjoin(JobDetail).filter(
         Job.site == site,
-        JobDetail.id.is_(None)
+        JobDetail.id.is_(None),
+        Job.job_description.isnot(None),
+        Job.job_description != ''
     )
     
     if limit:
@@ -37,22 +41,24 @@ def get_unprocessed_job_ids_for_site(session, site, limit=None):
     
     return [job_id[0] for job_id in query.all()]
 
-
 def process_job(job_id, session_class):
     """Process a single job using LLM."""
     session = session_class()
+    content = None
+    extracted_data = None
+    
     try:
         job = session.query(Job).filter(Job.id == job_id).first()
         if not job:
-            return job_id, False, "Job not found"
+            return job_id, False, "Job not found", None
         
         if not job.job_description:
-            return job_id, False, "Missing job description"
+            return job_id, False, "Missing job description", None
         
         # Check if already processed
         existing_detail = session.query(JobDetail).filter(JobDetail.job_id == job_id).first()
         if existing_detail:
-            return job_id, False, "Already has JobDetail"
+            return job_id, False, "Already has JobDetail", None
         
         # Prepare the LLM request
         desc_truncated = len(job.job_description) > Config.max_body_text_length
@@ -88,43 +94,72 @@ Begin JSON:"""
                     {"role": "user", "content": user_message}
                 ],
                 temperature=0.2,
-                response_format={"type": "json_object"},
-                timeout=Config.llm_request_timeout
+                response_format={"type": "json_object"}
             )
         except Exception as e:
-            return job_id, False, f"LLM API error: {str(e)[:100]}"
+            error_msg = f"LLM API error: {str(e)[:100]}"
+            error_details = f"Full API error:\n{type(e).__name__}: {str(e)}"
+            return job_id, False, error_msg, error_details
         
         content = response.choices[0].message.content
         
-        # Parse the JSON response
+        if not content:
+            return job_id, False, "Empty response from LLM", None
+        
+        # Parse the JSON response - try multiple strategies
+        extracted_data = None
+        parse_errors = []
+        
+        # Strategy 1: Direct parse
         try:
             extracted_data = json.loads(content)
-        except json.JSONDecodeError:
-            # Attempt to clean the response if direct parse fails
-            cleaned_content = content.strip()
-            if cleaned_content.startswith("```"):
-                lines = cleaned_content.split('\n')
-                start_idx = 0
-                end_idx = len(lines)
-                for i, line in enumerate(lines):
-                    if line.strip().startswith('{'):
-                        start_idx = i
-                        break
-                for i in range(len(lines) - 1, -1, -1):
-                    if lines[i].strip().endswith('}'):
-                        end_idx = i + 1
-                        break
-                cleaned_content = '\n'.join(lines[start_idx:end_idx])
-            
-            if '{' in cleaned_content:
-                cleaned_content = cleaned_content[cleaned_content.index('{'):]
-            if '}' in cleaned_content:
-                cleaned_content = cleaned_content[:cleaned_content.rindex('}') + 1]
-            
+        except json.JSONDecodeError as e:
+            parse_errors.append(f"Direct parse: {str(e)}")
+        
+        # Strategy 2: Find the outermost {} pair
+        if extracted_data is None:
             try:
-                extracted_data = json.loads(cleaned_content)
-            except json.JSONDecodeError as e:
-                return job_id, False, f"JSON parse error: {str(e)[:100]}"
+                first_brace = content.find('{')
+                last_brace = content.rfind('}')
+                
+                if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                    json_str = content[first_brace:last_brace + 1]
+                    extracted_data = json.loads(json_str)
+            except (json.JSONDecodeError, ValueError) as e:
+                parse_errors.append(f"Brace extraction: {str(e)}")
+        
+        # Strategy 3: Remove markdown code blocks
+        if extracted_data is None:
+            try:
+                cleaned_content = content.strip()
+                if cleaned_content.startswith("```"):
+                    lines = cleaned_content.split('\n')
+                    start_idx = 0
+                    end_idx = len(lines)
+                    for i, line in enumerate(lines):
+                        if line.strip().startswith('{'):
+                            start_idx = i
+                            break
+                    for i in range(len(lines) - 1, -1, -1):
+                        if lines[i].strip().endswith('}'):
+                            end_idx = i + 1
+                            break
+                    json_str = '\n'.join(lines[start_idx:end_idx])
+                    extracted_data = json.loads(json_str)
+            except (json.JSONDecodeError, ValueError) as e:
+                parse_errors.append(f"Markdown removal: {str(e)}")
+        
+        # If all strategies failed
+        if extracted_data is None:
+            error_msg = f"JSON parse failed: {'; '.join(parse_errors)}"
+            error_details = f"LLM Response:\n{content}\n\nParse errors: {parse_errors}"
+            return job_id, False, error_msg, error_details
+        
+        # Validate extracted_data is a dict
+        if not isinstance(extracted_data, dict):
+            error_msg = f"Invalid JSON format: expected dict, got {type(extracted_data).__name__}"
+            error_details = f"LLM Response:\n{content}\n\nParsed as: {extracted_data}"
+            return job_id, False, error_msg, error_details
         
         # Create JobDetail directly without creating a new Job
         detail = JobDetail(job_id=job.id)
@@ -158,14 +193,9 @@ Begin JSON:"""
         # Use repository helper method to save
         try:
             with JobRepository(session=session) as repo:
-                # Don't pass job_data since job already exists
-                # We need to modify the repository method or create JobDetail manually
-                # For now, let's create JobDetail manually using repository's helper methods
-                
                 for json_key, model_name, field_name in fk_mappings:
                     value = extracted_data.get(json_key)
-                    if value:
-                        # Import model dynamically
+                    if value and value != "null":
                         from src.database import (
                             Titles, JobFunctions, SeniorityLevels, Industries, Departments,
                             JobFamilies, Specializations, EducationLevels, EmploymentTypes,
@@ -240,60 +270,87 @@ Begin JSON:"""
                 ]
                 
                 for json_key, model, field_name, relationship_name in m2m_mappings:
-                    items = extracted_data.get(json_key, [])
+                    items = extracted_data.get(json_key)
+                    # FIX: Check if items is not None before processing
                     if items:
                         m2m_items = repo._get_or_create_m2m_items(model, field_name, items)
                         setattr(detail, relationship_name, m2m_items)
                 
                 # Handle responsibilities
                 from src.database import Responsibility
-                for i, resp in enumerate(extracted_data.get('responsibilities', [])):
-                    if resp:
-                        session.add(Responsibility(
-                            job_detail_id=detail.id,
-                            description=resp,
-                            order=i
-                        ))
+                responsibilities = extracted_data.get('responsibilities')
+                # FIX: Check if responsibilities is not None
+                if responsibilities:
+                    for i, resp in enumerate(responsibilities):
+                        if resp:
+                            session.add(Responsibility(
+                                job_detail_id=detail.id,
+                                description=resp,
+                                order=i
+                            ))
                 
                 # Handle languages
                 from src.database import JobLanguage
-                languages = extracted_data.get('languages', [])
-                proficiencies = extracted_data.get('language_proficiency', {})
-                for lang in languages:
-                    if lang:
-                        session.add(JobLanguage(
-                            job_detail_id=detail.id,
-                            language=lang,
-                            proficiency=proficiencies.get(lang)
-                        ))
+                languages = extracted_data.get('languages')
+                proficiencies = extracted_data.get('language_proficiency')
+                
+                # FIX: Check if languages is not None before iterating
+                if languages:
+                    for lang in languages:
+                        if lang:
+                            # FIX: Safely get proficiency, handle None case
+                            proficiency = None
+                            if proficiencies and isinstance(proficiencies, dict):
+                                proficiency = proficiencies.get(lang)
+                            
+                            session.add(JobLanguage(
+                                job_detail_id=detail.id,
+                                language=lang,
+                                proficiency=proficiency
+                            ))
                 
                 # Handle contact emails
                 from src.database import ContactEmail
-                for email in extracted_data.get('contact_emails', []):
-                    if email:
-                        session.add(ContactEmail(
-                            job_detail_id=detail.id,
-                            email=email
-                        ))
+                contact_emails = extracted_data.get('contact_emails')
+                # FIX: Check if contact_emails is not None
+                if contact_emails:
+                    for email in contact_emails:
+                        if email:
+                            session.add(ContactEmail(
+                                job_detail_id=detail.id,
+                                email=email
+                            ))
                 
                 # Handle contact phones
                 from src.database import ContactPhone
-                for phone in extracted_data.get('contact_phones', []):
-                    if phone:
-                        session.add(ContactPhone(
-                            job_detail_id=detail.id,
-                            phone=phone
-                        ))
+                contact_phones = extracted_data.get('contact_phones')
+                # FIX: Check if contact_phones is not None
+                if contact_phones:
+                    for phone in contact_phones:
+                        if phone:
+                            session.add(ContactPhone(
+                                job_detail_id=detail.id,
+                                phone=phone
+                            ))
                 
                 session.commit()
-                return job_id, True, "Success"
+                return job_id, True, "Success", None
                 
         except SQLAlchemyError as e:
             session.rollback()
-            return job_id, False, f"Database error: {str(e)[:100]}"
+            error_detail = f"{type(e).__name__}: {str(e)[:200]}"
+            error_details = f"Database error details:\n{str(e)}\n\nExtracted data:\n{json.dumps(extracted_data, indent=2)}"
+            return job_id, False, f"Database error: {error_detail}", error_details
     
     except Exception as e:
-        return job_id, False, f"Unexpected error: {str(e)[:100]}"
+        import traceback
+        error_msg = f"{type(e).__name__}: {str(e)[:100]}"
+        error_details = f"Exception: {type(e).__name__}\nMessage: {str(e)}\n\nFull traceback:\n{traceback.format_exc()}"
+        if 'content' in locals():
+            error_details += f"\n\nLLM Response:\n{content}"
+        if 'extracted_data' in locals() and extracted_data:
+            error_details += f"\n\nExtracted data:\n{json.dumps(extracted_data, indent=2)}"
+        return job_id, False, error_msg, error_details
     
     finally:
         session.close()
@@ -475,6 +532,29 @@ def structure_data_with_llm():
     error_log = []
     error_lock = Lock()
     
+    # Create a debug log file
+    import datetime
+    debug_log_path = f"llm_errors_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    
+    def log_error(thread_id, job_id, site, error, details=None):
+        """Log error with optional details"""
+        with error_lock:
+            error_log.append({
+                'thread': thread_id,
+                'job_id': job_id,
+                'site': site,
+                'error': error
+            })
+            # Also write to file with full details
+            with open(debug_log_path, 'a', encoding='utf-8') as f:
+                f.write(f"\n{'='*100}\n")
+                f.write(f"Thread {thread_id} | Job {job_id} | Site {site}\n")
+                f.write(f"Error: {error}\n")
+                if details:
+                    f.write(f"\n{'-'*100}\n")
+                    f.write(f"DETAILS:\n{details}\n")
+                f.write(f"{'='*100}\n")
+    
     def worker(thread_id):
         """Worker function for each thread."""
         local_session_class = sessionmaker(bind=engine)
@@ -482,17 +562,11 @@ def structure_data_with_llm():
         # Process assigned jobs
         for site, job_ids in thread_assignments[thread_id]:
             for job_id in job_ids:
-                job_id_result, success, message = process_job(job_id, local_session_class)
+                job_id_result, success, message, details = process_job(job_id, local_session_class)
                 tracker.update(thread_id, site, success)
                 
                 if not success:
-                    with error_lock:
-                        error_log.append({
-                            'thread': thread_id,
-                            'job_id': job_id_result,
-                            'site': site,
-                            'error': message
-                        })
+                    log_error(thread_id, job_id_result, site, message, details)
     
     # Display update thread
     stop_display = False
@@ -528,6 +602,7 @@ def structure_data_with_llm():
     if error_log:
         print(f"\n{'=' * 100}")
         print(f"ERRORS ({len(error_log)} failed jobs)")
+        print(f"Detailed error log saved to: {debug_log_path}")
         print("=" * 100)
         for err in error_log[:20]:  # Show first 20
             print(f"Thread {err['thread']} | Job {err['job_id']} | {err['site']:<15} | {err['error']}")
