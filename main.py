@@ -4,54 +4,90 @@ from src.scrape_job_recheck import recheck_alive_jobs, recheck_all_jobs
 from src.structure_data_with_llm import structure_data_with_llm
 from src.process_data import process_data
 from src.generate_html_page import generate_html_page
+from src.menu import Menu
 
 
-def exit_app():
-    print("Exiting...")
-    exit()
+# Menu Item Classes
+class ScrapeJobsListItem:
+    def get_item_description(self):
+        return "Scrape Job Listings (Stage 1)"
+    
+    def execute(self):
+        scrape_jobs_list()
+        return True
 
 
-def print_menu():
-    print("\033c", end="")  # Clear screen
-    print("="*50)
-    print("DATA PROCESSING CONSOLE APP")
-    print("="*50)
-
-    functions = [
-        ("Scrape Job Listings (Stage 1)", scrape_jobs_list),
-        ("Scrape Job Details (Stage 2)", scrape_job_details),
-        ("Re-check Alive Jobs", recheck_alive_jobs),
-        ("Re-check All (Including Rotten) Jobs", recheck_all_jobs),
-        ("Structure Data with LLM", structure_data_with_llm),
-        ("Process Data", process_data),
-        ("Generate HTML Page", generate_html_page),
-        ("Exit", exit_app)
-    ]
-
-    for i, (label, _) in enumerate(functions, 1):
-        print(f"{i}. {label}")
-
-    print("-"*50)
-    return functions
+class ScrapeJobDetailsItem:
+    def get_item_description(self):
+        return "Scrape Job Details (Stage 2)"
+    
+    def execute(self):
+        scrape_job_details()
+        return True
 
 
+class RecheckAliveJobsItem:
+    def get_item_description(self):
+        return "Re-check Alive Jobs"
+    
+    def execute(self):
+        recheck_alive_jobs()
+        return True
+
+
+class RecheckAllJobsItem:
+    def get_item_description(self):
+        return "Re-check All (Including Rotten) Jobs"
+    
+    def execute(self):
+        recheck_all_jobs()
+        return True
+
+
+class StructureDataItem:
+    def get_item_description(self):
+        return "Structure Data with LLM"
+    
+    def execute(self):
+        structure_data_with_llm()
+        return True
+
+
+class ProcessDataItem:
+    def get_item_description(self):
+        return "Process Data"
+    
+    def execute(self):
+        process_data()
+        return True
+
+
+class GenerateHtmlItem:
+    def get_item_description(self):
+        return "Generate HTML Page"
+    
+    def execute(self):
+        generate_html_page()
+        return True
+
+
+# Main run function
 def run():
-    while True:
-        functions = print_menu()
-        try:
-            choice = int(input("Select an option (1-5): ").strip())
-            if 1 <= choice <= len(functions):
-                _, func = functions[choice - 1]
-                func()
-                input("Press Enter to continue...")
-            else:
-                print("Invalid option. Please try again.")
-                import time
-                time.sleep(1)
-        except ValueError:
-            print("Invalid input. Please enter a number.")
-            import time
-            time.sleep(1)
+    menu = Menu()
+    menu.set_menu_title("DATA PROCESSING CONSOLE APP")
+    menu.set_header("Job Scraping and Processing Pipeline")
+    
+    # Register all menu items
+    menu.register_item(ScrapeJobsListItem())
+    menu.register_item(ScrapeJobDetailsItem())
+    menu.register_item(RecheckAliveJobsItem())
+    menu.register_item(RecheckAllJobsItem())
+    menu.register_item(StructureDataItem())
+    menu.register_item(ProcessDataItem())
+    menu.register_item(GenerateHtmlItem())
+    
+    # Run the menu
+    menu.run()
 
 
 if __name__ == "__main__":
