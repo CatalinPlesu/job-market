@@ -76,6 +76,7 @@ def run():
     menu = Menu()
     menu.set_menu_title("DATA PROCESSING CONSOLE APP")
     menu.set_header("Job Scraping and Processing Pipeline")
+    menu.set_footer("Enter to select")
     
     # Register all menu items
     menu.register_item(ScrapeJobsListItem())
