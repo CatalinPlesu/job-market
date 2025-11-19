@@ -67,47 +67,72 @@ class Menu:
 
     def _get_key(self):
         import os
+
         if os.name == 'nt':  # Windows
             import msvcrt
+
             while True:
-                if msvcrt.kbhit():
-                    key = msvcrt.getch().decode('utf-8').lower()
-                    if key == '\r':  # Enter
-                        return 'enter'
-                    elif key == '\x03':  # Ctrl+C
-                        raise KeyboardInterrupt
-                    elif key == '\x08':  # Backspace
-                        continue
-                    elif key == '\x1b':  # Escape sequence
-                        key2 = msvcrt.getch().decode('utf-8')
-                        if key2 == '[':
-                            key3 = msvcrt.getch().decode('utf-8')
-                            if key3 == 'A':
-                                return 'up'
-                            elif key3 == 'B':
-                                return 'down'
-                            elif key3 == 'C':
-                                return 'right'
-                            elif key3 == 'D':
-                                return 'left'
-                        return 'escape'
-                    elif key == '\t':  # Tab
-                        return 'tab'
-                    else:
-                        return key
+                ch = msvcrt.getch()  # читаем первый байт
+
+                # ----- спец-клавиши (стрелки, F-клавиши и т.п.) -----
+                if ch in (b'\x00', b'\xe0'):
+                    ch2 = msvcrt.getch()
+                    combo = ch + ch2
+
+                    # стрелки
+                    if combo == b'\xe0H':  # Up
+                        return 'up'
+                    elif combo == b'\xe0P':  # Down
+                        return 'down'
+                    elif combo == b'\xe0K':  # Left
+                        return 'left'
+                    elif combo == b'\xe0M':  # Right
+                        return 'right'
+
+                    # другие спец-клавиши нам не нужны
+                    continue
+
+                # ----- обычные клавиши (однобайтные) -----
+                if ch == b'\r':      # Enter
+                    return 'enter'
+                elif ch == b'\x03':  # Ctrl+C
+                    raise KeyboardInterrupt
+                elif ch == b'\x1b':  # Esc
+                    return 'escape'
+                elif ch == b'\t':    # Tab
+                    return 'tab'
+                elif ch == b'\x08':  # Backspace
+                    return 'backspace'
+
+                # пробуем декодировать символ
+                try:
+                    return ch.decode('utf-8').lower()
+                except UnicodeDecodeError:
+                    # пропускаем непонятные байты
+                    continue
+
         else:  # Unix/Linux/Mac
+            import sys
             import tty
             import termios
+
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
+
             try:
-                tty.setraw(sys.stdin.fileno())
-                key = sys.stdin.read(1).lower()
-                if ord(key) == 13:  # Enter
+                tty.setraw(fd)
+                key = sys.stdin.read(1)
+
+                if not key:
+                    return None
+
+                key = key.lower()
+
+                if ord(key) == 13 or ord(key) == 10:  # Enter / Return
                     return 'enter'
-                elif ord(key) == 3:  # Ctrl+C
+                elif ord(key) == 3:   # Ctrl+C
                     raise KeyboardInterrupt
-                elif ord(key) == 27:  # Escape sequence
+                elif ord(key) == 27:  # Escape / стрелки
                     key2 = sys.stdin.read(1)
                     if key2 == '[':
                         key3 = sys.stdin.read(1)
@@ -120,14 +145,16 @@ class Menu:
                         elif key3 == 'D':
                             return 'left'
                     return 'escape'
-                elif ord(key) == 9:  # Tab
+                elif ord(key) == 9:    # Tab
                     return 'tab'
-                elif ord(key) == 127:  # Backspace
+                elif ord(key) in (8, 127):  # Backspace (разные терминалы)
                     return 'backspace'
                 else:
                     return key
+
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
 
     def _draw_menu(self):
         import os
