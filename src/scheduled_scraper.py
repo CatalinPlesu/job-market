@@ -234,6 +234,11 @@ def run_stage2_with_stats():
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
     
+    # Helper function to avoid closure issues
+    def run_stage2_for_site(site_name, rules):
+        result = scrape_site_stage2_with_stats(rules, logger)
+        results[site_name] = result
+    
     # Process each site
     threads = []
     results = {}
@@ -242,7 +247,8 @@ def run_stage2_with_stats():
         site_name = rules[Config.scraper_name]
         results[site_name] = None
         thread = threading.Thread(
-            target=lambda r=rules, sn=site_name: results.update({sn: scrape_site_stage2_with_stats(r, logger)})
+            target=run_stage2_for_site,
+            args=(site_name, rules)
         )
         thread.start()
         threads.append(thread)
@@ -382,6 +388,11 @@ def run_stage3_with_stats():
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
     
+    # Helper function to avoid closure issues
+    def run_stage3_for_site(site_name, rules):
+        result = recheck_site_stage3_with_stats(rules, logger)
+        results[site_name] = result
+    
     # Process each site
     threads = []
     results = {}
@@ -390,7 +401,8 @@ def run_stage3_with_stats():
         site_name = rules[Config.scraper_name]
         results[site_name] = None
         thread = threading.Thread(
-            target=lambda r=rules, sn=site_name: results.update({sn: recheck_site_stage3_with_stats(r, logger)})
+            target=run_stage3_for_site,
+            args=(site_name, rules)
         )
         thread.start()
         threads.append(thread)
