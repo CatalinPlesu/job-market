@@ -16,7 +16,7 @@ from src.scrape_job_recheck import recheck_site_jobs
 from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
 from src.error_logger import get_logger
 from src.database_backup import DatabaseBackup
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
@@ -332,7 +332,7 @@ def scrape_site_stage2_with_stats(rules, logger):
                 
                 if description is not None:
                     job.job_description = description
-                    job.updated_at = datetime.utcnow()
+                    job.updated_at = datetime.now(timezone.utc)
                     
                     if description:
                         success += 1
@@ -503,7 +503,7 @@ def recheck_site_stage3_with_stats(rules, logger):
                 has_description = job.job_description is not None and job.job_description != ""
                 if not has_description and description is not None:
                     job.job_description = description
-                    job.updated_at = datetime.utcnow()
+                    job.updated_at = datetime.now(timezone.utc)
                 
                 # Update job check
                 update_job_check(db, job.id, today, http_status)

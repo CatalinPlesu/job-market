@@ -6,7 +6,7 @@ import time
 import json
 from datetime import datetime, time as dt_time
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 import threading
 
 
@@ -29,7 +29,7 @@ class Scheduler:
         self.running = False
         self.stop_event = threading.Event()
         
-    def load_last_run(self) -> datetime | None:
+    def load_last_run(self) -> Optional[datetime]:
         """Load the last run timestamp from state file."""
         if not self.state_file.exists():
             return None
