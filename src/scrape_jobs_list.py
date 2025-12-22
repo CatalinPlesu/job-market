@@ -300,6 +300,7 @@ def find_max_pages_threaded(thread_id, site_name, rules, delay):
     high = Config.max_page
     low = 1
     iteration = 0
+    last_valid_page = 0  # Track the last page we confirmed has jobs
     
     while low <= high:
         iteration += 1
@@ -315,6 +316,9 @@ def find_max_pages_threaded(thread_id, site_name, rules, delay):
         print_threaded(thread_id, f"Found {jobs} jobs on page {mid}")
 
         if jobs > 0:
+            # Update last valid page we've confirmed
+            last_valid_page = mid
+            
             next_page_url = pagination_url.replace("{page}", str(mid+1))
             print_threaded(thread_id, f"Testing next page {mid+1} at URL: {next_page_url}")
             
@@ -331,8 +335,11 @@ def find_max_pages_threaded(thread_id, site_name, rules, delay):
             print_threaded(thread_id, f"Page {mid} has no jobs, moving high to {mid - 1}")
             high = mid - 1
     
-    print_threaded(thread_id, f"Binary search completed. Returning low value: {low}")
-    return low
+    # If we exit the loop without finding exact boundary, return the last valid page we confirmed
+    # This handles edge cases where pages near max_page might give inconsistent results
+    result = max(last_valid_page, 1)  # Ensure we return at least 1
+    print_threaded(thread_id, f"Binary search completed. Last confirmed valid page: {result}")
+    return result
 
 def store_jobs(db, jobs_data):
     """

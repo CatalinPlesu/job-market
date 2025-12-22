@@ -13,3 +13,4 @@ wheels/
 
 data.db*
 state.json
+test_binary_search.py
