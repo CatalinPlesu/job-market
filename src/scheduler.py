@@ -82,12 +82,12 @@ class Scheduler:
         last_run = self.load_last_run()
         now = datetime.now()
         
-        # If never run before, don't run immediately (wait for scheduled time)
-        if last_run is None:
-            return False
-        
-        # Check if we've passed the scheduled time today and haven't run yet today
+        # Calculate today's scheduled time
         today_scheduled = datetime.combine(now.date(), self.schedule_time)
+        
+        # If never run before, check if we're past today's scheduled time
+        if last_run is None:
+            return now >= today_scheduled
         
         # Run if:
         # 1. Current time is past scheduled time today
@@ -146,6 +146,10 @@ class Scheduler:
         """
         self.running = True
         
+        # Ensure check_interval is reasonable (max 30 minutes as suggested)
+        max_interval = 30 * 60  # 30 minutes in seconds
+        check_interval = min(check_interval, max_interval)
+        
         # Show initial status
         last_run = self.load_last_run()
         next_run = self.get_next_run_time()
@@ -158,6 +162,7 @@ class Scheduler:
         else:
             print(f"Last run: Never")
         print(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Check interval: {check_interval} seconds")
         print(f"Press Ctrl+C to stop monitoring")
         print(f"{'='*80}\n")
         
@@ -171,15 +176,24 @@ class Scheduler:
                     # Show countdown to next run
                     now = datetime.now()
                     time_until_next = next_run - now
-                    hours = int(time_until_next.total_seconds() // 3600)
-                    minutes = int((time_until_next.total_seconds() % 3600) // 60)
+                    total_seconds = time_until_next.total_seconds()
+                    hours = int(total_seconds // 3600)
+                    minutes = int((total_seconds % 3600) // 60)
                     
                     print(f"Waiting for next run... "
                           f"(Next: {next_run.strftime('%Y-%m-%d %H:%M')} - "
                           f"{hours}h {minutes}m remaining)", end='\r')
+                    
+                    # Use adaptive check interval: check more frequently as we get closer
+                    # If less than 5 minutes away, check every minute
+                    adaptive_interval = check_interval
+                    if total_seconds < 300:  # Less than 5 minutes
+                        adaptive_interval = 60  # Check every minute
+                    elif total_seconds < 3600:  # Less than 1 hour
+                        adaptive_interval = min(check_interval, 300)  # Check every 5 minutes max
                 
                 # Check every interval
-                self.stop_event.wait(check_interval)
+                self.stop_event.wait(adaptive_interval)
         
         except KeyboardInterrupt:
             print("\n\nScheduler stopped by user.")
