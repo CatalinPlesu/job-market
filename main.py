@@ -92,7 +92,8 @@ class ScheduledScrapingItem:
         print("\nSchedule: Daily at 00:00 (midnight)")
         print("\nOptions:")
         print("  1. Run once NOW")
-        print("  2. Start scheduler (will wait for scheduled time)")
+        print("  2. Start scheduler (will wait for scheduled time 00:00)")
+        print("  3. Start scheduler with custom time (specify HH:MM in 24H format)")
         print("  0. Cancel")
         
         choice = input("\nEnter choice: ").strip()
@@ -107,7 +108,7 @@ class ScheduledScrapingItem:
                 print(f"\n✗ Error during execution: {e}")
         
         elif choice == "2":
-            # Start scheduler
+            # Start scheduler with default time (00:00)
             print("\nStarting scheduler...")
             print("The scheduler will monitor the schedule and run automatically at 00:00.")
             print("Press Ctrl+C to stop.\n")
@@ -121,6 +122,48 @@ class ScheduledScrapingItem:
                 )
             except KeyboardInterrupt:
                 print("\nScheduler stopped by user.")
+        
+        elif choice == "3":
+            # Start scheduler with custom time
+            print("\nEnter trigger time in 24H format (HH:MM):")
+            print("Examples: 00:00 (midnight), 14:30 (2:30 PM), 23:45 (11:45 PM)")
+            
+            time_input = input("Time (HH:MM): ").strip()
+            
+            # Parse and validate the time input
+            try:
+                parts = time_input.split(":")
+                if len(parts) != 2:
+                    print("\n✗ Invalid format. Please use HH:MM format.")
+                    return True
+                
+                hour = int(parts[0])
+                minute = int(parts[1])
+                
+                if hour < 0 or hour > 23:
+                    print("\n✗ Invalid hour. Must be between 00 and 23.")
+                    return True
+                
+                if minute < 0 or minute > 59:
+                    print("\n✗ Invalid minute. Must be between 00 and 59.")
+                    return True
+                
+                print(f"\nStarting scheduler...")
+                print(f"The scheduler will monitor the schedule and run automatically at {hour:02d}:{minute:02d}.")
+                print("Press Ctrl+C to stop.\n")
+                
+                scheduler = Scheduler(schedule_time_hour=hour, schedule_time_minute=minute)
+                try:
+                    scheduler.run_with_monitoring(
+                        task=run_all_stages_scheduled,
+                        task_name="Scheduled Scraping (All Stages)",
+                        check_interval=60  # Check every minute
+                    )
+                except KeyboardInterrupt:
+                    print("\nScheduler stopped by user.")
+            
+            except ValueError:
+                print("\n✗ Invalid time format. Please enter numbers only in HH:MM format.")
         
         else:
             print("\nCancelled.")
