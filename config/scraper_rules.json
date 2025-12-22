@@ -6,6 +6,7 @@
 		"job-url": "a.mui-8ugpds",
 		"job-title": "a.mui-8ugpds",
 		"company-name": "a.mui-14nesz",
+		"current-page": ".MuiPagination-root .Mui-selected",
 		"details": [
 			".MuiContainer-root"
 		]
@@ -17,6 +18,7 @@
 		"job-url": "a.vacancyShowPopup",
 		"job-title": "a.vacancyShowPopup span",
 		"company-name": ".text-black.flex.items-center span",
+		"current-page": ".pagination .active",
 		"details": [
 			"#main .content_wr"
 		]
@@ -28,6 +30,7 @@
 		"job-url": "a.link-job[title]",
 		"job-title": "a.link-job[title]",
 		"company-name": "img[alt]",
+		"current-page": ".pagination .active",
 		"details": [
 			".employer-details-page .detail-page-head",
 			".employer-details-page .lead",

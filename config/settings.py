@@ -14,6 +14,7 @@ class Config:
     scraper_job_title = "job-title"
     scraper_company_name = "company-name"
     scraper_details = "details"
+    scraper_current_page = "current-page"  # Selector for finding the current page number in pagination
 
     # Scraper Timeouts and Limits
     request_timeout = 10  # seconds

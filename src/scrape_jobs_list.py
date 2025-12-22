@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import time
+import re
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
 from datetime import datetime, date
@@ -312,20 +313,34 @@ def find_max_pages_threaded(thread_id, site_name, rules, delay):
         page_url = pagination_url.replace("{page}", str(mid))
         print_threaded(thread_id, f"Testing URL: {page_url}")
         
-        jobs = len(scrape_jobs(page_url, rules, delay))
-        print_threaded(thread_id, f"Found {jobs} jobs on page {mid}")
+        jobs, actual_page = scrape_jobs(page_url, rules, delay, return_page_info=True)
+        jobs_count = len(jobs)
+        print_threaded(thread_id, f"Found {jobs_count} jobs on page {mid}")
+        
+        # Verify we're actually on the expected page
+        if actual_page is not None and actual_page != mid:
+            print_threaded(thread_id, f"WARNING: Requested page {mid} but site returned page {actual_page}. Page {mid} likely doesn't exist.")
+            # Treat this as if the page has no jobs
+            jobs_count = 0
 
-        if jobs > 0:
+        if jobs_count > 0:
             # Update last valid page we've confirmed
             last_valid_page = mid
             
             next_page_url = pagination_url.replace("{page}", str(mid+1))
             print_threaded(thread_id, f"Testing next page {mid+1} at URL: {next_page_url}")
             
-            jobs2 = len(scrape_jobs(next_page_url, rules, delay = 3))
-            print_threaded(thread_id, f"Found {jobs2} jobs on page {mid+1}")
+            jobs2, actual_page2 = scrape_jobs(next_page_url, rules, delay=3, return_page_info=True)
+            jobs2_count = len(jobs2)
+            print_threaded(thread_id, f"Found {jobs2_count} jobs on page {mid+1}")
             
-            if jobs2 > 0:
+            # Verify we're actually on the expected page
+            if actual_page2 is not None and actual_page2 != mid+1:
+                print_threaded(thread_id, f"WARNING: Requested page {mid+1} but site returned page {actual_page2}. Page {mid+1} likely doesn't exist.")
+                # Treat this as if the page has no jobs
+                jobs2_count = 0
+            
+            if jobs2_count > 0:
                 print_threaded(thread_id, f"Page {mid+1} exists with jobs, moving low to {mid + 1}")
                 low = mid + 1
             else:
@@ -451,7 +466,39 @@ def get_crawl_delay_with_robotparser(site_url, user_agent="*"):
     else:
         return Config.default_crawl_delay
 
-def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
+def get_current_page_number(soup, rules):
+    """
+    Extract the current page number from the pagination element on the page.
+    This helps detect when a site redirects invalid page numbers to a valid page.
+    
+    Args:
+        soup: BeautifulSoup object of the page
+        rules (dict): A dictionary containing CSS selectors for scraping
+    
+    Returns:
+        int or None: The current page number if found, None otherwise
+    """
+    if Config.scraper_current_page not in rules:
+        return None
+    
+    current_page_selector = rules[Config.scraper_current_page]
+    if not current_page_selector:
+        return None
+    
+    try:
+        current_page_element = soup.select_one(current_page_selector)
+        if current_page_element:
+            page_text = current_page_element.get_text(strip=True)
+            # Try to extract a number from the text
+            match = re.search(r'\d+', page_text)
+            if match:
+                return int(match.group())
+    except:
+        pass
+    
+    return None
+
+def scrape_jobs(url, rules, delay=Config.default_crawl_delay, return_page_info=False):
     """
     Scrapes job listings from a given URL using configurable CSS selectors.
 
@@ -459,9 +506,10 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
         url (str): The URL of the page containing job listings.
         rules (dict): A dictionary containing CSS selectors for scraping.
         delay (float): Time to wait before making the request (in seconds).
+        return_page_info (bool): If True, returns tuple of (jobs_data, actual_page_number)
 
     Returns:
-        list: A list of dictionaries containing job data (url, title, company, site).
+        list or tuple: A list of dictionaries containing job data, or tuple (jobs_data, actual_page_number) if return_page_info=True
     """
     # Apply delay before request
     if delay > 0:
@@ -471,9 +519,16 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
     try:
         response.raise_for_status()
     except:
+        if return_page_info:
+            return [], None
         return []
     
     soup = BeautifulSoup(response.content, 'html.parser')
+    
+    # Get actual page number from pagination if requested
+    actual_page_number = None
+    if return_page_info:
+        actual_page_number = get_current_page_number(soup, rules)
 
     # Extract selectors from rules
     job_card_selector = rules[Config.scraper_job_card]
@@ -517,4 +572,6 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
         if job_data['title'] and job_data['url'] and job_data['company']:
             jobs_data.append(job_data)
 
+    if return_page_info:
+        return jobs_data, actual_page_number
     return jobs_data
