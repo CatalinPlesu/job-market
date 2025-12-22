@@ -493,7 +493,7 @@ def get_current_page_number(soup, rules):
             match = re.search(r'\d+', page_text)
             if match:
                 return int(match.group())
-    except:
+    except (AttributeError, ValueError, TypeError):
         pass
     
     return None
@@ -518,7 +518,7 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay, return_page_info=F
     response = requests.get(url)
     try:
         response.raise_for_status()
-    except:
+    except (requests.HTTPError, requests.ConnectionError, requests.Timeout, requests.RequestException):
         if return_page_info:
             return [], None
         return []
