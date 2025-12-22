@@ -192,6 +192,46 @@ def run_all_stages_decoupled():
         raise
 
 
+def find_max_pages_simple(site_name, rules, delay):
+    """
+    Find maximum pages using binary search without progress tracker.
+    
+    Args:
+        site_name: Name of the site being scraped
+        rules: Scraper rules dictionary
+        delay: Crawl delay in seconds
+    
+    Returns:
+        int: Maximum page number with jobs
+    """
+    pagination_url = rules[Config.scraper_pagination]
+    max_page = Config.max_page
+    
+    high = max_page
+    low = 1
+    iteration = 0
+    
+    while low <= high:
+        iteration += 1
+        mid = low + (high - low) // 2
+        
+        page_url = pagination_url.replace("{page}", str(mid))
+        jobs = len(scrape_jobs(page_url, rules, delay))
+        
+        if jobs > 0:
+            next_page_url = pagination_url.replace("{page}", str(mid+1))
+            jobs2 = len(scrape_jobs(next_page_url, rules, delay=3))
+            
+            if jobs2 > 0:
+                low = mid + 1
+            else:
+                return mid
+        else:
+            high = mid - 1
+    
+    return low
+
+
 def execute_stage1_for_site(rules, logger):
     """
     Execute Stage 1 (scrape job listings) for a single site.
@@ -212,8 +252,8 @@ def execute_stage1_for_site(rules, logger):
         # Get crawl delay
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
         
-        # Find max pages
-        pages = find_max_pages_threaded(0, site_name, rules, delay)
+        # Find max pages (using simple version without progress tracker)
+        pages = find_max_pages_simple(site_name, rules, delay)
         print(f"[Stage 1] {site_name}: Found {pages} pages")
         
         # Scrape pages
