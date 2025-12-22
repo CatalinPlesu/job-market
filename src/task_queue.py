@@ -69,11 +69,15 @@ class SiteWorker:
     
     def execute_task(self, task: Task):
         """Execute a task with crawl delay enforcement"""
+        # Mark as active before waiting for delay
         with self.lock:
             self.is_active = True
             self.current_task = task
         
         try:
+            # Wait for crawl delay (outside of lock)
+            self.wait_for_crawl_delay()
+            
             # Execute the task
             task.task_func(*task.task_args, **task.task_kwargs)
         finally:
@@ -156,14 +160,11 @@ class TaskQueue:
                     self.task_queue.task_done()
                     continue
                 
-                # Wait if worker is busy (shouldn't happen with proper queuing)
+                # Wait if worker is busy
                 while worker.is_active:
                     time.sleep(0.1)
                 
-                # Wait for crawl delay
-                worker.wait_for_crawl_delay()
-                
-                # Execute task
+                # Execute task (includes crawl delay enforcement)
                 print(f"[TaskQueue] Executing {task.stage_name} for {task.site_name}")
                 try:
                     worker.execute_task(task)

@@ -71,6 +71,61 @@ def run_all_stages_decoupled():
         # Start task queue
         task_queue.start()
         
+        # Define task functions that will be used by all sites
+        def make_stage1_task(rules, site_name):
+            """Create Stage 1 task for a site"""
+            def task():
+                try:
+                    stats = execute_stage1_for_site(rules, logger)
+                    with stats_lock:
+                        stats_collection['stage1'][site_name] = stats
+                    
+                    # Queue Stage 2 for this site after Stage 1 completes
+                    stage2_task = make_stage2_task(rules, site_name)
+                    task_queue.add_task(
+                        site_name=site_name,
+                        priority=Priority.STAGE2,
+                        stage_name=f"Stage 2: {site_name}",
+                        task_func=stage2_task
+                    )
+                except Exception as e:
+                    logger.exception(f"Stage 1 failed for {site_name}: {e}")
+                    print(f"ERROR in Stage 1 for {site_name}: {e}")
+            return task
+        
+        def make_stage2_task(rules, site_name):
+            """Create Stage 2 task for a site"""
+            def task():
+                try:
+                    stats = execute_stage2_for_site(rules, logger)
+                    with stats_lock:
+                        stats_collection['stage2'][site_name] = stats
+                    
+                    # Queue Stage 3 for this site after Stage 2 completes
+                    stage3_task = make_stage3_task(rules, site_name)
+                    task_queue.add_task(
+                        site_name=site_name,
+                        priority=Priority.STAGE3,
+                        stage_name=f"Stage 3: {site_name}",
+                        task_func=stage3_task
+                    )
+                except Exception as e:
+                    logger.exception(f"Stage 2 failed for {site_name}: {e}")
+                    print(f"ERROR in Stage 2 for {site_name}: {e}")
+            return task
+        
+        def make_stage3_task(rules, site_name):
+            """Create Stage 3 task for a site"""
+            def task():
+                try:
+                    stats = execute_stage3_for_site(rules, logger)
+                    with stats_lock:
+                        stats_collection['stage3'][site_name] = stats
+                except Exception as e:
+                    logger.exception(f"Stage 3 failed for {site_name}: {e}")
+                    print(f"ERROR in Stage 3 for {site_name}: {e}")
+            return task
+        
         # Queue all Stage 1 tasks (highest priority)
         print(f"\n{'='*80}")
         print(f"Queuing Stage 1 tasks (scrape job listings)...")
@@ -79,57 +134,8 @@ def run_all_stages_decoupled():
         for rules in ruless:
             site_name = rules[Config.scraper_name]
             
-            # Create wrapper function for Stage 1
-            def stage1_task(rules=rules, site_name=site_name):
-                try:
-                    stats = execute_stage1_for_site(rules, logger)
-                    with stats_lock:
-                        stats_collection['stage1'][site_name] = stats
-                    
-                    # Queue Stage 2 for this site after Stage 1 completes
-                    task_queue.add_task(
-                        site_name=site_name,
-                        priority=Priority.STAGE2,
-                        stage_name=f"Stage 2: {site_name}",
-                        task_func=stage2_task,
-                        rules=rules,
-                        site_name=site_name
-                    )
-                except Exception as e:
-                    logger.exception(f"Stage 1 failed for {site_name}: {e}")
-                    print(f"ERROR in Stage 1 for {site_name}: {e}")
-            
-            # Create wrapper function for Stage 2
-            def stage2_task(rules, site_name):
-                try:
-                    stats = execute_stage2_for_site(rules, logger)
-                    with stats_lock:
-                        stats_collection['stage2'][site_name] = stats
-                    
-                    # Queue Stage 3 for this site after Stage 2 completes
-                    task_queue.add_task(
-                        site_name=site_name,
-                        priority=Priority.STAGE3,
-                        stage_name=f"Stage 3: {site_name}",
-                        task_func=stage3_task,
-                        rules=rules,
-                        site_name=site_name
-                    )
-                except Exception as e:
-                    logger.exception(f"Stage 2 failed for {site_name}: {e}")
-                    print(f"ERROR in Stage 2 for {site_name}: {e}")
-            
-            # Create wrapper function for Stage 3
-            def stage3_task(rules, site_name):
-                try:
-                    stats = execute_stage3_for_site(rules, logger)
-                    with stats_lock:
-                        stats_collection['stage3'][site_name] = stats
-                except Exception as e:
-                    logger.exception(f"Stage 3 failed for {site_name}: {e}")
-                    print(f"ERROR in Stage 3 for {site_name}: {e}")
-            
             # Add Stage 1 task to queue
+            stage1_task = make_stage1_task(rules, site_name)
             task_queue.add_task(
                 site_name=site_name,
                 priority=Priority.STAGE1,
