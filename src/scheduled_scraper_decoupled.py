@@ -279,7 +279,7 @@ def execute_stage2_for_site(rules, logger):
         # Get jobs without descriptions
         jobs_without_description = db.query(Job).filter(
             Job.site == site_name,
-            Job.job_description == None
+            Job.job_description.is_(None)  # Use is_(None) for proper SQL NULL comparison
         ).all()
         
         total_jobs = len(jobs_without_description)

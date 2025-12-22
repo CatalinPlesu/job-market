@@ -9,6 +9,7 @@ from enum import IntEnum
 from dataclasses import dataclass
 from typing import Callable, Dict, Any, Optional
 from datetime import datetime
+import itertools
 
 
 class Priority(IntEnum):
@@ -54,6 +55,8 @@ class SiteWorker:
         self.lock = threading.Lock()
         self.is_active = False
         self.current_task: Optional[Task] = None
+        self.available_event = threading.Event()
+        self.available_event.set()  # Initially available
     
     def wait_for_crawl_delay(self):
         """Wait for crawl delay to elapse since last request"""
@@ -69,10 +72,11 @@ class SiteWorker:
     
     def execute_task(self, task: Task):
         """Execute a task with crawl delay enforcement"""
-        # Mark as active before waiting for delay
+        # Mark as active and clear available event
         with self.lock:
             self.is_active = True
             self.current_task = task
+            self.available_event.clear()
         
         try:
             # Wait for crawl delay (outside of lock)
@@ -84,6 +88,7 @@ class SiteWorker:
             with self.lock:
                 self.is_active = False
                 self.current_task = None
+                self.available_event.set()  # Signal that worker is available
 
 
 class TaskQueue:
@@ -95,6 +100,9 @@ class TaskQueue:
     def __init__(self, max_workers: int = 10):
         # Priority queue for all tasks
         self.task_queue = queue.PriorityQueue()
+        
+        # Monotonic counter for insertion ordering
+        self.insertion_counter = itertools.count()
         
         # Per-site workers
         self.site_workers: Dict[str, SiteWorker] = {}
@@ -135,8 +143,9 @@ class TaskQueue:
         )
         
         # Use tuple for priority queue: (priority, insertion_order, task)
-        # This ensures FIFO within same priority level
-        self.task_queue.put((priority, time.time(), task))
+        # insertion_order ensures FIFO within same priority level
+        insertion_order = next(self.insertion_counter)
+        self.task_queue.put((priority, insertion_order, task))
         
         with self.stats_lock:
             self.tasks_by_stage[priority] = self.tasks_by_stage.get(priority, 0) + 1
@@ -151,7 +160,7 @@ class TaskQueue:
         while self.running and not self.stop_event.is_set():
             try:
                 # Get next task with timeout
-                priority, insertion_time, task = self.task_queue.get(timeout=1)
+                priority, insertion_order, task = self.task_queue.get(timeout=1)
                 
                 # Get worker for this site
                 worker = self.get_site_worker(task.site_name)
@@ -160,9 +169,8 @@ class TaskQueue:
                     self.task_queue.task_done()
                     continue
                 
-                # Wait if worker is busy
-                while worker.is_active:
-                    time.sleep(0.1)
+                # Wait for worker to become available (using Event for efficiency)
+                worker.available_event.wait()
                 
                 # Execute task (includes crawl delay enforcement)
                 print(f"[TaskQueue] Executing {task.stage_name} for {task.site_name}")
