@@ -330,32 +330,42 @@ Begin JSON object:"""
                 data_session.add(detail)
                 data_session.flush()
                 
-                # Handle many-to-many relationships
+                # Handle many-to-many relationships - Insert directly into association tables
                 from src.data_database import (
                     HardSkills, SoftSkills, Certifications, Licenses, Benefits,
                     WorkEnvironment, ProfessionalDevelopment, WorkLifeBalance,
-                    PhysicalRequirements, WorkConditions, SpecialRequirements
+                    PhysicalRequirements, WorkConditions, SpecialRequirements,
+                    job_hard_skills, job_soft_skills, job_certifications, job_licenses,
+                    job_benefits, job_work_environment, job_professional_development,
+                    job_work_life_balance, job_physical_requirements, job_work_conditions,
+                    job_special_requirements
                 )
                 
                 m2m_mappings = [
-                    ('hard_skills', HardSkills, 'name', 'hard_skills'),
-                    ('soft_skills', SoftSkills, 'name', 'soft_skills'),
-                    ('certifications', Certifications, 'name', 'certifications'),
-                    ('licenses_required', Licenses, 'name', 'licenses'),
-                    ('benefits', Benefits, 'description', 'benefits'),
-                    ('work_environment', WorkEnvironment, 'description', 'work_environment'),
-                    ('professional_development', ProfessionalDevelopment, 'description', 'professional_development'),
-                    ('work_life_balance', WorkLifeBalance, 'description', 'work_life_balance'),
-                    ('physical_requirements', PhysicalRequirements, 'description', 'physical_requirements'),
-                    ('work_conditions', WorkConditions, 'description', 'work_conditions'),
-                    ('special_requirements', SpecialRequirements, 'description', 'special_requirements'),
+                    ('hard_skills', HardSkills, 'name', job_hard_skills),
+                    ('soft_skills', SoftSkills, 'name', job_soft_skills),
+                    ('certifications', Certifications, 'name', job_certifications),
+                    ('licenses_required', Licenses, 'name', job_licenses),
+                    ('benefits', Benefits, 'description', job_benefits),
+                    ('work_environment', WorkEnvironment, 'description', job_work_environment),
+                    ('professional_development', ProfessionalDevelopment, 'description', job_professional_development),
+                    ('work_life_balance', WorkLifeBalance, 'description', job_work_life_balance),
+                    ('physical_requirements', PhysicalRequirements, 'description', job_physical_requirements),
+                    ('work_conditions', WorkConditions, 'description', job_work_conditions),
+                    ('special_requirements', SpecialRequirements, 'description', job_special_requirements),
                 ]
                 
-                for json_key, model, field_name, relationship_name in m2m_mappings:
+                for json_key, model, field_name, assoc_table in m2m_mappings:
                     items = extracted_data.get(json_key)
                     if items:
                         m2m_items = repo._get_or_create_m2m_items(model, field_name, items)
-                        setattr(detail, relationship_name, m2m_items)
+                        for item in m2m_items:
+                            data_session.execute(
+                                assoc_table.insert().values(
+                                    job_details_id=detail.id,
+                                    **{f'{model.__tablename__}_id': item.id}
+                                )
+                            )
                 
                 # Handle responsibilities
                 from src.data_database import Responsibility

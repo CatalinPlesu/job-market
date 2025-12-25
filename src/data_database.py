@@ -167,50 +167,6 @@ class JobDetail(DataBase):
     posting_date = Column(Date)
     original_language = Column(String(10))
     processed_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships - Foreign Key Lookups
-    title = relationship("Titles", foreign_keys=[title_id])
-    job_function = relationship("JobFunctions", foreign_keys=[job_function_id])
-    seniority_level = relationship("SeniorityLevels", foreign_keys=[seniority_level_id])
-    industry = relationship("Industries", foreign_keys=[industry_id])
-    department = relationship("Departments", foreign_keys=[department_id])
-    job_family = relationship("JobFamilies", foreign_keys=[job_family_id])
-    specialization = relationship("Specializations", foreign_keys=[specialization_id])
-    required_education = relationship("EducationLevels", foreign_keys=[required_education_id])
-    employment_type = relationship("EmploymentTypes", foreign_keys=[employment_type_id])
-    contract_type = relationship("ContractTypes", foreign_keys=[contract_type_id])
-    work_schedule = relationship("WorkSchedules", foreign_keys=[work_schedule_id])
-    shift_details = relationship("ShiftDetails", foreign_keys=[shift_details_id])
-    remote_work = relationship("RemoteWorkOptions", foreign_keys=[remote_work_id])
-    travel_required = relationship("TravelRequirements", foreign_keys=[travel_required_id])
-    salary_currency = relationship("Currencies", foreign_keys=[salary_currency_id])
-    salary_period = relationship("SalaryPeriods", foreign_keys=[salary_period_id])
-    city = relationship("Cities", foreign_keys=[city_id])
-    region = relationship("Regions", foreign_keys=[region_id])
-    country = relationship("Countries", foreign_keys=[country_id])
-    full_address = relationship("FullAddresses", foreign_keys=[full_address_id])
-    company_name = relationship("Companies", foreign_keys=[company_name_id])
-    company_size = relationship("CompanySizes", foreign_keys=[company_size_id])
-    contact_person = relationship("ContactPersons", foreign_keys=[contact_person_id])
-    
-    # Relationships - One-to-Many (children)
-    responsibilities = relationship("Responsibility", back_populates="job_detail", cascade="all, delete-orphan")
-    languages = relationship("JobLanguage", back_populates="job_detail", cascade="all, delete-orphan")
-    contact_emails = relationship("ContactEmail", back_populates="job_detail", cascade="all, delete-orphan")
-    contact_phones = relationship("ContactPhone", back_populates="job_detail", cascade="all, delete-orphan")
-    
-    # Relationships - Many-to-Many
-    hard_skills = relationship("HardSkills", secondary=job_hard_skills)
-    soft_skills = relationship("SoftSkills", secondary=job_soft_skills)
-    certifications = relationship("Certifications", secondary=job_certifications)
-    licenses = relationship("Licenses", secondary=job_licenses)
-    benefits = relationship("Benefits", secondary=job_benefits)
-    work_environment = relationship("WorkEnvironment", secondary=job_work_environment)
-    professional_development = relationship("ProfessionalDevelopment", secondary=job_professional_development)
-    work_life_balance = relationship("WorkLifeBalance", secondary=job_work_life_balance)
-    physical_requirements = relationship("PhysicalRequirements", secondary=job_physical_requirements)
-    work_conditions = relationship("WorkConditions", secondary=job_work_conditions)
-    special_requirements = relationship("SpecialRequirements", secondary=job_special_requirements)
 
 
 # ============ Child Tables (One-to-Many) ============
@@ -223,8 +179,6 @@ class Responsibility(DataBase):
     job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
     description = Column(String(500), nullable=False)
     order = Column(Integer, default=0)
-    
-    job_detail = relationship("JobDetail", back_populates="responsibilities")
 
 
 class JobLanguage(DataBase):
@@ -235,8 +189,6 @@ class JobLanguage(DataBase):
     job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
     language = Column(String(100), nullable=False)
     proficiency = Column(String(50))
-    
-    job_detail = relationship("JobDetail", back_populates="languages")
 
 
 class ContactEmail(DataBase):
@@ -246,8 +198,6 @@ class ContactEmail(DataBase):
     id = Column(Integer, primary_key=True)
     job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
     email = Column(String(200), nullable=False)
-    
-    job_detail = relationship("JobDetail", back_populates="contact_emails")
 
 
 class ContactPhone(DataBase):
@@ -257,8 +207,6 @@ class ContactPhone(DataBase):
     id = Column(Integer, primary_key=True)
     job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
     phone = Column(String(50), nullable=False)
-    
-    job_detail = relationship("JobDetail", back_populates="contact_phones")
 
 
 def get_data_db():
