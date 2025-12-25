@@ -178,7 +178,8 @@ def update_display():
 
 def print_threaded(thread_id, message):
     """Add log message for a specific thread"""
-    progress_tracker.add_log_message(thread_id, message)
+    if progress_tracker is not None:
+        progress_tracker.add_log_message(thread_id, message)
 
 def scrape_jobs_list():
     global progress_tracker
