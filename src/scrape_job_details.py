@@ -204,7 +204,7 @@ def scrape_site_details(rules):
         db.close()
 
 
-def fetch_job_description(url, selectors, delay=Config.default_crawl_delay):
+def fetch_job_description(url, selectors, delay=Config.default_crawl_delay, skip_delay=False):
     """
     Fetch job description from URL using CSS selectors.
     Falls back to simplified selector, then body content if selectors don't find anything.
@@ -213,14 +213,15 @@ def fetch_job_description(url, selectors, delay=Config.default_crawl_delay):
         url (str): The URL to fetch
         selectors (list): List of CSS selectors to extract text from
         delay (float): Time to wait before making the request (in seconds)
+        skip_delay (bool): If True, skip the sleep delay (used when delay is enforced externally)
     
     Returns:
         tuple: (description_text, http_status_code)
             - description_text: Combined text from selectors or body, empty string if page has no content, None if failed
             - http_status_code: HTTP status code from the request
     """
-    # Apply delay before request
-    if delay > 0:
+    # Apply delay before request (unless externally managed)
+    if delay > 0 and not skip_delay:
         time.sleep(delay)
     
     try:

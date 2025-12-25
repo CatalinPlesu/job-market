@@ -374,7 +374,6 @@ def execute_stage2_for_site(rules, logger, rich_logger):
         details_selectors = rules.get(Config.scraper_details, [])
         
         # Process jobs
-        work_times = []
         job_index = 0
         for job in jobs_without_description:
             job_index += 1
@@ -386,21 +385,13 @@ def execute_stage2_for_site(rules, logger, rich_logger):
             )
             
             try:
-                # Calculate adjusted delay
-                adjusted_delay = delay
-                if work_times:
-                    last_work_time = work_times[-1]
-                    adjusted_delay = max(0, delay - last_work_time)
-                
-                # Fetch description
-                work_start = time.time()
+                # Fetch description (delay is enforced by TaskQueue's SiteWorker)
                 description, http_status = fetch_job_description(
                     job.job_url,
                     details_selectors,
-                    adjusted_delay
+                    delay,
+                    skip_delay=True
                 )
-                work_end = time.time()
-                work_times.append(work_end - work_start - adjusted_delay)
                 
                 # Update statistics
                 if http_status == 200:
@@ -526,7 +517,6 @@ def execute_stage3_for_site(rules, logger, rich_logger):
         details_selectors = rules.get(Config.scraper_details, [])
         
         # Process jobs
-        work_times = []
         job_index = 0
         for job in jobs_to_recheck:
             job_index += 1
@@ -538,21 +528,13 @@ def execute_stage3_for_site(rules, logger, rich_logger):
             )
             
             try:
-                # Calculate adjusted delay
-                adjusted_delay = delay
-                if work_times:
-                    last_work_time = work_times[-1]
-                    adjusted_delay = max(0, delay - last_work_time)
-                
-                # Fetch description
-                work_start = time.time()
+                # Fetch description (delay is enforced by TaskQueue's SiteWorker)
                 description, http_status = fetch_job_description(
                     job.job_url,
                     details_selectors,
-                    adjusted_delay
+                    delay,
+                    skip_delay=True
                 )
-                work_end = time.time()
-                work_times.append(work_end - work_start - adjusted_delay)
                 
                 # Count alive vs dead
                 if http_status == 200:
