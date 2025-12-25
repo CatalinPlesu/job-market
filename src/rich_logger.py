@@ -29,6 +29,9 @@ class RichLogger:
     Provides colorful console output, progress bars, and live status panels.
     """
     
+    # Configuration constants
+    LIVE_REFRESH_RATE = 4  # Refresh rate in Hz (times per second)
+    
     def __init__(self):
         self.console = Console()
         self.progress = Progress(
@@ -220,7 +223,7 @@ class RichLogger:
     def start_live_display(self):
         """Start live display mode with progress bars."""
         if not self.is_live:
-            self.live = Live(self.progress, console=self.console, refresh_per_second=4)
+            self.live = Live(self.progress, console=self.console, refresh_per_second=self.LIVE_REFRESH_RATE)
             self.live.start()
             self.is_live = True
     

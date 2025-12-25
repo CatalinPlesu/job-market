@@ -250,7 +250,7 @@ def execute_stage1_for_site(rules, logger, rich_logger):
         pages = find_max_pages_simple(site_name, rules, delay)
         
         # Start progress tracking
-        task_id = rich_logger.start_stage("Stage 1", site_name, pages)
+        rich_logger.start_stage("Stage 1", site_name, pages)
         rich_logger.set_stage_status_message(site_name, "Stage 1", f"Found {pages} pages")
         
         # Scrape pages
@@ -323,6 +323,9 @@ def execute_stage2_for_site(rules, logger, rich_logger):
         total_jobs = len(jobs_without_description)
         
         if total_jobs == 0:
+            # No jobs to process - mark as complete with no progress
+            rich_logger.start_stage("Stage 2", site_name, 0)
+            rich_logger.complete_stage(site_name, "Stage 2", "success")
             return Stage2Stats(
                 site=site_name,
                 total_jobs=0,
@@ -332,7 +335,7 @@ def execute_stage2_for_site(rules, logger, rich_logger):
             )
         
         # Start progress tracking
-        task_id = rich_logger.start_stage("Stage 2", site_name, total_jobs)
+        rich_logger.start_stage("Stage 2", site_name, total_jobs)
         rich_logger.set_stage_status_message(site_name, "Stage 2", f"Processing {total_jobs} jobs")
         
         # Get details selectors
@@ -464,6 +467,9 @@ def execute_stage3_for_site(rules, logger, rich_logger):
         total_checked = len(jobs_to_recheck)
         
         if total_checked == 0:
+            # No jobs to recheck - mark as complete with no progress
+            rich_logger.start_stage("Stage 3", site_name, 0)
+            rich_logger.complete_stage(site_name, "Stage 3", "success")
             return Stage3Stats(
                 site=site_name,
                 total_checked=0,
@@ -472,7 +478,7 @@ def execute_stage3_for_site(rules, logger, rich_logger):
             )
         
         # Start progress tracking
-        task_id = rich_logger.start_stage("Stage 3", site_name, total_checked)
+        rich_logger.start_stage("Stage 3", site_name, total_checked)
         rich_logger.set_stage_status_message(site_name, "Stage 3", f"Rechecking {total_checked} jobs")
         
         # Get details selectors
