@@ -256,3 +256,114 @@ class DailyReport:
             # Fall back to JSON
             report_data = DailyReport.load_report(report_file)
             print(json.dumps(report_data, indent=2))
+    
+    @staticmethod
+    def display_report_rich(report_file: Path, rich_logger):
+        """
+        Display a report with rich formatting.
+        
+        Args:
+            report_file: Path to report file
+            rich_logger: RichLogger instance for formatted output
+        """
+        from rich.table import Table
+        
+        report_data = DailyReport.load_report(report_file)
+        
+        rich_logger.print_header(
+            f"DAILY SCRAPING REPORT - {report_data['date']}",
+            f"Generated at {report_data['completed_at']}"
+        )
+        
+        # Stage 1 Table
+        rich_logger.print_section("Stage 1: Job Listings Scraping")
+        table1 = Table(show_header=True, header_style="bold cyan")
+        table1.add_column("Site", style="yellow", no_wrap=True)
+        table1.add_column("Links Found", justify="right", style="green")
+        table1.add_column("Pages Scraped", justify="right", style="blue")
+        table1.add_column("Errors", justify="right", style="red")
+        
+        for site_stats in report_data['stage1']['sites']:
+            table1.add_row(
+                site_stats['site'],
+                str(site_stats['links_found']),
+                str(site_stats['pages_scraped']),
+                str(site_stats['errors'])
+            )
+        
+        agg = report_data['stage1']['aggregated']
+        table1.add_row(
+            "[bold]TOTAL[/bold]",
+            f"[bold]{agg['total_links']}[/bold]",
+            f"[bold]{agg['total_pages']}[/bold]",
+            f"[bold]{agg['total_errors']}[/bold]",
+            style="bold"
+        )
+        
+        rich_logger.console.print(table1)
+        rich_logger.console.print()
+        
+        # Stage 2 Table
+        rich_logger.print_section("Stage 2: Job Details Scraping")
+        table2 = Table(show_header=True, header_style="bold cyan")
+        table2.add_column("Site", style="yellow", no_wrap=True)
+        table2.add_column("Total", justify="right", style="cyan")
+        table2.add_column("Success", justify="right", style="green")
+        table2.add_column("Empty", justify="right", style="yellow")
+        table2.add_column("Failed", justify="right", style="red")
+        table2.add_column("HTTP 200", justify="right", style="blue")
+        table2.add_column("HTTP 404", justify="right", style="magenta")
+        
+        for site_stats in report_data['stage2']['sites']:
+            table2.add_row(
+                site_stats['site'],
+                str(site_stats['total_jobs']),
+                str(site_stats['success']),
+                str(site_stats['empty']),
+                str(site_stats['failed']),
+                str(site_stats['http_200']),
+                str(site_stats['http_404'])
+            )
+        
+        agg = report_data['stage2']['aggregated']
+        table2.add_row(
+            "[bold]TOTAL[/bold]",
+            f"[bold]{agg['total_jobs']}[/bold]",
+            f"[bold]{agg['total_success']}[/bold]",
+            f"[bold]{agg['total_empty']}[/bold]",
+            f"[bold]{agg['total_failed']}[/bold]",
+            f"[bold]{agg['total_http_200']}[/bold]",
+            f"[bold]{agg['total_http_404']}[/bold]",
+            style="bold"
+        )
+        
+        rich_logger.console.print(table2)
+        rich_logger.console.print()
+        
+        # Stage 3 Table
+        rich_logger.print_section("Stage 3: Job Status Recheck")
+        table3 = Table(show_header=True, header_style="bold cyan")
+        table3.add_column("Site", style="yellow", no_wrap=True)
+        table3.add_column("Total Checked", justify="right", style="cyan")
+        table3.add_column("Alive", justify="right", style="green")
+        table3.add_column("Dead", justify="right", style="red")
+        
+        for site_stats in report_data['stage3']['sites']:
+            table3.add_row(
+                site_stats['site'],
+                str(site_stats['total_checked']),
+                str(site_stats['alive']),
+                str(site_stats['dead'])
+            )
+        
+        agg = report_data['stage3']['aggregated']
+        table3.add_row(
+            "[bold]TOTAL[/bold]",
+            f"[bold]{agg['total_checked']}[/bold]",
+            f"[bold]{agg['total_alive']}[/bold]",
+            f"[bold]{agg['total_dead']}[/bold]",
+            style="bold"
+        )
+        
+        rich_logger.console.print(table3)
+        rich_logger.console.print()
