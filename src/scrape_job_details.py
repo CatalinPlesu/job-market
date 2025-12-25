@@ -204,7 +204,7 @@ def scrape_site_details(rules):
         db.close()
 
 
-def fetch_job_description(url, selectors, delay=Config.default_crawl_delay, skip_delay=False):
+def fetch_job_description(url, selectors, delay=Config.default_crawl_delay, skip_delay: bool = False):
     """
     Fetch job description from URL using CSS selectors.
     Falls back to simplified selector, then body content if selectors don't find anything.

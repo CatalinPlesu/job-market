@@ -389,7 +389,7 @@ def execute_stage2_for_site(rules, logger, rich_logger):
                 description, http_status = fetch_job_description(
                     job.job_url,
                     details_selectors,
-                    delay,
+                    delay=0,
                     skip_delay=True
                 )
                 
@@ -532,7 +532,7 @@ def execute_stage3_for_site(rules, logger, rich_logger):
                 description, http_status = fetch_job_description(
                     job.job_url,
                     details_selectors,
-                    delay,
+                    delay=0,
                     skip_delay=True
                 )
                 
