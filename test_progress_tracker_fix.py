@@ -3,7 +3,8 @@ Test that print_threaded handles None progress_tracker gracefully.
 This test verifies the fix for the error:
 'NoneType' object has no attribute 'add_log_message'
 """
-from src.scrape_jobs_list import print_threaded, progress_tracker
+from src.scrape_jobs_list import print_threaded, progress_tracker, store_jobs
+from src.scrape_database import ScrapeSessionLocal
 
 
 def test_print_threaded_with_none_tracker():
@@ -25,9 +26,6 @@ def test_print_threaded_with_none_tracker():
 
 def test_store_jobs_with_none_tracker():
     """Test that store_jobs doesn't crash when progress_tracker is None"""
-    from src.scrape_jobs_list import store_jobs
-    from src.scrape_database import ScrapeSessionLocal
-    
     print("Testing store_jobs with None progress_tracker...")
     
     # Create a test database session
