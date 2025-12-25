@@ -526,8 +526,11 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
         bool: True if the page exists and has the correct page number, False otherwise.
     
     Note:
-        If the page-number selector is not provided in rules or cannot be parsed,
-        the function falls back to checking if job cards exist on the page.
+        If the page-number selector is provided in rules, it will ONLY use that for
+        verification and not fall back to job checks. This prevents false positives
+        when sites redirect invalid pages to valid pages with jobs.
+        If the page-number selector is not provided, it falls back to checking if
+        job cards exist on the page.
     """
     # Apply delay before request
     if delay > 0:
@@ -543,7 +546,7 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
     
     # Check if page-number selector exists in rules
     if Config.scraper_page_number in rules:
-        # Try to verify using page number indicator
+        # Use page number indicator for verification (no fallback to job check)
         page_number_selector = rules[Config.scraper_page_number]
         page_number_element = soup.select_one(page_number_selector)
         
@@ -553,10 +556,14 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
                 actual_page_number = int(page_text)
                 return actual_page_number == expected_page_number
             except ValueError:
-                # If we can't parse the page number, fall through to job check
-                pass
+                # Can't parse page number, so page doesn't match
+                return False
+        else:
+            # Page number element not found, page doesn't exist
+            return False
     
-    # Fallback: check if jobs exist on the page
+    # Fallback: only used if no page-number selector is configured
+    # Check if jobs exist on the page
     job_card_selector = rules[Config.scraper_job_card]
     job_cards = soup.select(job_card_selector)
     return len(job_cards) > 0
