@@ -13,7 +13,7 @@
     },
     {
         "name": "rabota.md",
-        "pagination": "https://www.rabota.md/ro/jobs-moldova/{page}",
+        "pagination": "https://www.rabota.md/ro/jobs-moldova/page-{page}",
 		"job-card": ".previewCardContent",
 		"job-url": "a.vacancyShowPopup",
 		"job-title": "a.vacancyShowPopup span",
