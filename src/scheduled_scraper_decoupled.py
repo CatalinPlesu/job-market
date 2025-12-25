@@ -285,6 +285,9 @@ def execute_stage1_for_site(rules, logger, rich_logger):
         # Scrape pages
         for i in range(1, pages + 1):
             try:
+                # Update status to show current page being scraped
+                rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping page {i}/{pages}")
+                
                 pagination = rules[Config.scraper_pagination]
                 url = pagination.replace("{page}", str(i))
                 
@@ -372,8 +375,17 @@ def execute_stage2_for_site(rules, logger, rich_logger):
         
         # Process jobs
         work_times = []
+        job_index = 0
         for job in jobs_without_description:
+            job_index += 1
             try:
+                # Update status to show current job being processed
+                rich_logger.set_stage_status_message(
+                    site_name, 
+                    "Stage 2", 
+                    f"Processing job {job_index}/{total_jobs}"
+                )
+                
                 # Calculate adjusted delay
                 adjusted_delay = delay
                 if work_times:
@@ -515,8 +527,17 @@ def execute_stage3_for_site(rules, logger, rich_logger):
         
         # Process jobs
         work_times = []
+        job_index = 0
         for job in jobs_to_recheck:
+            job_index += 1
             try:
+                # Update status to show current job being rechecked
+                rich_logger.set_stage_status_message(
+                    site_name,
+                    "Stage 3",
+                    f"Rechecking job {job_index}/{total_checked}"
+                )
+                
                 # Calculate adjusted delay
                 adjusted_delay = delay
                 if work_times:

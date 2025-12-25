@@ -171,10 +171,18 @@ class RichLogger:
                 self.site_status[site_name][stage_name]['completed_at'] = datetime.now()
     
     def set_stage_status_message(self, site_name: str, stage_name: str, message: str):
-        """Set a status message for a stage."""
+        """Set a status message for a stage and update the progress bar description."""
         with self.status_lock:
             if site_name in self.site_status and stage_name in self.site_status[site_name]:
                 self.site_status[site_name][stage_name]['message'] = message
+        
+        # Update the progress bar description to show the status message
+        with self.task_lock:
+            if site_name in self.tasks and stage_name in self.tasks[site_name]:
+                task_id = self.tasks[site_name][stage_name]
+                # Update description to include the status message
+                new_description = f"[{stage_name}] {site_name} - {message}"
+                self.progress.update(task_id, description=new_description)
     
     def get_status_table(self) -> Table:
         """Generate a status table showing all sites and their stages."""
