@@ -284,10 +284,10 @@ def execute_stage1_for_site(rules, logger, rich_logger):
         
         # Scrape pages
         for i in range(1, pages + 1):
+            # Update status to show current page being scraped
+            rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping page {i}/{pages}")
+            
             try:
-                # Update status to show current page being scraped
-                rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping page {i}/{pages}")
-                
                 pagination = rules[Config.scraper_pagination]
                 url = pagination.replace("{page}", str(i))
                 
@@ -298,12 +298,12 @@ def execute_stage1_for_site(rules, logger, rich_logger):
                 # Store jobs
                 store_jobs(db, jobs)
                 
-                # Update progress
-                rich_logger.update_progress(site_name, "Stage 1", 1)
-                
             except Exception as e:
                 errors += 1
                 logger.error(f"Stage 1 - {site_name} page {i}: {e}")
+            finally:
+                # Always update progress, even if scraping failed
+                rich_logger.update_progress(site_name, "Stage 1", 1)
         
         rich_logger.complete_stage(site_name, "Stage 1", "success")
         
@@ -378,14 +378,14 @@ def execute_stage2_for_site(rules, logger, rich_logger):
         job_index = 0
         for job in jobs_without_description:
             job_index += 1
+            # Update status to show current job being processed
+            rich_logger.set_stage_status_message(
+                site_name, 
+                "Stage 2", 
+                f"Processing job {job_index}/{total_jobs}"
+            )
+            
             try:
-                # Update status to show current job being processed
-                rich_logger.set_stage_status_message(
-                    site_name, 
-                    "Stage 2", 
-                    f"Processing job {job_index}/{total_jobs}"
-                )
-                
                 # Calculate adjusted delay
                 adjusted_delay = delay
                 if work_times:
@@ -425,13 +425,13 @@ def execute_stage2_for_site(rules, logger, rich_logger):
                 update_job_check(db, job.id, today, http_status)
                 db.commit()
                 
-                # Update progress
-                rich_logger.update_progress(site_name, "Stage 2", 1)
-                
             except Exception as e:
                 failed += 1
                 logger.error(f"Stage 2 - {site_name} job {job.id}: {e}")
                 db.rollback()
+            finally:
+                # Always update progress, even if processing failed
+                rich_logger.update_progress(site_name, "Stage 2", 1)
         
         rich_logger.complete_stage(site_name, "Stage 2", "success")
     
@@ -530,14 +530,14 @@ def execute_stage3_for_site(rules, logger, rich_logger):
         job_index = 0
         for job in jobs_to_recheck:
             job_index += 1
+            # Update status to show current job being rechecked
+            rich_logger.set_stage_status_message(
+                site_name,
+                "Stage 3",
+                f"Rechecking job {job_index}/{total_checked}"
+            )
+            
             try:
-                # Update status to show current job being rechecked
-                rich_logger.set_stage_status_message(
-                    site_name,
-                    "Stage 3",
-                    f"Rechecking job {job_index}/{total_checked}"
-                )
-                
                 # Calculate adjusted delay
                 adjusted_delay = delay
                 if work_times:
@@ -570,13 +570,13 @@ def execute_stage3_for_site(rules, logger, rich_logger):
                 update_job_check(db, job.id, today, http_status)
                 db.commit()
                 
-                # Update progress
-                rich_logger.update_progress(site_name, "Stage 3", 1)
-                
             except Exception as e:
                 dead += 1
                 logger.error(f"Stage 3 - {site_name} job {job.id}: {e}")
                 db.rollback()
+            finally:
+                # Always update progress, even if rechecking failed
+                rich_logger.update_progress(site_name, "Stage 3", 1)
         
         rich_logger.complete_stage(site_name, "Stage 3", "success")
     
