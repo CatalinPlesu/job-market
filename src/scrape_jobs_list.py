@@ -524,6 +524,10 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
     
     Returns:
         bool: True if the page exists and has the correct page number, False otherwise.
+    
+    Note:
+        If the page-number selector is not provided in rules or cannot be parsed,
+        the function falls back to checking if job cards exist on the page.
     """
     # Apply delay before request
     if delay > 0:
@@ -532,30 +536,25 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
     try:
         response = requests.get(url)
         response.raise_for_status()
-    except:
+    except requests.RequestException:
         return False
     
     soup = BeautifulSoup(response.content, 'html.parser')
     
     # Check if page-number selector exists in rules
-    if Config.scraper_page_number not in rules:
-        # Fallback to checking if jobs exist
-        job_card_selector = rules[Config.scraper_job_card]
-        job_cards = soup.select(job_card_selector)
-        return len(job_cards) > 0
-    
-    # Check if the page number indicator is present
-    page_number_selector = rules[Config.scraper_page_number]
-    page_number_element = soup.select_one(page_number_selector)
-    
-    if page_number_element:
-        page_text = page_number_element.get_text(strip=True)
-        try:
-            actual_page_number = int(page_text)
-            return actual_page_number == expected_page_number
-        except ValueError:
-            # If we can't parse the page number, fall back to checking for jobs
-            pass
+    if Config.scraper_page_number in rules:
+        # Try to verify using page number indicator
+        page_number_selector = rules[Config.scraper_page_number]
+        page_number_element = soup.select_one(page_number_selector)
+        
+        if page_number_element:
+            page_text = page_number_element.get_text(strip=True)
+            try:
+                actual_page_number = int(page_text)
+                return actual_page_number == expected_page_number
+            except ValueError:
+                # If we can't parse the page number, fall through to job check
+                pass
     
     # Fallback: check if jobs exist on the page
     job_card_selector = rules[Config.scraper_job_card]
