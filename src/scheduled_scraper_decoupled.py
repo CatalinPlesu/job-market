@@ -8,7 +8,7 @@ from src.database import SessionLocal, Job, JobCheck
 from src.scrape_jobs_list import (
     get_crawl_delay_with_robotparser, find_max_pages_threaded, 
     scrape_jobs, store_jobs, ThreadProgressTracker, progress_tracker as global_progress_tracker,
-    monitor_progress
+    monitor_progress, check_page_exists
 )
 from src.scrape_job_details import fetch_job_description, update_job_check
 from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
@@ -216,13 +216,13 @@ def find_max_pages_simple(site_name, rules, delay):
         mid = low + (high - low) // 2
         
         page_url = pagination_url.replace("{page}", str(mid))
-        jobs = len(scrape_jobs(page_url, rules, delay))
+        page_exists = check_page_exists(page_url, rules, mid, delay)
         
-        if jobs > 0:
+        if page_exists:
             next_page_url = pagination_url.replace("{page}", str(mid+1))
-            jobs2 = len(scrape_jobs(next_page_url, rules, delay=3))
+            next_page_exists = check_page_exists(next_page_url, rules, mid+1, delay=3)
             
-            if jobs2 > 0:
+            if next_page_exists:
                 low = mid + 1
             else:
                 return mid
