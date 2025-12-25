@@ -14,10 +14,11 @@ class Config:
     scraper_job_title = "job-title"
     scraper_company_name = "company-name"
     scraper_details = "details"
+    scraper_page_number = "page-number"
 
     # Scraper Timeouts and Limits
     request_timeout = 10  # seconds
-    max_page = 2000  # Maximum pages to search in binary search
+    max_page = 500  # Maximum pages to search in binary search
     default_crawl_delay = 1.0  # seconds
     min_crawl_delay = 0.5  # seconds
     max_crawl_delay = 5.0  # seconds

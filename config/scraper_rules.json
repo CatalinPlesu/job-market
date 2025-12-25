@@ -6,17 +6,19 @@
 		"job-url": "a.mui-8ugpds",
 		"job-title": "a.mui-8ugpds",
 		"company-name": "a.mui-14nesz",
+		"page-number": "li.Mui-selected a",
 		"details": [
 			".MuiContainer-root"
 		]
     },
     {
         "name": "rabota.md",
-        "pagination": "https://www.rabota.md/ro/jobs-moldova/{page}",
+        "pagination": "https://www.rabota.md/ro/jobs-moldova/page-{page}",
 		"job-card": ".previewCardContent",
 		"job-url": "a.vacancyShowPopup",
 		"job-title": "a.vacancyShowPopup span",
 		"company-name": ".text-black.flex.items-center span",
+		"page-number": "a.bg-red-500",
 		"details": [
 			"#main .content_wr"
 		]
@@ -28,6 +30,7 @@
 		"job-url": "a.link-job[title]",
 		"job-title": "a.link-job[title]",
 		"company-name": "img[alt]",
+		"page-number": "li.active a",
 		"details": [
 			".employer-details-page .detail-page-head",
 			".employer-details-page .lead",

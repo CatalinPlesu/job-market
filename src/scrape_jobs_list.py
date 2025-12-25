@@ -311,24 +311,24 @@ def find_max_pages_threaded(thread_id, site_name, rules, delay):
         page_url = pagination_url.replace("{page}", str(mid))
         print_threaded(thread_id, f"Testing URL: {page_url}")
         
-        jobs = len(scrape_jobs(page_url, rules, delay))
-        print_threaded(thread_id, f"Found {jobs} jobs on page {mid}")
+        page_exists = check_page_exists(page_url, rules, mid, delay)
+        print_threaded(thread_id, f"Page {mid} exists: {page_exists}")
 
-        if jobs > 0:
+        if page_exists:
             next_page_url = pagination_url.replace("{page}", str(mid+1))
             print_threaded(thread_id, f"Testing next page {mid+1} at URL: {next_page_url}")
             
-            jobs2 = len(scrape_jobs(next_page_url, rules, delay = 3))
-            print_threaded(thread_id, f"Found {jobs2} jobs on page {mid+1}")
+            next_page_exists = check_page_exists(next_page_url, rules, mid+1, delay=3)
+            print_threaded(thread_id, f"Page {mid+1} exists: {next_page_exists}")
             
-            if jobs2 > 0:
-                print_threaded(thread_id, f"Page {mid+1} exists with jobs, moving low to {mid + 1}")
+            if next_page_exists:
+                print_threaded(thread_id, f"Page {mid+1} exists, moving low to {mid + 1}")
                 low = mid + 1
             else:
-                print_threaded(thread_id, f"Page {mid+1} has no jobs, max page found: {mid}")
+                print_threaded(thread_id, f"Page {mid+1} does not exist, max page found: {mid}")
                 return mid
         else:
-            print_threaded(thread_id, f"Page {mid} has no jobs, moving high to {mid - 1}")
+            print_threaded(thread_id, f"Page {mid} does not exist, moving high to {mid - 1}")
             high = mid - 1
     
     print_threaded(thread_id, f"Binary search completed. Returning low value: {low}")
@@ -511,3 +511,61 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
             jobs_data.append(job_data)
 
     return jobs_data
+
+def check_page_exists(url, rules, expected_page_number, delay=Config.default_crawl_delay):
+    """
+    Check if a page exists by verifying the page number indicator on the page.
+    
+    Args:
+        url (str): The URL of the page to check.
+        rules (dict): A dictionary containing CSS selectors for scraping.
+        expected_page_number (int): The expected page number.
+        delay (float): Time to wait before making the request (in seconds).
+    
+    Returns:
+        bool: True if the page exists and has the correct page number, False otherwise.
+    
+    Note:
+        If the page-number selector is configured, it will try to verify the page number.
+        If a matching element with the expected page number is found, returns True.
+        If matching elements are found but none have the expected page number, returns False
+        (strict check to prevent false positives when sites redirect invalid pages).
+        If no matching elements are found, falls back to checking for job cards.
+    """
+    # Apply delay before request
+    if delay > 0:
+        time.sleep(delay)
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.RequestException:
+        return False
+    
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    # Check if page-number selector exists in rules
+    if Config.scraper_page_number in rules:
+        # Try to verify using page number indicator
+        page_number_selector = rules[Config.scraper_page_number]
+        page_number_elements = soup.select(page_number_selector)
+        
+        if page_number_elements:
+            # Found pagination elements, check if any match the expected page
+            for element in page_number_elements:
+                page_text = element.get_text(strip=True)
+                try:
+                    actual_page_number = int(page_text)
+                    if actual_page_number == expected_page_number:
+                        return True
+                except ValueError:
+                    # Can't parse this element, try the next one
+                    continue
+            # Found pagination elements but none matched the expected page
+            return False
+        # If no pagination elements found, fall through to job check
+    
+    # Fallback: check if jobs exist on the page
+    job_card_selector = rules[Config.scraper_job_card]
+    job_cards = soup.select(job_card_selector)
+    return len(job_cards) > 0
