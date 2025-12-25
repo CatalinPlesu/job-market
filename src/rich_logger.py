@@ -161,7 +161,9 @@ class RichLogger:
         with self.task_lock:
             if site_name in self.tasks and stage_name in self.tasks[site_name]:
                 task_id = self.tasks[site_name][stage_name]
-                self.progress.update(task_id, completed=True)
+                # Set completed to total to mark as 100% done
+                task = self.progress.tasks[task_id]
+                self.progress.update(task_id, completed=task.total)
         
         with self.status_lock:
             if site_name in self.site_status and stage_name in self.site_status[site_name]:
