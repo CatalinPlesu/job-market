@@ -229,11 +229,11 @@ def find_max_pages_simple(site_name, rules, delay, rich_logger=None):
             )
         
         page_url = pagination_url.replace("{page}", str(mid))
-        page_exists = check_page_exists(page_url, rules, mid, delay)
+        page_exists = check_page_exists(page_url, rules, mid, delay=0, skip_delay=True)
         
         if page_exists:
             next_page_url = pagination_url.replace("{page}", str(mid+1))
-            next_page_exists = check_page_exists(next_page_url, rules, mid+1, delay=3)
+            next_page_exists = check_page_exists(next_page_url, rules, mid+1, delay=0, skip_delay=True)
             
             if next_page_exists:
                 low = mid + 1

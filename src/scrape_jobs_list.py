@@ -513,7 +513,7 @@ def scrape_jobs(url, rules, delay=Config.default_crawl_delay):
 
     return jobs_data
 
-def check_page_exists(url, rules, expected_page_number, delay=Config.default_crawl_delay):
+def check_page_exists(url, rules, expected_page_number, delay=Config.default_crawl_delay, skip_delay: bool = False):
     """
     Check if a page exists by verifying the page number indicator on the page.
     
@@ -522,6 +522,7 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
         rules (dict): A dictionary containing CSS selectors for scraping.
         expected_page_number (int): The expected page number.
         delay (float): Time to wait before making the request (in seconds).
+        skip_delay (bool): If True, skip the sleep delay (used when delay is enforced externally).
     
     Returns:
         bool: True if the page exists and has the correct page number, False otherwise.
@@ -533,8 +534,8 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
         (strict check to prevent false positives when sites redirect invalid pages).
         If no matching elements are found, falls back to checking for job cards.
     """
-    # Apply delay before request
-    if delay > 0:
+    # Apply delay before request (unless externally managed)
+    if delay > 0 and not skip_delay:
         time.sleep(delay)
     
     try:
