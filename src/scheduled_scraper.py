@@ -24,78 +24,13 @@ import time
 
 def run_all_stages_scheduled():
     """
-    Run all scraping stages (1, 2, 3) in sequence with reporting and error logging.
+    Run all scraping stages (1, 2, 3) with decoupled per-site execution.
     This is the main entry point for scheduled execution.
+    Uses the new task queue system where each site progresses independently.
     """
-    # Initialize components
-    logger = get_logger()
-    report = DailyReport()
-    backup = DatabaseBackup(Config.db_path, keep_days=3)
-    
-    print(f"\n{'='*80}")
-    print(f"SCHEDULED SCRAPING RUN - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{'='*80}\n")
-    
-    try:
-        # Create database backup before starting
-        print("Creating database backup...")
-        backup.backup_and_cleanup()
-        print()
-        
-        # Stage 1: Scrape job listings
-        print("\n" + "="*80)
-        print("STAGE 1: Scraping Job Listings")
-        print("="*80 + "\n")
-        
-        try:
-            stage1_stats = run_stage1_with_stats()
-            for stats in stage1_stats:
-                report.add_stage1_stats(stats)
-        except Exception as e:
-            logger.exception(f"Stage 1 failed: {e}")
-            print(f"ERROR in Stage 1: {e}")
-        
-        # Stage 2: Get job details
-        print("\n" + "="*80)
-        print("STAGE 2: Scraping Job Details")
-        print("="*80 + "\n")
-        
-        try:
-            stage2_stats = run_stage2_with_stats()
-            for stats in stage2_stats:
-                report.add_stage2_stats(stats)
-        except Exception as e:
-            logger.exception(f"Stage 2 failed: {e}")
-            print(f"ERROR in Stage 2: {e}")
-        
-        # Stage 3: Recheck alive jobs
-        print("\n" + "="*80)
-        print("STAGE 3: Rechecking Job Status")
-        print("="*80 + "\n")
-        
-        try:
-            stage3_stats = run_stage3_with_stats()
-            for stats in stage3_stats:
-                report.add_stage3_stats(stats)
-        except Exception as e:
-            logger.exception(f"Stage 3 failed: {e}")
-            print(f"ERROR in Stage 3: {e}")
-        
-        # Save report
-        report.save()
-        print(f"\n{'='*80}")
-        print(f"Report saved to: {report.report_file}")
-        print(f"{'='*80}\n")
-        
-        # Display summary
-        report.display_report(report.report_file)
-        
-    except Exception as e:
-        logger.exception(f"Scheduled run failed: {e}")
-        print(f"\n{'='*80}")
-        print(f"FATAL ERROR: Scheduled run failed: {e}")
-        print(f"{'='*80}\n")
-        raise
+    # Import and delegate to decoupled implementation
+    from src.scheduled_scraper_decoupled import run_all_stages_decoupled
+    run_all_stages_decoupled()
 
 
 def run_stage1_with_stats():
