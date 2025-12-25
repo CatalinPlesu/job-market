@@ -188,14 +188,15 @@ def run_all_stages_decoupled():
         raise
 
 
-def find_max_pages_simple(site_name, rules, delay):
+def find_max_pages_simple(site_name, rules, delay, rich_logger=None):
     """
-    Find maximum pages using binary search without progress tracker.
+    Find maximum pages using binary search with optional progress tracking.
     
     Args:
         site_name: Name of the site being scraped
         rules: Scraper rules dictionary
         delay: Crawl delay in seconds
+        rich_logger: Optional RichLogger for progress tracking
     
     Returns:
         int: Maximum page number with jobs
@@ -207,9 +208,25 @@ def find_max_pages_simple(site_name, rules, delay):
     low = 1
     iteration = 0
     
+    # Estimate max iterations for binary search (log2(max_page) + buffer)
+    import math
+    max_iterations = int(math.log2(max_page)) + 3
+    
+    # Start progress tracking for binary search if logger provided
+    if rich_logger:
+        rich_logger.start_stage("Finding pages", site_name, max_iterations)
+    
     while low <= high:
         iteration += 1
         mid = low + (high - low) // 2
+        
+        # Update progress message
+        if rich_logger:
+            rich_logger.set_stage_status_message(
+                site_name, 
+                "Finding pages", 
+                f"Checking page {mid} (range: {low}-{high})"
+            )
         
         page_url = pagination_url.replace("{page}", str(mid))
         page_exists = check_page_exists(page_url, rules, mid, delay)
@@ -221,9 +238,21 @@ def find_max_pages_simple(site_name, rules, delay):
             if next_page_exists:
                 low = mid + 1
             else:
+                # Found the last page
+                if rich_logger:
+                    rich_logger.update_progress(site_name, "Finding pages", max_iterations - iteration + 1)
+                    rich_logger.complete_stage(site_name, "Finding pages", "success")
                 return mid
         else:
             high = mid - 1
+        
+        # Update progress after each iteration
+        if rich_logger:
+            rich_logger.update_progress(site_name, "Finding pages", 1)
+    
+    # Complete the search
+    if rich_logger:
+        rich_logger.complete_stage(site_name, "Finding pages", "success")
     
     return low
 
@@ -246,12 +275,12 @@ def execute_stage1_for_site(rules, logger, rich_logger):
         # Get crawl delay
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
         
-        # Find max pages (using simple version without progress tracker)
-        pages = find_max_pages_simple(site_name, rules, delay)
+        # Find max pages with progress tracking
+        pages = find_max_pages_simple(site_name, rules, delay, rich_logger)
         
-        # Start progress tracking
+        # Start progress tracking for scraping
         rich_logger.start_stage("Stage 1", site_name, pages)
-        rich_logger.set_stage_status_message(site_name, "Stage 1", f"Found {pages} pages")
+        rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping {pages} pages")
         
         # Scrape pages
         for i in range(1, pages + 1):
