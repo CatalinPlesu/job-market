@@ -1,11 +1,12 @@
 """
 Database backup module.
-Handles database backups and cleanup of old backups.
+Handles database backups and cleanup of old backups for both scrape.db and data.db.
 """
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List
+from config.settings import Config
 
 
 class DatabaseBackup:
@@ -156,3 +157,35 @@ class DatabaseBackup:
             print(f"✓ Cleaned up {deleted} old backup(s)")
         
         return backup_path
+
+
+def backup_all_databases(backup_dir: str = "backups", keep_days: int = 3):
+    """
+    Backup both scrape.db and data.db databases.
+    
+    Args:
+        backup_dir: Directory to store backups
+        keep_days: Number of days of backups to keep
+    
+    Returns:
+        Tuple of (scrape_backup_path, data_backup_path)
+    """
+    scrape_backup = DatabaseBackup(Config.scrape_db_path, backup_dir, keep_days)
+    data_backup = DatabaseBackup(Config.data_db_path, backup_dir, keep_days)
+    
+    scrape_path = None
+    data_path = None
+    
+    # Backup scrape.db if it exists
+    if Path(Config.scrape_db_path).exists():
+        scrape_path = scrape_backup.backup_and_cleanup()
+    else:
+        print(f"⚠ Scrape database not found: {Config.scrape_db_path}")
+    
+    # Backup data.db if it exists
+    if Path(Config.data_db_path).exists():
+        data_path = data_backup.backup_and_cleanup()
+    else:
+        print(f"⚠ Data database not found: {Config.data_db_path}")
+    
+    return scrape_path, data_path

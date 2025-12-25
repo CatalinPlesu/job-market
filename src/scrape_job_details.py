@@ -1,5 +1,5 @@
 from config.settings import Config
-from src.database import SessionLocal, Job, JobCheck
+from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -83,7 +83,7 @@ def scrape_site_details(rules):
     site = rules[Config.scraper_name]
     
     # Each thread gets its own database session
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     try:

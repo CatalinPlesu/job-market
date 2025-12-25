@@ -8,8 +8,9 @@ from openai import OpenAI
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.database import Job, JobDetail, engine
-from src.repository import JobRepository
+from src.scrape_database import Job as ScrapeJob, scrape_engine
+from src.data_database import JobDetail, data_engine
+from src.data_repository import JobRepository
 from config.settings import Config
 
 # Constants
@@ -28,19 +29,28 @@ client = OpenAI(
 )
 
 
-def get_unprocessed_job_ids_for_site(session, site, limit=None):
-    """Fetch unprocessed job IDs for a specific site."""
-    query = session.query(Job.id).outerjoin(JobDetail).filter(
-        Job.site == site,
-        JobDetail.id.is_(None),
-        Job.job_description.isnot(None),
-        Job.job_description != ''
-    )
+def get_unprocessed_job_ids_for_site(scrape_session, data_session, site, limit=None):
+    """Fetch unprocessed job IDs for a specific site.
+    
+    Gets jobs from scrape.db that don't have corresponding JobDetail in data.db.
+    """
+    # Get all job URLs from scrape.db for this site that have descriptions
+    scrape_jobs = scrape_session.query(ScrapeJob.id, ScrapeJob.job_url).filter(
+        ScrapeJob.site == site,
+        ScrapeJob.job_description.isnot(None),
+        ScrapeJob.job_description != ''
+    ).all()
+    
+    # Get all processed job URLs from data.db
+    processed_urls = set(row[0] for row in data_session.query(JobDetail.job_url).all())
+    
+    # Filter to only unprocessed jobs
+    unprocessed_ids = [job_id for job_id, job_url in scrape_jobs if job_url not in processed_urls]
     
     if limit:
-        query = query.limit(limit)
+        unprocessed_ids = unprocessed_ids[:limit]
     
-    return [job_id[0] for job_id in query.all()]
+    return unprocessed_ids
 
 
 def extract_json_from_response(content):
@@ -141,22 +151,26 @@ def extract_json_from_response(content):
     return None, errors
 
 
-def process_job(job_id, session_class):
-    """Process a single job using LLM."""
-    session = session_class()
+def process_job(job_id, scrape_session_class, data_session_class):
+    """Process a single job using LLM.
+    
+    Reads from scrape.db and writes to data.db.
+    """
+    scrape_session = scrape_session_class()
+    data_session = data_session_class()
     content = None
     extracted_data = None
     
     try:
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = scrape_session.query(ScrapeJob).filter(ScrapeJob.id == job_id).first()
         if not job:
             return job_id, False, "Job not found", None, None
         
         if not job.job_description or job.job_description.strip() == '':
             return job_id, False, "Missing or empty job description", None, job.site
         
-        # Check if already processed
-        existing_detail = session.query(JobDetail).filter(JobDetail.job_id == job_id).first()
+        # Check if already processed in data.db
+        existing_detail = data_session.query(JobDetail).filter(JobDetail.job_url == job.job_url).first()
         if existing_detail:
             return job_id, False, "Already has JobDetail", None, job.site
         
@@ -225,8 +239,14 @@ Begin JSON object:"""
             error_details = f"LLM Response:\n{content}\n\nParsed as: {extracted_data}"
             return job_id, False, error_msg, error_details, job.site
         
-        # Create JobDetail
-        detail = JobDetail(job_id=job.id)
+        # Create JobDetail in data.db
+        detail = JobDetail(
+            job_url=job.job_url,
+            site=job.site,
+            job_title=job.job_title,
+            company_name=job.company_name,
+            job_description=job.job_description
+        )
         
         # Handle foreign keys
         fk_mappings = [
@@ -255,8 +275,8 @@ Begin JSON object:"""
         ]
         
         try:
-            with JobRepository(session=session) as repo:
-                from src.database import (
+            with JobRepository(session=data_session) as repo:
+                from src.data_database import (
                     Titles, JobFunctions, SeniorityLevels, Industries, Departments,
                     JobFamilies, Specializations, EducationLevels, EmploymentTypes,
                     ContractTypes, WorkSchedules, ShiftDetails, RemoteWorkOptions,
@@ -307,11 +327,11 @@ Begin JSON object:"""
                         except:
                             pass
                 
-                session.add(detail)
-                session.flush()
+                data_session.add(detail)
+                data_session.flush()
                 
                 # Handle many-to-many relationships
-                from src.database import (
+                from src.data_database import (
                     HardSkills, SoftSkills, Certifications, Licenses, Benefits,
                     WorkEnvironment, ProfessionalDevelopment, WorkLifeBalance,
                     PhysicalRequirements, WorkConditions, SpecialRequirements
@@ -338,19 +358,19 @@ Begin JSON object:"""
                         setattr(detail, relationship_name, m2m_items)
                 
                 # Handle responsibilities
-                from src.database import Responsibility
+                from src.data_database import Responsibility
                 responsibilities = extracted_data.get('responsibilities')
                 if responsibilities:
                     for i, resp in enumerate(responsibilities):
                         if resp:
-                            session.add(Responsibility(
+                            data_session.add(Responsibility(
                                 job_detail_id=detail.id,
                                 description=resp,
                                 order=i
                             ))
                 
                 # Handle languages
-                from src.database import JobLanguage
+                from src.data_database import JobLanguage
                 languages = extracted_data.get('languages')
                 proficiencies = extracted_data.get('language_proficiency')
                 
@@ -361,39 +381,39 @@ Begin JSON object:"""
                             if proficiencies and isinstance(proficiencies, dict):
                                 proficiency = proficiencies.get(lang)
                             
-                            session.add(JobLanguage(
+                            data_session.add(JobLanguage(
                                 job_detail_id=detail.id,
                                 language=lang,
                                 proficiency=proficiency
                             ))
                 
                 # Handle contact emails
-                from src.database import ContactEmail
+                from src.data_database import ContactEmail
                 contact_emails = extracted_data.get('contact_emails')
                 if contact_emails:
                     for email in contact_emails:
                         if email:
-                            session.add(ContactEmail(
+                            data_session.add(ContactEmail(
                                 job_detail_id=detail.id,
                                 email=email
                             ))
                 
                 # Handle contact phones
-                from src.database import ContactPhone
+                from src.data_database import ContactPhone
                 contact_phones = extracted_data.get('contact_phones')
                 if contact_phones:
                     for phone in contact_phones:
                         if phone:
-                            session.add(ContactPhone(
+                            data_session.add(ContactPhone(
                                 job_detail_id=detail.id,
                                 phone=phone
                             ))
                 
-                session.commit()
+                data_session.commit()
                 return job_id, True, "Success", None, job.site
                 
         except SQLAlchemyError as e:
-            session.rollback()
+            data_session.rollback()
             error_detail = f"{type(e).__name__}: {str(e)[:200]}"
             error_details = f"Database error:\n{str(e)}\n\nExtracted data:\n{json.dumps(extracted_data, indent=2)}"
             return job_id, False, f"Database error: {error_detail}", error_details, job.site
@@ -409,7 +429,8 @@ Begin JSON object:"""
         return job_id, False, error_msg, error_details, None
     
     finally:
-        session.close()
+        scrape_session.close()
+        data_session.close()
 
 
 def format_time(seconds):
@@ -566,24 +587,29 @@ class ProgressTracker:
 
 
 def structure_data_with_llm():
-    """Main function to structure data using LLM with dynamic work-stealing."""
+    """Main function to structure data using LLM with dynamic work-stealing.
+    
+    Reads jobs from scrape.db and writes processed details to data.db.
+    """
     print("Initializing LLM job processor...")
     
-    # Get all unique sites
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
-        sites = [site[0] for site in session.query(Job.site).distinct().all()]
+    # Get all unique sites from scrape.db
+    ScrapeSession = sessionmaker(bind=scrape_engine)
+    DataSession = sessionmaker(bind=data_engine)
+    
+    with ScrapeSession() as scrape_session:
+        sites = [site[0] for site in scrape_session.query(ScrapeJob.site).distinct().all()]
     
     # Prepare jobs for each site
     all_jobs = []
     site_counts = {}
     
     for site in sites:
-        with Session() as session:
+        with ScrapeSession() as scrape_session, DataSession() as data_session:
             if DEBUG:
-                job_ids = get_unprocessed_job_ids_for_site(session, site, JOBS_PER_SITE_DEBUG)
+                job_ids = get_unprocessed_job_ids_for_site(scrape_session, data_session, site, JOBS_PER_SITE_DEBUG)
             else:
-                job_ids = get_unprocessed_job_ids_for_site(session, site)
+                job_ids = get_unprocessed_job_ids_for_site(scrape_session, data_session, site)
             
             if job_ids:
                 site_counts[site] = len(job_ids)
@@ -633,7 +659,8 @@ def structure_data_with_llm():
     
     def worker(thread_id):
         """Worker function - grabs batches dynamically"""
-        local_session_class = sessionmaker(bind=engine)
+        local_scrape_session_class = sessionmaker(bind=scrape_engine)
+        local_data_session_class = sessionmaker(bind=data_engine)
         
         while True:
             batch = job_pool.get_batch(JOBS_PER_BATCH)
@@ -643,7 +670,9 @@ def structure_data_with_llm():
                 break
             
             for site, job_id in batch:
-                job_id_result, success, message, details, result_site = process_job(job_id, local_session_class)
+                job_id_result, success, message, details, result_site = process_job(
+                    job_id, local_scrape_session_class, local_data_session_class
+                )
                 display_site = result_site if result_site else site
                 tracker.update(thread_id, display_site, success, is_active=True)
                 
