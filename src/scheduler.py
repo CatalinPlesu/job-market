@@ -86,7 +86,9 @@ class Scheduler:
         today_scheduled = datetime.combine(now.date(), self.schedule_time)
         
         # If never run before, don't run immediately
-        # Wait for the next scheduled time
+        # This prevents unwanted immediate execution when scheduler starts
+        # after scheduled time has already passed today (e.g., starting at
+        # 20:05 with a 00:00 schedule should wait until tomorrow at 00:00)
         if last_run is None:
             return False
         
