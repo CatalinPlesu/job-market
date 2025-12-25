@@ -4,7 +4,7 @@ Each site progresses through stages independently without waiting for others.
 """
 import json
 from config.settings import Config
-from src.database import SessionLocal, Job, JobCheck
+from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
 from src.scrape_jobs_list import (
     get_crawl_delay_with_robotparser, find_max_pages_threaded, 
     scrape_jobs, store_jobs, ThreadProgressTracker, progress_tracker as global_progress_tracker,
@@ -13,7 +13,7 @@ from src.scrape_jobs_list import (
 from src.scrape_job_details import fetch_job_description, update_job_check
 from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
 from src.error_logger import get_logger
-from src.database_backup import DatabaseBackup
+from src.database_backup import backup_all_databases
 from src.task_queue import TaskQueue, Priority
 from datetime import date, datetime, timezone
 import threading
@@ -30,16 +30,15 @@ def run_all_stages_decoupled():
     # Initialize components
     logger = get_logger()
     report = DailyReport()
-    backup = DatabaseBackup(Config.db_path, keep_days=3)
     
     print(f"\n{'='*80}")
     print(f"DECOUPLED SCHEDULED SCRAPING - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*80}\n")
     
     try:
-        # Create database backup before starting
-        print("Creating database backup...")
-        backup.backup_and_cleanup()
+        # Create database backups before starting
+        print("Creating database backups...")
+        backup_all_databases(keep_days=3)
         print()
         
         # Load scraper rules
@@ -240,7 +239,7 @@ def execute_stage1_for_site(rules, logger):
         Stage1Stats object
     """
     site_name = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     
     links_found = 0
     pages_scraped = 0
@@ -299,7 +298,7 @@ def execute_stage2_for_site(rules, logger):
         Stage2Stats object
     """
     site_name = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     total_jobs = 0
@@ -416,7 +415,7 @@ def execute_stage3_for_site(rules, logger):
         Stage3Stats object
     """
     site_name = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     total_checked = 0

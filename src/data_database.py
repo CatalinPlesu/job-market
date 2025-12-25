@@ -1,0 +1,222 @@
+"""
+Data Database Module
+Handles the data.db database for LLM-processed job data.
+This database stores JobDetail records and all lookup tables.
+"""
+from sqlalchemy import (
+    create_engine, Column, Integer, String, DateTime, Text, 
+    ForeignKey, Date, Numeric, Table
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+from datetime import datetime
+from typing import Type
+from pathlib import Path
+from config.settings import Config
+
+# Ensure database directory exists
+db_path = Path(Config.data_db_path)
+db_path.parent.mkdir(parents=True, exist_ok=True)
+
+# Create engine for data database
+data_engine = create_engine('sqlite:///' + Config.data_db_path, echo=False)
+DataBase = declarative_base()
+DataSessionLocal = sessionmaker(bind=data_engine)
+
+
+# ============ Factory Functions ============
+
+def create_simple_lookup(table_name: str, field_name: str = 'name', 
+                         field_length: int = 200) -> Type[DataBase]:
+    """Create a simple lookup table class dynamically"""
+    
+    attrs = {
+        '__tablename__': table_name,
+        'id': Column(Integer, primary_key=True),
+        field_name: Column(String(field_length), nullable=False, unique=True, index=True),
+    }
+    
+    return type(table_name.title().replace('_', ''), (DataBase,), attrs)
+
+
+def create_m2m_table(left_table: str, right_table: str) -> Table:
+    """Create many-to-many association table"""
+    table_name = f"{left_table}_{right_table}"
+    
+    return Table(
+        table_name, DataBase.metadata,
+        Column(f'{left_table}_id', Integer, ForeignKey(f'{left_table}.id'), primary_key=True),
+        Column(f'{right_table}_id', Integer, ForeignKey(f'{right_table}.id'), primary_key=True)
+    )
+
+
+# ============ Lookup Tables - Simple String Lookups ============
+
+Titles = create_simple_lookup('titles')
+JobFunctions = create_simple_lookup('job_functions')
+SeniorityLevels = create_simple_lookup('seniority_levels')
+Industries = create_simple_lookup('industries')
+Departments = create_simple_lookup('departments')
+JobFamilies = create_simple_lookup('job_families')
+Specializations = create_simple_lookup('specializations')
+EducationLevels = create_simple_lookup('education_levels')
+EmploymentTypes = create_simple_lookup('employment_types')
+ContractTypes = create_simple_lookup('contract_types')
+WorkSchedules = create_simple_lookup('work_schedules')
+ShiftDetails = create_simple_lookup('shift_details')
+RemoteWorkOptions = create_simple_lookup('remote_work_options')
+TravelRequirements = create_simple_lookup('travel_requirements')
+SalaryPeriods = create_simple_lookup('salary_periods')
+Cities = create_simple_lookup('cities')
+Regions = create_simple_lookup('regions')
+Countries = create_simple_lookup('countries')
+Companies = create_simple_lookup('companies')
+CompanySizes = create_simple_lookup('company_sizes')
+ContactPersons = create_simple_lookup('contact_persons')
+
+# Special lookups with different field names/lengths
+Currencies = create_simple_lookup('currencies', 'code', 10)
+FullAddresses = create_simple_lookup('full_addresses', 'address', 500)
+
+
+# ============ Lookup Tables - Many-to-Many ============
+
+HardSkills = create_simple_lookup('hard_skills', 'name', 200)
+SoftSkills = create_simple_lookup('soft_skills', 'name', 200)
+Certifications = create_simple_lookup('certifications', 'name', 200)
+Licenses = create_simple_lookup('licenses', 'name', 200)
+Benefits = create_simple_lookup('benefits', 'description', 500)
+WorkEnvironment = create_simple_lookup('work_environment', 'description', 500)
+ProfessionalDevelopment = create_simple_lookup('professional_development', 'description', 500)
+WorkLifeBalance = create_simple_lookup('work_life_balance', 'description', 500)
+PhysicalRequirements = create_simple_lookup('physical_requirements', 'description', 500)
+WorkConditions = create_simple_lookup('work_conditions', 'description', 500)
+SpecialRequirements = create_simple_lookup('special_requirements', 'description', 500)
+
+
+# ============ Association Tables (Many-to-Many) ============
+
+job_hard_skills = create_m2m_table('job_details', 'hard_skills')
+job_soft_skills = create_m2m_table('job_details', 'soft_skills')
+job_certifications = create_m2m_table('job_details', 'certifications')
+job_licenses = create_m2m_table('job_details', 'licenses')
+job_benefits = create_m2m_table('job_details', 'benefits')
+job_work_environment = create_m2m_table('job_details', 'work_environment')
+job_professional_development = create_m2m_table('job_details', 'professional_development')
+job_work_life_balance = create_m2m_table('job_details', 'work_life_balance')
+job_physical_requirements = create_m2m_table('job_details', 'physical_requirements')
+job_work_conditions = create_m2m_table('job_details', 'work_conditions')
+job_special_requirements = create_m2m_table('job_details', 'special_requirements')
+
+
+# ============ Main Tables ============
+
+class JobDetail(DataBase):
+    """Processed/extracted job details - fully normalized"""
+    __tablename__ = 'job_details'
+    
+    id = Column(Integer, primary_key=True)
+    # Reference to job in scrape.db (stored as job_url for cross-database reference)
+    job_url = Column(String(500), nullable=False, unique=True, index=True)
+    
+    # Original job data (copied from scrape.db for convenience)
+    site = Column(String(200), nullable=False, index=True)
+    job_title = Column(String(200), nullable=False)
+    company_name = Column(String(200), nullable=False, index=True)
+    job_description = Column(Text)
+    
+    # Job classification
+    title_id = Column(Integer, ForeignKey('titles.id'))
+    job_function_id = Column(Integer, ForeignKey('job_functions.id'))
+    seniority_level_id = Column(Integer, ForeignKey('seniority_levels.id'))
+    industry_id = Column(Integer, ForeignKey('industries.id'))
+    department_id = Column(Integer, ForeignKey('departments.id'))
+    job_family_id = Column(Integer, ForeignKey('job_families.id'))
+    specialization_id = Column(Integer, ForeignKey('specializations.id'))
+    
+    # Compensation
+    min_salary = Column(Numeric(12, 2))
+    max_salary = Column(Numeric(12, 2))
+    salary_currency_id = Column(Integer, ForeignKey('currencies.id'))
+    salary_period_id = Column(Integer, ForeignKey('salary_periods.id'))
+    
+    # Requirements
+    required_education_id = Column(Integer, ForeignKey('education_levels.id'))
+    experience_years = Column(Integer)
+    
+    # Work arrangement
+    employment_type_id = Column(Integer, ForeignKey('employment_types.id'))
+    contract_type_id = Column(Integer, ForeignKey('contract_types.id'))
+    work_schedule_id = Column(Integer, ForeignKey('work_schedules.id'))
+    shift_details_id = Column(Integer, ForeignKey('shift_details.id'))
+    remote_work_id = Column(Integer, ForeignKey('remote_work_options.id'))
+    travel_required_id = Column(Integer, ForeignKey('travel_requirements.id'))
+    
+    # Location
+    city_id = Column(Integer, ForeignKey('cities.id'))
+    region_id = Column(Integer, ForeignKey('regions.id'))
+    country_id = Column(Integer, ForeignKey('countries.id'))
+    full_address_id = Column(Integer, ForeignKey('full_addresses.id'))
+    
+    # Company information
+    company_name_id = Column(Integer, ForeignKey('companies.id'))
+    company_size_id = Column(Integer, ForeignKey('company_sizes.id'))
+    contact_person_id = Column(Integer, ForeignKey('contact_persons.id'))
+    
+    # Metadata
+    posting_date = Column(Date)
+    original_language = Column(String(10))
+    processed_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ============ Child Tables (One-to-Many) ============
+
+class Responsibility(DataBase):
+    """Job responsibilities"""
+    __tablename__ = 'responsibilities'
+    
+    id = Column(Integer, primary_key=True)
+    job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
+    description = Column(String(500), nullable=False)
+    order = Column(Integer, default=0)
+
+
+class JobLanguage(DataBase):
+    """Languages required for job with proficiency level"""
+    __tablename__ = 'job_languages'
+    
+    id = Column(Integer, primary_key=True)
+    job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
+    language = Column(String(100), nullable=False)
+    proficiency = Column(String(50))
+
+
+class ContactEmail(DataBase):
+    """Contact emails"""
+    __tablename__ = 'contact_emails'
+    
+    id = Column(Integer, primary_key=True)
+    job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
+    email = Column(String(200), nullable=False)
+
+
+class ContactPhone(DataBase):
+    """Contact phones"""
+    __tablename__ = 'contact_phones'
+    
+    id = Column(Integer, primary_key=True)
+    job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
+    phone = Column(String(50), nullable=False)
+
+
+def get_data_db():
+    """Get data database session"""
+    db = DataSessionLocal()
+    try:
+        return db
+    finally:
+        pass
+
+
+# Create all tables in data database
+DataBase.metadata.create_all(data_engine)

@@ -1,4 +1,4 @@
-from src.database import get_db, Job, JobCheck
+from src.scrape_database import get_scrape_db, Job, JobCheck
 from datetime import datetime, date
 from sqlalchemy.exc import IntegrityError
 import logging
@@ -6,7 +6,7 @@ import logging
 
 def insert_job(job_title, company_name, job_url):
     """Insert new job (stage 1) - handles duplicates automatically"""
-    db = get_db()
+    db = get_scrape_db()
     try:
         # Check if job already exists
         existing_job = db.query(Job).filter(Job.job_url == job_url).first()
@@ -35,7 +35,7 @@ def insert_job(job_title, company_name, job_url):
 
 def update_job_description(job_url, job_description):
     """Update job description (stage 2) - only updates if description is null"""
-    db = get_db()
+    db = get_scrape_db()
     try:
         job = db.query(Job).filter(Job.job_url == job_url).first()
 
@@ -61,7 +61,7 @@ def update_job_description(job_url, job_description):
 
 def check_job_status(job_url, http_status):
     """Record job status check"""
-    db = get_db()
+    db = get_scrape_db()
     try:
         from datetime import date
         today = datetime.combine(date.today(), datetime.min.time())
@@ -95,7 +95,7 @@ def check_job_status(job_url, http_status):
 
 def get_jobs_without_description():
     """Get all jobs that need description (stage 2 targets)"""
-    db = get_db()
+    db = get_scrape_db()
     try:
         jobs = db.query(Job).filter(Job.job_description == None).all()
         return jobs
@@ -105,7 +105,7 @@ def get_jobs_without_description():
 
 def get_all_jobs():
     """Get all jobs"""
-    db = get_db()
+    db = get_scrape_db()
     try:
         jobs = db.query(Job).all()
         return jobs

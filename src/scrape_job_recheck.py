@@ -1,5 +1,5 @@
 from config.settings import Config
-from src.database import SessionLocal, Job, JobCheck
+from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
 import json
 import time
 from datetime import datetime, date
@@ -82,7 +82,7 @@ def recheck_site_jobs(rules, alive_only):
     site = rules[Config.scraper_name]
     
     # Each thread gets its own database session
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     try:

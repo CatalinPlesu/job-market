@@ -1,5 +1,5 @@
 from config.settings import Config
-from src.database import SessionLocal, Job, JobCheck
+from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -191,7 +191,7 @@ def scrape_jobs_list():
     progress_tracker = ThreadProgressTracker(len(ruless))
 
     # Create database session
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     
     try:
         # Start a thread to monitor progress
@@ -247,7 +247,7 @@ def scrape_single_site(thread_id, rules, db):
     Scrape a single site with its own rules and database session
     """
     # Create a new database session for this thread
-    local_db = SessionLocal()
+    local_db = ScrapeSessionLocal()
     
     try:
         site_name = rules[Config.scraper_name]

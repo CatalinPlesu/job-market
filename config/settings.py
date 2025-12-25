@@ -29,8 +29,13 @@ class Config:
     llm_model = "openai/gpt-oss-safeguard-20b"
     llm_request_timeout = 30
 
-    # Scraper Configuration
-    db_path = "data.db"
+    # Database Configuration
+    # Scrape database stores raw scraped data (Job records)
+    scrape_db_path = "databases/scrape.db"
+    # Data database stores LLM-processed data (JobDetail records and all lookups)
+    data_db_path = "databases/data.db"
+    # Legacy db_path for backward compatibility (points to data.db)
+    db_path = "databases/data.db"
 
     # Text Processing
     max_body_text_length = 30000  # characters

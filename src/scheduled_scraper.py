@@ -4,7 +4,7 @@ Runs all scraping stages with reporting and logging.
 """
 import json
 from config.settings import Config
-from src.database import SessionLocal, Job, JobCheck
+from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
 from src.scrape_jobs_list import (
     scrape_single_site, get_crawl_delay_with_robotparser, 
     find_max_pages_threaded, scrape_jobs, store_jobs,
@@ -15,7 +15,7 @@ from src.scrape_job_details import scrape_site_details, fetch_job_description, u
 from src.scrape_job_recheck import recheck_site_jobs
 from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
 from src.error_logger import get_logger
-from src.database_backup import DatabaseBackup
+from src.database_backup import backup_all_databases
 from datetime import date, datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
