@@ -526,11 +526,11 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
         bool: True if the page exists and has the correct page number, False otherwise.
     
     Note:
-        If the page-number selector is provided in rules, it will ONLY use that for
-        verification and not fall back to job checks. This prevents false positives
-        when sites redirect invalid pages to valid pages with jobs.
-        If the page-number selector is not provided, it falls back to checking if
-        job cards exist on the page.
+        If the page-number selector is configured, it will try to verify the page number.
+        If a matching element with the expected page number is found, returns True.
+        If matching elements are found but none have the expected page number, returns False
+        (strict check to prevent false positives when sites redirect invalid pages).
+        If no matching elements are found, falls back to checking for job cards.
     """
     # Apply delay before request
     if delay > 0:
@@ -546,24 +546,26 @@ def check_page_exists(url, rules, expected_page_number, delay=Config.default_cra
     
     # Check if page-number selector exists in rules
     if Config.scraper_page_number in rules:
-        # Use page number indicator for verification (no fallback to job check)
+        # Try to verify using page number indicator
         page_number_selector = rules[Config.scraper_page_number]
-        page_number_element = soup.select_one(page_number_selector)
+        page_number_elements = soup.select(page_number_selector)
         
-        if page_number_element:
-            page_text = page_number_element.get_text(strip=True)
-            try:
-                actual_page_number = int(page_text)
-                return actual_page_number == expected_page_number
-            except ValueError:
-                # Can't parse page number, so page doesn't match
-                return False
-        else:
-            # Page number element not found, page doesn't exist
+        if page_number_elements:
+            # Found pagination elements, check if any match the expected page
+            for element in page_number_elements:
+                page_text = element.get_text(strip=True)
+                try:
+                    actual_page_number = int(page_text)
+                    if actual_page_number == expected_page_number:
+                        return True
+                except ValueError:
+                    # Can't parse this element, try the next one
+                    continue
+            # Found pagination elements but none matched the expected page
             return False
+        # If no pagination elements found, fall through to job check
     
-    # Fallback: only used if no page-number selector is configured
-    # Check if jobs exist on the page
+    # Fallback: check if jobs exist on the page
     job_card_selector = rules[Config.scraper_job_card]
     job_cards = soup.select(job_card_selector)
     return len(job_cards) > 0
