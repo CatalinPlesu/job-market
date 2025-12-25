@@ -195,7 +195,7 @@ class JobRepository:
             
             # Work arrangement
             'employment_type': related_data['employment_type'],
-            'contract_type': detail.contract_type,
+            'contract_type': related_data['contract_type'],
             'work_schedule': related_data['work_schedule'],
             'shift_details': related_data['shift_details'],
             'remote_work': related_data['remote_work'],
