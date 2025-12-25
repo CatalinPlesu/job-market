@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Callable, Dict, Any, Optional
 from datetime import datetime
 import itertools
+from src.rich_logger import get_rich_logger
 
 
 class Priority(IntEnum):
@@ -123,6 +124,9 @@ class TaskQueue:
             Priority.STAGE2: 0,
             Priority.STAGE3: 0,
         }
+        
+        # Rich logger
+        self.rich_logger = get_rich_logger()
     
     def register_site(self, site_name: str, crawl_delay: float = 1.0):
         """Register a site with its crawl delay"""
@@ -165,7 +169,7 @@ class TaskQueue:
                 # Get worker for this site
                 worker = self.get_site_worker(task.site_name)
                 if not worker:
-                    print(f"Warning: No worker registered for site {task.site_name}")
+                    self.rich_logger.print_warning(f"No worker registered for site {task.site_name}", "TaskQueue")
                     self.task_queue.task_done()
                     continue
                 
@@ -173,13 +177,13 @@ class TaskQueue:
                 worker.available_event.wait()
                 
                 # Execute task (includes crawl delay enforcement)
-                print(f"[TaskQueue] Executing {task.stage_name} for {task.site_name}")
+                self.rich_logger.print_info(f"Executing {task.stage_name}", "TaskQueue")
                 try:
                     worker.execute_task(task)
                     with self.stats_lock:
                         self.completed_tasks += 1
                 except Exception as e:
-                    print(f"[TaskQueue] Error executing {task.stage_name} for {task.site_name}: {e}")
+                    self.rich_logger.print_error(f"Error executing {task.stage_name}: {e}", "TaskQueue")
                     with self.stats_lock:
                         self.failed_tasks += 1
                 finally:
@@ -189,7 +193,7 @@ class TaskQueue:
                 # No tasks available, continue
                 continue
             except Exception as e:
-                print(f"[TaskQueue] Worker error: {e}")
+                self.rich_logger.print_error(f"Worker error: {e}", "TaskQueue")
     
     def start(self):
         """Start worker threads"""
@@ -205,7 +209,7 @@ class TaskQueue:
             thread.start()
             self.worker_threads.append(thread)
         
-        print(f"[TaskQueue] Started with {self.max_workers} workers")
+        self.rich_logger.print_success(f"Started with {self.max_workers} workers", "TaskQueue")
     
     def wait_completion(self, timeout: Optional[float] = None):
         """Wait for all tasks to complete"""
@@ -221,7 +225,7 @@ class TaskQueue:
                 thread.join(timeout=5)
         
         self.worker_threads.clear()
-        print(f"[TaskQueue] Stopped")
+        self.rich_logger.print_success("Stopped", "TaskQueue")
     
     def get_stats(self) -> Dict[str, Any]:
         """Get queue statistics"""

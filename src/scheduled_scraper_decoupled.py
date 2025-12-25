@@ -15,6 +15,7 @@ from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
 from src.error_logger import get_logger
 from src.database_backup import backup_all_databases
 from src.task_queue import TaskQueue, Priority
+from src.rich_logger import get_rich_logger
 from datetime import date, datetime, timezone
 import threading
 import time
@@ -30,16 +31,19 @@ def run_all_stages_decoupled():
     # Initialize components
     logger = get_logger()
     report = DailyReport()
+    rich_logger = get_rich_logger()
     
-    print(f"\n{'='*80}")
-    print(f"DECOUPLED SCHEDULED SCRAPING - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{'='*80}\n")
+    rich_logger.print_header(
+        "DECOUPLED SCHEDULED SCRAPING",
+        f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     
     try:
         # Create database backups before starting
-        print("Creating database backups...")
+        rich_logger.print_section("Database Backup")
+        rich_logger.print_info("Creating database backups...")
         backup_all_databases(keep_days=3)
-        print()
+        rich_logger.print_success("Database backups created")
         
         # Load scraper rules
         with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
@@ -49,15 +53,14 @@ def run_all_stages_decoupled():
         task_queue = TaskQueue(max_workers=len(ruless))
         
         # Register all sites and get crawl delays
-        print("Registering sites...")
+        rich_logger.print_section("Registering Sites")
         site_crawl_delays = {}
         for rules in ruless:
             site_name = rules[Config.scraper_name]
             delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
             task_queue.register_site(site_name, delay)
             site_crawl_delays[site_name] = delay
-            print(f"  {site_name}: {delay}s crawl delay")
-        print()
+            rich_logger.print_info(f"{delay}s crawl delay", site_name)
         
         # Statistics collection
         stats_collection = {
@@ -70,12 +73,16 @@ def run_all_stages_decoupled():
         # Start task queue
         task_queue.start()
         
+        # Start live display
+        rich_logger.print_section("Starting Scraping Operations")
+        rich_logger.start_live_display()
+        
         # Define task functions that will be used by all sites
         def make_stage1_task(rules, site_name):
             """Create Stage 1 task for a site"""
             def task():
                 try:
-                    stats = execute_stage1_for_site(rules, logger)
+                    stats = execute_stage1_for_site(rules, logger, rich_logger)
                     with stats_lock:
                         stats_collection['stage1'][site_name] = stats
                     
@@ -89,14 +96,14 @@ def run_all_stages_decoupled():
                     )
                 except Exception as e:
                     logger.exception(f"Stage 1 failed for {site_name}: {e}")
-                    print(f"ERROR in Stage 1 for {site_name}: {e}")
+                    rich_logger.print_error(f"Stage 1 failed: {e}", site_name)
             return task
         
         def make_stage2_task(rules, site_name):
             """Create Stage 2 task for a site"""
             def task():
                 try:
-                    stats = execute_stage2_for_site(rules, logger)
+                    stats = execute_stage2_for_site(rules, logger, rich_logger)
                     with stats_lock:
                         stats_collection['stage2'][site_name] = stats
                     
@@ -110,26 +117,22 @@ def run_all_stages_decoupled():
                     )
                 except Exception as e:
                     logger.exception(f"Stage 2 failed for {site_name}: {e}")
-                    print(f"ERROR in Stage 2 for {site_name}: {e}")
+                    rich_logger.print_error(f"Stage 2 failed: {e}", site_name)
             return task
         
         def make_stage3_task(rules, site_name):
             """Create Stage 3 task for a site"""
             def task():
                 try:
-                    stats = execute_stage3_for_site(rules, logger)
+                    stats = execute_stage3_for_site(rules, logger, rich_logger)
                     with stats_lock:
                         stats_collection['stage3'][site_name] = stats
                 except Exception as e:
                     logger.exception(f"Stage 3 failed for {site_name}: {e}")
-                    print(f"ERROR in Stage 3 for {site_name}: {e}")
+                    rich_logger.print_error(f"Stage 3 failed: {e}", site_name)
             return task
         
         # Queue all Stage 1 tasks (highest priority)
-        print(f"\n{'='*80}")
-        print(f"Queuing Stage 1 tasks (scrape job listings)...")
-        print(f"{'='*80}\n")
-        
         for rules in ruless:
             site_name = rules[Config.scraper_name]
             
@@ -143,18 +146,16 @@ def run_all_stages_decoupled():
             )
         
         # Wait for all tasks to complete
-        print("\nWaiting for all tasks to complete...")
         task_queue.wait_completion()
         
-        # Stop task queue
+        # Stop live display and task queue
+        rich_logger.stop_live_display()
         task_queue.stop()
         
-        print(f"\n{'='*80}")
-        print(f"All stages completed!")
-        print(f"{'='*80}\n")
+        rich_logger.print_section("All Stages Completed")
         
         # Generate report
-        print("Generating report...")
+        rich_logger.print_info("Generating report...")
         
         # Add statistics to report
         with stats_lock:
@@ -169,36 +170,33 @@ def run_all_stages_decoupled():
         
         # Save and display report
         report.save()
-        print(f"\n{'='*80}")
-        print(f"Report saved to: {report.report_file}")
-        print(f"{'='*80}\n")
+        rich_logger.print_success(f"Report saved to: {report.report_file}")
         
-        report.display_report(report.report_file)
+        # Display report with rich formatting
+        report.display_report_rich(report.report_file, rich_logger)
         
         # Display queue statistics
         queue_stats = task_queue.get_stats()
-        print(f"\n{'='*80}")
-        print(f"Task Queue Statistics:")
-        print(f"  Completed: {queue_stats['completed_tasks']}")
-        print(f"  Failed: {queue_stats['failed_tasks']}")
-        print(f"{'='*80}\n")
+        rich_logger.print_summary("Task Queue Statistics", {
+            'completed': queue_stats['completed_tasks'],
+            'failed': queue_stats['failed_tasks'],
+        })
         
     except Exception as e:
         logger.exception(f"Decoupled scheduled run failed: {e}")
-        print(f"\n{'='*80}")
-        print(f"FATAL ERROR: Decoupled scheduled run failed: {e}")
-        print(f"{'='*80}\n")
+        rich_logger.print_error(f"Decoupled scheduled run failed: {e}", "FATAL ERROR")
         raise
 
 
-def find_max_pages_simple(site_name, rules, delay):
+def find_max_pages_simple(site_name, rules, delay, rich_logger=None):
     """
-    Find maximum pages using binary search without progress tracker.
+    Find maximum pages using binary search with optional progress tracking.
     
     Args:
         site_name: Name of the site being scraped
         rules: Scraper rules dictionary
         delay: Crawl delay in seconds
+        rich_logger: Optional RichLogger for progress tracking
     
     Returns:
         int: Maximum page number with jobs
@@ -210,9 +208,25 @@ def find_max_pages_simple(site_name, rules, delay):
     low = 1
     iteration = 0
     
+    # Estimate max iterations for binary search (log2(max_page) + buffer)
+    import math
+    max_iterations = int(math.log2(max_page)) + 3
+    
+    # Start progress tracking for binary search if logger provided
+    if rich_logger:
+        rich_logger.start_stage("Finding pages", site_name, max_iterations)
+    
     while low <= high:
         iteration += 1
         mid = low + (high - low) // 2
+        
+        # Update progress message
+        if rich_logger:
+            rich_logger.set_stage_status_message(
+                site_name, 
+                "Finding pages", 
+                f"Checking page {mid} (range: {low}-{high})"
+            )
         
         page_url = pagination_url.replace("{page}", str(mid))
         page_exists = check_page_exists(page_url, rules, mid, delay)
@@ -224,14 +238,26 @@ def find_max_pages_simple(site_name, rules, delay):
             if next_page_exists:
                 low = mid + 1
             else:
+                # Found the last page
+                if rich_logger:
+                    rich_logger.update_progress(site_name, "Finding pages", max_iterations - iteration + 1)
+                    rich_logger.complete_stage(site_name, "Finding pages", "success")
                 return mid
         else:
             high = mid - 1
+        
+        # Update progress after each iteration
+        if rich_logger:
+            rich_logger.update_progress(site_name, "Finding pages", 1)
+    
+    # Complete the search
+    if rich_logger:
+        rich_logger.complete_stage(site_name, "Finding pages", "success")
     
     return low
 
 
-def execute_stage1_for_site(rules, logger):
+def execute_stage1_for_site(rules, logger, rich_logger):
     """
     Execute Stage 1 (scrape job listings) for a single site.
     
@@ -245,18 +271,22 @@ def execute_stage1_for_site(rules, logger):
     pages_scraped = 0
     errors = 0
     
-    print(f"\n[Stage 1] Starting {site_name}")
-    
     try:
         # Get crawl delay
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
         
-        # Find max pages (using simple version without progress tracker)
-        pages = find_max_pages_simple(site_name, rules, delay)
-        print(f"[Stage 1] {site_name}: Found {pages} pages")
+        # Find max pages with progress tracking
+        pages = find_max_pages_simple(site_name, rules, delay, rich_logger)
+        
+        # Start progress tracking for scraping
+        rich_logger.start_stage("Stage 1", site_name, pages)
+        rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping {pages} pages")
         
         # Scrape pages
         for i in range(1, pages + 1):
+            # Update status to show current page being scraped
+            rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping page {i}/{pages}")
+            
             try:
                 pagination = rules[Config.scraper_pagination]
                 url = pagination.replace("{page}", str(i))
@@ -271,13 +301,16 @@ def execute_stage1_for_site(rules, logger):
             except Exception as e:
                 errors += 1
                 logger.error(f"Stage 1 - {site_name} page {i}: {e}")
+            finally:
+                # Always update progress, even if scraping failed
+                rich_logger.update_progress(site_name, "Stage 1", 1)
         
-        print(f"[Stage 1] {site_name}: Completed - {links_found} links from {pages_scraped} pages")
+        rich_logger.complete_stage(site_name, "Stage 1", "success")
         
     except Exception as e:
         errors += 1
         logger.exception(f"Stage 1 - {site_name} failed: {e}")
-        print(f"[Stage 1] {site_name}: ERROR - {e}")
+        rich_logger.complete_stage(site_name, "Stage 1", "error")
     
     finally:
         db.close()
@@ -290,7 +323,7 @@ def execute_stage1_for_site(rules, logger):
     )
 
 
-def execute_stage2_for_site(rules, logger):
+def execute_stage2_for_site(rules, logger, rich_logger):
     """
     Execute Stage 2 (scrape job details) for a single site.
     
@@ -309,8 +342,6 @@ def execute_stage2_for_site(rules, logger):
     http_404 = 0
     http_other = 0
     
-    print(f"\n[Stage 2] Starting {site_name}")
-    
     try:
         # Get crawl delay
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
@@ -324,7 +355,9 @@ def execute_stage2_for_site(rules, logger):
         total_jobs = len(jobs_without_description)
         
         if total_jobs == 0:
-            print(f"[Stage 2] {site_name}: No jobs to process")
+            # No jobs to process - mark as complete with no progress
+            rich_logger.start_stage("Stage 2", site_name, 0)
+            rich_logger.complete_stage(site_name, "Stage 2", "success")
             return Stage2Stats(
                 site=site_name,
                 total_jobs=0,
@@ -333,14 +366,25 @@ def execute_stage2_for_site(rules, logger):
                 failed=0
             )
         
-        print(f"[Stage 2] {site_name}: Processing {total_jobs} jobs")
+        # Start progress tracking
+        rich_logger.start_stage("Stage 2", site_name, total_jobs)
+        rich_logger.set_stage_status_message(site_name, "Stage 2", f"Processing {total_jobs} jobs")
         
         # Get details selectors
         details_selectors = rules.get(Config.scraper_details, [])
         
         # Process jobs
         work_times = []
+        job_index = 0
         for job in jobs_without_description:
+            job_index += 1
+            # Update status to show current job being processed
+            rich_logger.set_stage_status_message(
+                site_name, 
+                "Stage 2", 
+                f"Processing job {job_index}/{total_jobs}"
+            )
+            
             try:
                 # Calculate adjusted delay
                 adjusted_delay = delay
@@ -385,12 +429,15 @@ def execute_stage2_for_site(rules, logger):
                 failed += 1
                 logger.error(f"Stage 2 - {site_name} job {job.id}: {e}")
                 db.rollback()
+            finally:
+                # Always update progress, even if processing failed
+                rich_logger.update_progress(site_name, "Stage 2", 1)
         
-        print(f"[Stage 2] {site_name}: Completed - {success} success, {empty} empty, {failed} failed")
+        rich_logger.complete_stage(site_name, "Stage 2", "success")
     
     except Exception as e:
         logger.exception(f"Stage 2 - {site_name} failed: {e}")
-        print(f"[Stage 2] {site_name}: ERROR - {e}")
+        rich_logger.complete_stage(site_name, "Stage 2", "error")
     
     finally:
         db.close()
@@ -407,7 +454,7 @@ def execute_stage2_for_site(rules, logger):
     )
 
 
-def execute_stage3_for_site(rules, logger):
+def execute_stage3_for_site(rules, logger, rich_logger):
     """
     Execute Stage 3 (recheck alive jobs) for a single site.
     
@@ -421,8 +468,6 @@ def execute_stage3_for_site(rules, logger):
     total_checked = 0
     alive = 0
     dead = 0
-    
-    print(f"\n[Stage 3] Starting {site_name}")
     
     try:
         # Get crawl delay
@@ -463,7 +508,9 @@ def execute_stage3_for_site(rules, logger):
         total_checked = len(jobs_to_recheck)
         
         if total_checked == 0:
-            print(f"[Stage 3] {site_name}: No jobs to recheck")
+            # No jobs to recheck - mark as complete with no progress
+            rich_logger.start_stage("Stage 3", site_name, 0)
+            rich_logger.complete_stage(site_name, "Stage 3", "success")
             return Stage3Stats(
                 site=site_name,
                 total_checked=0,
@@ -471,14 +518,25 @@ def execute_stage3_for_site(rules, logger):
                 dead=0
             )
         
-        print(f"[Stage 3] {site_name}: Rechecking {total_checked} jobs")
+        # Start progress tracking
+        rich_logger.start_stage("Stage 3", site_name, total_checked)
+        rich_logger.set_stage_status_message(site_name, "Stage 3", f"Rechecking {total_checked} jobs")
         
         # Get details selectors
         details_selectors = rules.get(Config.scraper_details, [])
         
         # Process jobs
         work_times = []
+        job_index = 0
         for job in jobs_to_recheck:
+            job_index += 1
+            # Update status to show current job being rechecked
+            rich_logger.set_stage_status_message(
+                site_name,
+                "Stage 3",
+                f"Rechecking job {job_index}/{total_checked}"
+            )
+            
             try:
                 # Calculate adjusted delay
                 adjusted_delay = delay
@@ -516,12 +574,15 @@ def execute_stage3_for_site(rules, logger):
                 dead += 1
                 logger.error(f"Stage 3 - {site_name} job {job.id}: {e}")
                 db.rollback()
+            finally:
+                # Always update progress, even if rechecking failed
+                rich_logger.update_progress(site_name, "Stage 3", 1)
         
-        print(f"[Stage 3] {site_name}: Completed - {alive} alive, {dead} dead")
+        rich_logger.complete_stage(site_name, "Stage 3", "success")
     
     except Exception as e:
         logger.exception(f"Stage 3 - {site_name} failed: {e}")
-        print(f"[Stage 3] {site_name}: ERROR - {e}")
+        rich_logger.complete_stage(site_name, "Stage 3", "error")
     
     finally:
         db.close()
