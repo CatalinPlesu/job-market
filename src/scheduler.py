@@ -85,9 +85,10 @@ class Scheduler:
         # Calculate today's scheduled time
         today_scheduled = datetime.combine(now.date(), self.schedule_time)
         
-        # If never run before, check if we're past today's scheduled time
+        # If never run before, don't run immediately
+        # Wait for the next scheduled time instead
         if last_run is None:
-            return now >= today_scheduled
+            return False
         
         # Run if:
         # 1. Current time is past scheduled time today
