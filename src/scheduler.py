@@ -85,9 +85,10 @@ class Scheduler:
         # Calculate today's scheduled time
         today_scheduled = datetime.combine(now.date(), self.schedule_time)
         
-        # If never run before, check if we're past today's scheduled time
+        # If never run before, don't run immediately
+        # Wait for the next scheduled time instead
         if last_run is None:
-            return now >= today_scheduled
+            return False
         
         # Run if:
         # 1. Current time is past scheduled time today
@@ -168,6 +169,10 @@ class Scheduler:
         
         try:
             while self.running and not self.stop_event.is_set():
+                # Initialize adaptive_interval with default value
+                # This ensures it's always defined even if exceptions occur
+                adaptive_interval = check_interval
+                
                 if self.should_run_now():
                     self.run_once(task, task_name)
                     # After running, recalculate next run
@@ -186,7 +191,6 @@ class Scheduler:
                     
                     # Use adaptive check interval: check more frequently as we get closer
                     # If less than 5 minutes away, check every minute
-                    adaptive_interval = check_interval
                     if total_seconds < 300:  # Less than 5 minutes
                         adaptive_interval = 60  # Check every minute
                     elif total_seconds < 3600:  # Less than 1 hour
