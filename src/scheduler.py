@@ -172,6 +172,8 @@ class Scheduler:
                     self.run_once(task, task_name)
                     # After running, recalculate next run
                     next_run = self.get_next_run_time()
+                    # Use default check interval after running
+                    adaptive_interval = check_interval
                 else:
                     # Show countdown to next run
                     now = datetime.now()
