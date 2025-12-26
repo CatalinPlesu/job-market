@@ -169,12 +169,14 @@ class Scheduler:
         
         try:
             while self.running and not self.stop_event.is_set():
+                # Initialize adaptive_interval with default value
+                # This ensures it's always defined even if exceptions occur
+                adaptive_interval = check_interval
+                
                 if self.should_run_now():
                     self.run_once(task, task_name)
                     # After running, recalculate next run
                     next_run = self.get_next_run_time()
-                    # Use default check interval after running
-                    adaptive_interval = check_interval
                 else:
                     # Show countdown to next run
                     now = datetime.now()
@@ -189,7 +191,6 @@ class Scheduler:
                     
                     # Use adaptive check interval: check more frequently as we get closer
                     # If less than 5 minutes away, check every minute
-                    adaptive_interval = check_interval
                     if total_seconds < 300:  # Less than 5 minutes
                         adaptive_interval = 60  # Check every minute
                     elif total_seconds < 3600:  # Less than 1 hour
