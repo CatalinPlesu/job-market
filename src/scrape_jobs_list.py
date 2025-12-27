@@ -14,7 +14,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import os
 import math
-from pathlib import Path
 
 # Global lock for synchronized printing
 print_lock = threading.Lock()
@@ -57,7 +56,7 @@ def update_site_page_stats(site_name, pages_scraped):
     # Update statistics
     stats[site_name]['total_runs'] += 1
     stats[site_name]['total_pages'] += pages_scraped
-    # Calculate average and round up
+    # Calculate average and round up to nearest integer using ceiling function
     average = stats[site_name]['total_pages'] / stats[site_name]['total_runs']
     stats[site_name]['average_pages'] = math.ceil(average)
     
@@ -362,7 +361,9 @@ def scrape_single_site(thread_id, rules, db, full_scrape=False):
             
             # Check if jobs list is empty (no more pages)
             if len(jobs) == 0:
-                finish_scraping(thread_id, site_name, i-1, max_pages, "NO MORE PAGES", 
+                # If first page is empty, no jobs exist; otherwise we finished previous page
+                pages_completed = max(0, i - 1)
+                finish_scraping(thread_id, site_name, pages_completed, max_pages, "NO MORE PAGES", 
                               f"No jobs found on page {i}, stopping", total_start_time)
                 break
             
@@ -370,8 +371,11 @@ def scrape_single_site(thread_id, rules, db, full_scrape=False):
             current_page_urls = set(job['url'] for job in jobs)
             
             # Check for duplicate pages (infinite loop detection)
+            # Note: We check for exact equality to detect infinite loops where the same page
+            # is returned repeatedly. Partial overlaps between pages are normal and expected.
             if i > 1 and current_page_urls == previous_page_urls:
-                finish_scraping(thread_id, site_name, i-1, max_pages, "DUPLICATE PAGE",
+                pages_completed = max(0, i - 1)
+                finish_scraping(thread_id, site_name, pages_completed, max_pages, "DUPLICATE PAGE",
                               f"Page {i} has same URLs as page {i-1}, infinite loop detected, stopping", 
                               total_start_time)
                 break
