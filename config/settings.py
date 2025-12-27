@@ -46,7 +46,7 @@ class Config:
     
     # Stage 1 Efficiency Settings
     # Stop scraping when this many consecutive jobs already exist in database
-    stage1_consecutive_known_threshold = 100  # consecutive known jobs
+    stage1_consecutive_known_threshold = 30  # consecutive known jobs
 
     job_to_db_prompt = """
     Extract job posting data as JSON. Translate descriptive text to English; keep proper nouns original.
