@@ -9,7 +9,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from config.settings import Config
 
@@ -33,8 +33,8 @@ class Job(ScrapeBase):
     company_name = Column(String(200), nullable=False, index=True)
     job_url = Column(String(500), nullable=False, unique=True)
     job_description = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     checks = relationship("JobCheck", back_populates="job", cascade="all, delete-orphan")
 
@@ -60,7 +60,7 @@ class SiteStatistics(ScrapeBase):
     total_runs = Column(Integer, default=0, nullable=False)
     total_pages = Column(Integer, default=0, nullable=False)
     average_pages = Column(Integer, default=0, nullable=False)
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 def get_scrape_db():

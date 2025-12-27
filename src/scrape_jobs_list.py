@@ -7,7 +7,7 @@ import json
 import time
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from sqlalchemy import and_
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -58,12 +58,12 @@ def update_site_page_stats(site_name, pages_scraped):
             # Calculate average and round up to nearest integer using ceiling function
             average = site_stats.total_pages / site_stats.total_runs
             site_stats.average_pages = math.ceil(average)
-            site_stats.last_updated = datetime.utcnow()
+            site_stats.last_updated = datetime.now(timezone.utc)
             
             db.commit()
             return site_stats.average_pages
         except Exception as e:
-            print(f"Warning: Could not update page statistics: {e}")
+            print(f"Warning: Could not update page statistics for {site_name}: {e}")
             db.rollback()
             return 0
         finally:
