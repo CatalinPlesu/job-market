@@ -1,5 +1,6 @@
 from config.settings import Config
 from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
+from src.job_identification import should_create_new_job
 import requests
 from bs4 import BeautifulSoup
 import json
@@ -349,8 +350,6 @@ def store_jobs(db, jobs_data):
         db: SQLAlchemy database session
         jobs_data: List of job dictionaries from scrape_jobs()
     """
-    from src.job_identification import should_create_new_job
-    
     added_count = 0
     existing_count = 0
     resurrected_count = 0

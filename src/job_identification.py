@@ -89,7 +89,7 @@ def get_last_failed_check_date(db: Session, job: Job):
         and_(
             JobCheck.job_id == job.id,
             JobCheck.http_status != 200,
-            JobCheck.http_status != None
+            JobCheck.http_status.isnot(None)
         )
     ).order_by(desc(JobCheck.check_date)).first()
     
@@ -111,11 +111,11 @@ def is_job_dead(db: Session, job: Job):
     last_check = db.query(JobCheck).filter(
         and_(
             JobCheck.job_id == job.id,
-            JobCheck.http_status != None
+            JobCheck.http_status.isnot(None)
         )
     ).order_by(desc(JobCheck.check_date)).first()
     
-    return last_check and last_check.http_status != 200 if last_check else False
+    return last_check.http_status != 200 if last_check else False
 
 
 def days_since_last_alive(db: Session, job: Job):
