@@ -270,6 +270,7 @@ def execute_stage1_for_site(rules, logger, rich_logger):
     links_found = 0
     pages_scraped = 0
     errors = 0
+    early_stopped = False
     
     try:
         # Get crawl delay
@@ -281,6 +282,10 @@ def execute_stage1_for_site(rules, logger, rich_logger):
         # Start progress tracking for scraping
         rich_logger.start_stage("Stage 1", site_name, pages)
         rich_logger.set_stage_status_message(site_name, "Stage 1", f"Scraping {pages} pages")
+        
+        # Track consecutive existing jobs for early stopping
+        consecutive_existing = 0
+        threshold = Config.stage1_consecutive_known_threshold
         
         # Scrape pages
         for i in range(1, pages + 1):
@@ -296,7 +301,23 @@ def execute_stage1_for_site(rules, logger, rich_logger):
                 pages_scraped += 1
                 
                 # Store jobs
-                store_jobs(db, jobs)
+                stats = store_jobs(db, jobs)
+                
+                # Track consecutive existing jobs
+                if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
+                    # All jobs on this page were existing
+                    consecutive_existing += stats['existing']
+                else:
+                    # Reset counter when we find new or resurrected jobs
+                    consecutive_existing = 0
+                
+                # Check if we should stop early
+                if consecutive_existing >= threshold:
+                    early_stopped = True
+                    logger.info(f"Stage 1 - {site_name}: Early stop at page {i}/{pages}, found {consecutive_existing} consecutive known jobs (threshold: {threshold})")
+                    rich_logger.set_stage_status_message(site_name, "Stage 1", f"Early stop: {consecutive_existing} consecutive known jobs")
+                    rich_logger.update_progress(site_name, "Stage 1", 1)
+                    break
                 
             except Exception as e:
                 errors += 1

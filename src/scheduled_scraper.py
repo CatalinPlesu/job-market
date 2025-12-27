@@ -53,7 +53,7 @@ def run_stage1_with_stats():
     scrape_jobs_list.progress_tracker = ThreadProgressTracker(len(ruless))
     
     # Create database session
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     
     try:
         # Start progress monitor thread
@@ -99,11 +99,12 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
     Returns:
         Stage1Stats object
     """
-    local_db = SessionLocal()
+    local_db = ScrapeSessionLocal()
     site_name = rules[Config.scraper_name]
     links_found = 0
     pages_scraped = 0
     errors = 0
+    early_stopped = False
     
     try:
         # Get crawl delay
@@ -120,6 +121,10 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
         # Scrape pages
         progress_tracker.update_progress(thread_id, site_name, 0, pages, "Starting page scraping", "SCRAPING")
         
+        # Track consecutive existing jobs for early stopping
+        consecutive_existing = 0
+        threshold = Config.stage1_consecutive_known_threshold
+        
         for i in range(1, pages + 1):
             try:
                 progress_tracker.update_progress(thread_id, site_name, i, pages, f"Scraping page {i}/{pages}", "SCRAPING")
@@ -132,13 +137,29 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
                 pages_scraped += 1
                 
                 # Store jobs
-                store_jobs(local_db, jobs)
+                stats = store_jobs(local_db, jobs)
+                
+                # Track consecutive existing jobs
+                if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
+                    # All jobs on this page were existing
+                    consecutive_existing += stats['existing']
+                else:
+                    # Reset counter when we find new or resurrected jobs
+                    consecutive_existing = 0
+                
+                # Check if we should stop early
+                if consecutive_existing >= threshold:
+                    early_stopped = True
+                    logger.info(f"Stage 1 - {site_name}: Early stop at page {i}/{pages}, found {consecutive_existing} consecutive known jobs (threshold: {threshold})")
+                    progress_tracker.update_progress(thread_id, site_name, i, pages, "EARLY STOP", "FINISHED")
+                    break
                 
             except Exception as e:
                 errors += 1
                 logger.error(f"Stage 1 - {site_name} page {i}: {e}")
         
-        progress_tracker.update_progress(thread_id, site_name, pages, pages, "COMPLETED", "FINISHED")
+        if not early_stopped:
+            progress_tracker.update_progress(thread_id, site_name, pages, pages, "COMPLETED", "FINISHED")
         
     except Exception as e:
         errors += 1
@@ -208,7 +229,7 @@ def scrape_site_stage2_with_stats(rules, logger):
         Stage2Stats object
     """
     site = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     total_jobs = 0
@@ -362,7 +383,7 @@ def recheck_site_stage3_with_stats(rules, logger):
         Stage3Stats object
     """
     site = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     total_checked = 0

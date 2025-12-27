@@ -268,6 +268,11 @@ def scrape_single_site(thread_id, rules, db):
         progress_tracker.update_progress(thread_id, site_name, 0, pages, "Starting page scraping", "SCRAPING")
         total_start_time = time.time()
         
+        # Track consecutive existing jobs for early stopping
+        consecutive_existing = 0
+        threshold = Config.stage1_consecutive_known_threshold
+        early_stopped = False
+        
         for i in range(1, pages+1):
             progress_tracker.update_progress(thread_id, site_name, i, pages, f"Scraping page {i}/{pages}", "SCRAPING")
             
@@ -278,14 +283,34 @@ def scrape_single_site(thread_id, rules, db):
             print_threaded(thread_id, f"Found {len(jobs)} jobs on page {i}/{pages}")
             
             # Store jobs in database using local session
-            store_jobs(local_db, jobs)
+            stats = store_jobs(local_db, jobs)
+            
+            # Track consecutive existing jobs
+            if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
+                # All jobs on this page were existing
+                consecutive_existing += stats['existing']
+                print_threaded(thread_id, f"Consecutive existing jobs: {consecutive_existing}/{threshold}")
+            else:
+                # Reset counter when we find new or resurrected jobs
+                consecutive_existing = 0
+            
+            # Check if we should stop early
+            if consecutive_existing >= threshold:
+                early_stopped = True
+                total_end_time = time.time()
+                total_duration = total_end_time - total_start_time
+                progress_tracker.update_progress(thread_id, site_name, i, pages, "EARLY STOP", "FINISHED")
+                print_threaded(thread_id, f"Early stop: Found {consecutive_existing} consecutive known jobs (threshold: {threshold})")
+                print_threaded(thread_id, f"Completed scraping {i}/{pages} pages in {format_time(total_duration)}")
+                break
             
             # The progress tracker now handles time estimation automatically
         
-        total_end_time = time.time()
-        total_duration = total_end_time - total_start_time
-        progress_tracker.update_progress(thread_id, site_name, pages, pages, "COMPLETED", "FINISHED")
-        print_threaded(thread_id, f"Completed scraping {pages} pages in {format_time(total_duration)}")
+        if not early_stopped:
+            total_end_time = time.time()
+            total_duration = total_end_time - total_start_time
+            progress_tracker.update_progress(thread_id, site_name, pages, pages, "COMPLETED", "FINISHED")
+            print_threaded(thread_id, f"Completed scraping {pages} pages in {format_time(total_duration)}")
     
     finally:
         local_db.close()
@@ -349,6 +374,12 @@ def store_jobs(db, jobs_data):
     Args:
         db: SQLAlchemy database session
         jobs_data: List of job dictionaries from scrape_jobs()
+    
+    Returns:
+        dict: Statistics about stored jobs
+            - 'added': Number of new jobs added
+            - 'existing': Number of existing jobs reused
+            - 'resurrected': Number of resurrected jobs
     """
     added_count = 0
     existing_count = 0
@@ -438,6 +469,12 @@ def store_jobs(db, jobs_data):
     except Exception as e:
         print_threaded(0, f"✗ Error committing to database: {e}")  # Use thread 0 for errors
         db.rollback()
+    
+    return {
+        'added': added_count,
+        'existing': existing_count,
+        'resurrected': resurrected_count
+    }
 
 def get_robots_url(site_url):
     parts = urlparse(site_url)
