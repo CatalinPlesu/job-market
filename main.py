@@ -186,109 +186,11 @@ class DatabaseRollbackItem:
 
 class ScheduledScrapingItem:
     def get_item_description(self):
-        return "Run All Stages on Schedule (with Logging & Reports)"
+        return "Run Scheduled Scraping (Stages 1&2 hourly, Stage 3 daily)"
     
     def execute(self):
         print("\n" + "="*80)
-        print("SCHEDULED SCRAPING - SELF-MANAGED SCHEDULER")
-        print("="*80)
-        print("\nThis will run all 3 scraping stages:")
-        print("  1. Stage 1: Scrape job listings")
-        print("  2. Stage 2: Get job details")
-        print("  3. Stage 3: Re-check alive jobs")
-        print("\nFeatures:")
-        print("  • Database backup before each run (keeps last 3 days)")
-        print("  • Error-only logging (weekly log files)")
-        print("  • Daily reports with statistics per site and aggregated")
-        print("\nSchedule: Daily at 00:00 (midnight)")
-        print("\nOptions:")
-        print("  1. Run once NOW")
-        print("  2. Start scheduler (will wait for scheduled time 00:00)")
-        print("  3. Start scheduler with custom time (specify HH:MM in 24H format)")
-        print("  0. Cancel")
-        
-        choice = input("\nEnter choice: ").strip()
-        
-        if choice == "1":
-            # Run immediately
-            print("\nRunning all stages immediately...")
-            try:
-                run_all_stages_scheduled()
-                print("\n✓ All stages completed successfully!")
-            except Exception as e:
-                print(f"\n✗ Error during execution: {e}")
-        
-        elif choice == "2":
-            # Start scheduler with default time (00:00)
-            print("\nStarting scheduler...")
-            print("The scheduler will monitor the schedule and run automatically at 00:00.")
-            print("Press Ctrl+C to stop.\n")
-            
-            scheduler = Scheduler(schedule_time_hour=0, schedule_time_minute=0)
-            try:
-                scheduler.run_with_monitoring(
-                    task=run_all_stages_scheduled,
-                    task_name="Scheduled Scraping (All Stages)",
-                    check_interval=60  # Check every minute
-                )
-            except KeyboardInterrupt:
-                print("\nScheduler stopped by user.")
-        
-        elif choice == "3":
-            # Start scheduler with custom time
-            print("\nEnter trigger time in 24H format (HH:MM):")
-            print("Examples: 00:00 (midnight), 14:30 (2:30 PM), 23:45 (11:45 PM)")
-            
-            time_input = input("Time (HH:MM): ").strip()
-            
-            # Parse and validate the time input
-            try:
-                parts = time_input.split(":")
-                if len(parts) != 2:
-                    print("\n✗ Invalid format. Please use HH:MM format.")
-                    return True
-                
-                hour = int(parts[0])
-                minute = int(parts[1])
-                
-                if hour < 0 or hour > 23:
-                    print("\n✗ Invalid hour. Must be between 00 and 23.")
-                    return True
-                
-                if minute < 0 or minute > 59:
-                    print("\n✗ Invalid minute. Must be between 00 and 59.")
-                    return True
-                
-                print(f"\nStarting scheduler...")
-                print(f"The scheduler will monitor the schedule and run automatically at {hour:02d}:{minute:02d}.")
-                print("Press Ctrl+C to stop.\n")
-                
-                scheduler = Scheduler(schedule_time_hour=hour, schedule_time_minute=minute)
-                try:
-                    scheduler.run_with_monitoring(
-                        task=run_all_stages_scheduled,
-                        task_name="Scheduled Scraping (All Stages)",
-                        check_interval=60  # Check every minute
-                    )
-                except KeyboardInterrupt:
-                    print("\nScheduler stopped by user.")
-            
-            except ValueError:
-                print("\n✗ Invalid time format. Please enter numbers only in HH:MM format.")
-        
-        else:
-            print("\nCancelled.")
-        
-        return True
-
-
-class ImprovedScheduledScrapingItem:
-    def get_item_description(self):
-        return "Run Stages on Improved Schedule (Hourly for 1&2, Daily for 3)"
-    
-    def execute(self):
-        print("\n" + "="*80)
-        print("IMPROVED SCHEDULED SCRAPING")
+        print("SCHEDULED SCRAPING")
         print("="*80)
         print("\nThis will run stages on optimized schedules:")
         print("  • Stage 1 & 2: Every HOUR (fast with early stopping)")
@@ -301,50 +203,13 @@ class ImprovedScheduledScrapingItem:
         print("  • Database backup before each run (keeps last 3 days)")
         print("  • Error-only logging (weekly log files)")
         print("  • Daily reports with statistics per site")
-        print("\nOptions:")
-        print("  1. Run Stages 1 & 2 once NOW")
-        print("  2. Run Stage 3 once NOW")
-        print("  3. Start improved scheduler (hourly for 1&2, daily for 3)")
-        print("  0. Cancel")
+        print("\nPress Ctrl+C to stop the scheduler.\n")
         
-        choice = input("\nEnter choice: ").strip()
-        
-        if choice == "1":
-            # Run Stages 1 & 2 immediately
-            print("\nRunning Stages 1 & 2 immediately...")
-            try:
-                from src.scheduled_scraper import run_stages_1_and_2
-                run_stages_1_and_2()
-                print("\n✓ Stages 1 & 2 completed successfully!")
-            except Exception as e:
-                print(f"\n✗ Error during execution: {e}")
-        
-        elif choice == "2":
-            # Run Stage 3 immediately
-            print("\nRunning Stage 3 immediately...")
-            try:
-                from src.scheduled_scraper import run_stage_3_only
-                run_stage_3_only()
-                print("\n✓ Stage 3 completed successfully!")
-            except Exception as e:
-                print(f"\n✗ Error during execution: {e}")
-        
-        elif choice == "3":
-            # Start improved multi-scheduler
-            print("\nStarting improved scheduler...")
-            print("This will run:")
-            print("  • Stages 1 & 2 every hour")
-            print("  • Stage 3 once daily at 00:00")
-            print("\nPress Ctrl+C to stop.\n")
-            
-            try:
-                from src.multi_scheduler import run_improved_scheduler
-                run_improved_scheduler()
-            except KeyboardInterrupt:
-                print("\nScheduler stopped by user.")
-        
-        else:
-            print("\nCancelled.")
+        try:
+            from src.multi_scheduler import run_improved_scheduler
+            run_improved_scheduler()
+        except KeyboardInterrupt:
+            print("\nScheduler stopped by user.")
         
         return True
 
@@ -357,8 +222,7 @@ def run():
     menu.set_footer("Enter to select")
     
     # Register all menu items
-    menu.register_item(ImprovedScheduledScrapingItem())  # New improved scheduler
-    menu.register_item(ScheduledScrapingItem())  # Original scheduled scraping option
+    menu.register_item(ScheduledScrapingItem())  # Improved scheduler with hourly stages 1&2, daily stage 3
     menu.register_item(ScrapeJobsListItem())
     menu.register_item(ScrapeJobsListFullItem())  # Full scrape without early termination
     menu.register_item(ScrapeJobDetailsItem())
