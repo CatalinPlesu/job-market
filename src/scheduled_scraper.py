@@ -33,6 +33,92 @@ def run_all_stages_scheduled():
     run_all_stages_decoupled()
 
 
+def run_stages_1_and_2():
+    """
+    Run Stage 1 (scrape job listings) and Stage 2 (get job details) only.
+    Optimized for hourly execution since Stage 1 now has early stopping.
+    Does not include Stage 3 (recheck alive jobs).
+    """
+    logger = get_logger()
+    report = DailyReport()
+    
+    print("\n" + "="*80)
+    print("RUNNING STAGES 1 & 2 (Hourly Schedule)")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80 + "\n")
+    
+    try:
+        # Create database backups before starting
+        print("Creating database backups...")
+        backup_all_databases(keep_days=3)
+        print("✓ Database backups created\n")
+        
+        # Run Stage 1
+        print("="*80)
+        print("STAGE 1: Scraping Job Listings")
+        print("="*80)
+        stage1_stats = run_stage1_with_stats()
+        for stats in stage1_stats:
+            report.add_stage1_stats(stats)
+        print(f"✓ Stage 1 completed - {sum(s.links_found for s in stage1_stats)} links found\n")
+        
+        # Run Stage 2
+        print("="*80)
+        print("STAGE 2: Getting Job Details")
+        print("="*80)
+        stage2_stats = run_stage2_with_stats()
+        for stats in stage2_stats:
+            report.add_stage2_stats(stats)
+        print(f"✓ Stage 2 completed - {sum(s.total_jobs for s in stage2_stats)} jobs processed\n")
+        
+        # Save report
+        report.save()
+        print(f"\n✓ Report saved to: {report.report_file}")
+        
+    except Exception as e:
+        logger.exception(f"Stages 1 & 2 failed: {e}")
+        print(f"\n✗ ERROR: {e}")
+        raise
+
+
+def run_stage_3_only():
+    """
+    Run Stage 3 (recheck alive jobs) only.
+    Scheduled separately as this is the slowest stage.
+    """
+    logger = get_logger()
+    report = DailyReport()
+    
+    print("\n" + "="*80)
+    print("RUNNING STAGE 3 ONLY (Daily Schedule)")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80 + "\n")
+    
+    try:
+        # Create database backups before starting
+        print("Creating database backups...")
+        backup_all_databases(keep_days=3)
+        print("✓ Database backups created\n")
+        
+        # Run Stage 3
+        print("="*80)
+        print("STAGE 3: Rechecking Alive Jobs")
+        print("="*80)
+        stage3_stats = run_stage3_with_stats()
+        for stats in stage3_stats:
+            report.add_stage3_stats(stats)
+        print(f"✓ Stage 3 completed - {sum(s.total_checked for s in stage3_stats)} jobs rechecked\n")
+        
+        # Save report
+        report.save()
+        print(f"\n✓ Report saved to: {report.report_file}")
+        
+    except Exception as e:
+        logger.exception(f"Stage 3 failed: {e}")
+        print(f"\n✗ ERROR: {e}")
+        raise
+
+
 def run_stage1_with_stats():
     """
     Run Stage 1 (scrape job listings) and collect statistics.

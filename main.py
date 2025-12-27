@@ -282,6 +282,73 @@ class ScheduledScrapingItem:
         return True
 
 
+class ImprovedScheduledScrapingItem:
+    def get_item_description(self):
+        return "Run Stages on Improved Schedule (Hourly for 1&2, Daily for 3)"
+    
+    def execute(self):
+        print("\n" + "="*80)
+        print("IMPROVED SCHEDULED SCRAPING")
+        print("="*80)
+        print("\nThis will run stages on optimized schedules:")
+        print("  • Stage 1 & 2: Every HOUR (fast with early stopping)")
+        print("    - Stage 1: Scrape job listings (stops at 100+ consecutive existing)")
+        print("    - Stage 2: Get job details")
+        print("  • Stage 3: Daily at 00:00 (slow)")
+        print("    - Stage 3: Re-check alive jobs")
+        print("\nFeatures:")
+        print("  • Separate schedules optimized for each stage's speed")
+        print("  • Database backup before each run (keeps last 3 days)")
+        print("  • Error-only logging (weekly log files)")
+        print("  • Daily reports with statistics per site")
+        print("\nOptions:")
+        print("  1. Run Stages 1 & 2 once NOW")
+        print("  2. Run Stage 3 once NOW")
+        print("  3. Start improved scheduler (hourly for 1&2, daily for 3)")
+        print("  0. Cancel")
+        
+        choice = input("\nEnter choice: ").strip()
+        
+        if choice == "1":
+            # Run Stages 1 & 2 immediately
+            print("\nRunning Stages 1 & 2 immediately...")
+            try:
+                from src.scheduled_scraper import run_stages_1_and_2
+                run_stages_1_and_2()
+                print("\n✓ Stages 1 & 2 completed successfully!")
+            except Exception as e:
+                print(f"\n✗ Error during execution: {e}")
+        
+        elif choice == "2":
+            # Run Stage 3 immediately
+            print("\nRunning Stage 3 immediately...")
+            try:
+                from src.scheduled_scraper import run_stage_3_only
+                run_stage_3_only()
+                print("\n✓ Stage 3 completed successfully!")
+            except Exception as e:
+                print(f"\n✗ Error during execution: {e}")
+        
+        elif choice == "3":
+            # Start improved multi-scheduler
+            print("\nStarting improved scheduler...")
+            print("This will run:")
+            print("  • Stages 1 & 2 every hour")
+            print("  • Stage 3 once daily at 00:00")
+            print("\nPress Ctrl+C to stop.\n")
+            
+            try:
+                from src.multi_scheduler import run_improved_scheduler
+                run_improved_scheduler()
+            except KeyboardInterrupt:
+                print("\nScheduler stopped by user.")
+        
+        else:
+            print("\nCancelled.")
+        
+        return True
+
+
 # Main run function
 def run():
     menu = Menu()
@@ -290,7 +357,8 @@ def run():
     menu.set_footer("Enter to select")
     
     # Register all menu items
-    menu.register_item(ScheduledScrapingItem())  # New scheduled scraping option
+    menu.register_item(ImprovedScheduledScrapingItem())  # New improved scheduler
+    menu.register_item(ScheduledScrapingItem())  # Original scheduled scraping option
     menu.register_item(ScrapeJobsListItem())
     menu.register_item(ScrapeJobsListFullItem())  # Full scrape without early termination
     menu.register_item(ScrapeJobDetailsItem())

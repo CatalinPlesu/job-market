@@ -4,7 +4,7 @@ Self-manages scheduling without requiring cron jobs.
 """
 import time
 import json
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Callable, Optional
 import threading
@@ -14,18 +14,23 @@ class Scheduler:
     """
     Self-managing scheduler that runs tasks at specified times.
     Handles schedule tracking and execution without external cron.
+    Supports both daily schedules and interval-based schedules (e.g., hourly).
     """
     
-    def __init__(self, schedule_time_hour: int = 0, schedule_time_minute: int = 0):
+    def __init__(self, schedule_time_hour: int = 0, schedule_time_minute: int = 0, 
+                 interval_minutes: Optional[int] = None, state_file_name: str = "scheduler_state.json"):
         """
-        Initialize scheduler with target time.
+        Initialize scheduler with target time or interval.
         
         Args:
-            schedule_time_hour: Hour to run (0-23), default 0 (midnight)
-            schedule_time_minute: Minute to run (0-59), default 0
+            schedule_time_hour: Hour to run (0-23), default 0 (midnight). Ignored if interval_minutes is set.
+            schedule_time_minute: Minute to run (0-59), default 0. Ignored if interval_minutes is set.
+            interval_minutes: If set, run every N minutes instead of at a specific time
+            state_file_name: Name of the state file to track last run
         """
         self.schedule_time = dt_time(schedule_time_hour, schedule_time_minute)
-        self.state_file = Path("scheduler_state.json")
+        self.interval_minutes = interval_minutes
+        self.state_file = Path(state_file_name)
         self.running = False
         self.stop_event = threading.Event()
         
@@ -63,14 +68,31 @@ class Scheduler:
             datetime: Next scheduled run time
         """
         now = datetime.now()
-        scheduled = datetime.combine(now.date(), self.schedule_time)
         
-        # If scheduled time has passed today, schedule for tomorrow
-        if scheduled <= now:
-            from datetime import timedelta
-            scheduled = scheduled + timedelta(days=1)
-        
-        return scheduled
+        if self.interval_minutes:
+            # Interval-based scheduling: next run is interval_minutes from last run
+            last_run = self.load_last_run()
+            if last_run:
+                next_run = last_run + timedelta(minutes=self.interval_minutes)
+                # If next run is in the past, calculate the next future run
+                if next_run <= now:
+                    # Calculate how many intervals have passed since last run
+                    time_since_last = (now - last_run).total_seconds() / 60
+                    intervals_passed = int(time_since_last / self.interval_minutes) + 1
+                    next_run = last_run + timedelta(minutes=self.interval_minutes * intervals_passed)
+                return next_run
+            else:
+                # First run: schedule for interval_minutes from now
+                return now + timedelta(minutes=self.interval_minutes)
+        else:
+            # Time-based scheduling: next run is at the scheduled time
+            scheduled = datetime.combine(now.date(), self.schedule_time)
+            
+            # If scheduled time has passed today, schedule for tomorrow
+            if scheduled <= now:
+                scheduled = scheduled + timedelta(days=1)
+            
+            return scheduled
     
     def should_run_now(self) -> bool:
         """
@@ -82,21 +104,32 @@ class Scheduler:
         last_run = self.load_last_run()
         now = datetime.now()
         
-        # Calculate today's scheduled time
-        today_scheduled = datetime.combine(now.date(), self.schedule_time)
-        
-        # If never run before, don't run immediately
-        # Wait for the next scheduled time instead
-        if last_run is None:
+        if self.interval_minutes:
+            # Interval-based scheduling
+            if last_run is None:
+                # Never run before, don't run immediately
+                return False
+            
+            # Run if interval has passed since last run
+            time_since_last = (now - last_run).total_seconds() / 60
+            return time_since_last >= self.interval_minutes
+        else:
+            # Time-based scheduling
+            # Calculate today's scheduled time
+            today_scheduled = datetime.combine(now.date(), self.schedule_time)
+            
+            # If never run before, don't run immediately
+            # Wait for the next scheduled time instead
+            if last_run is None:
+                return False
+            
+            # Run if:
+            # 1. Current time is past scheduled time today
+            # 2. Last run was before today's scheduled time
+            if now >= today_scheduled and last_run < today_scheduled:
+                return True
+            
             return False
-        
-        # Run if:
-        # 1. Current time is past scheduled time today
-        # 2. Last run was before today's scheduled time
-        if now >= today_scheduled and last_run < today_scheduled:
-            return True
-        
-        return False
     
     def run_once(self, task: Callable, task_name: str = "Scheduled Task") -> bool:
         """
@@ -157,7 +190,10 @@ class Scheduler:
         
         print(f"\n{'='*80}")
         print(f"Scheduler started for: {task_name}")
-        print(f"Schedule time: {self.schedule_time.strftime('%H:%M')}")
+        if self.interval_minutes:
+            print(f"Schedule: Every {self.interval_minutes} minutes")
+        else:
+            print(f"Schedule time: {self.schedule_time.strftime('%H:%M')}")
         if last_run:
             print(f"Last run: {last_run.strftime('%Y-%m-%d %H:%M:%S')}")
         else:
