@@ -1,6 +1,6 @@
 # Job Market Analytics & Reporting Specification
 
-This document outlines the planned analytics features and HTML report generation for the job market scraper. These features are designed for **job seekers** to gain insights into the Moldovan job market.
+This document outlines the planned analytics features and HTML report generation for the job market scraper. These features are designed for **job seekers** to gain insights into the Moldovan job market across all industries and sectors (manufacturing, retail, healthcare, IT, finance, hospitality, agriculture, construction, etc.).
 
 ## Overview
 
@@ -21,7 +21,7 @@ Provide salary insights at multiple granularity levels to help job seekers under
 - **Time series**: Track how average salaries change over time (if historical data available)
 
 #### 1.2 Salary by Job Function
-- **Metric**: Average and median salary per job function (e.g., Software Development, Marketing, Sales)
+- **Metric**: Average and median salary per job function (e.g., Sales, Marketing, Engineering, Healthcare, Administration, Manufacturing, Customer Service, etc.)
 - **Visualization**: Bar charts comparing job functions
 - **Ranking**: Top 10 highest-paying job functions
 - **Sample size**: Show number of jobs in each category
@@ -34,13 +34,13 @@ Provide salary insights at multiple granularity levels to help job seekers under
 
 #### 1.4 Salary by Specialization
 - **Metric**: Average and median salary for specific specializations
-- **Examples**: Frontend Developer, Backend Developer, DevOps Engineer, Data Analyst
+- **Examples**: Nurse, Electrician, Accountant, Sales Manager, Machine Operator, Teacher, Driver, etc.
 - **Visualization**: Sortable table with bar charts
 - **Filters**: Allow filtering by job function, seniority, location
 
 #### 1.5 Salary by Industry
 - **Metric**: Average compensation across different industries
-- **Examples**: IT, Finance, Healthcare, Manufacturing, Retail
+- **Examples**: Manufacturing, Retail, Healthcare, Finance, IT, Agriculture, Construction, Hospitality, Transportation, Education, etc.
 - **Visualization**: Horizontal bar chart
 - **Insight**: Which industries pay best for similar roles
 
@@ -81,14 +81,15 @@ Help job seekers understand which skills are in demand and how they correlate wi
 - **Metric**: Average salary for jobs requiring specific skills
 - **Analysis**: Which skills command the highest salaries?
 - **Examples**: 
-  - Python: $X average salary
-  - JavaScript: $Y average salary
-  - AWS: $Z average salary
+  - Welding: $X average salary
+  - Accounting software (e.g., 1C): $Y average salary
+  - Heavy machinery operation: $Z average salary
+  - English language proficiency: $W average salary
 - **Visualization**: Bubble chart (skill frequency vs. average salary)
 - **Insight**: High-value skills to learn for career growth
 
 #### 2.3 Skill Combinations
-- **Metric**: Common skill pairs/triplets (e.g., Python + Django + PostgreSQL)
+- **Metric**: Common skill pairs/triplets (e.g., "Driver's License + English + Customer Service" or "Welding + Blueprint Reading + Safety Certification")
 - **Analysis**: Which skill combinations appear together frequently?
 - **Visualization**: Network graph or co-occurrence matrix
 - **Salary impact**: Does combining certain skills increase average salary?

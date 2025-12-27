@@ -1,6 +1,6 @@
 # Job Market Scraper - Moldova
 
-A job scraping and analysis tool for the Moldovan job market. Collects job postings from multiple job sites, processes them with LLM for structured data extraction, and generates reports.
+A comprehensive job scraping and analysis tool for the Moldovan job market across all industries and sectors. Collects job postings from multiple job sites, processes them with LLM for structured data extraction, and generates reports.
 
 ## Configuration Files
 
