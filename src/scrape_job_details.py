@@ -99,33 +99,44 @@ def scrape_site_details(rules):
         # We filter for http_status.isnot(None) because:
         # - JobCheck records can exist without http_status (e.g., from Stage 1)
         # - Only checks with http_status indicate an actual fetch attempt
-        latest_checks_cte = db.query(
+        # First, find the max check date per job
+        latest_date_per_job = db.query(
             JobCheck.job_id,
             func.max(JobCheck.check_date).label('max_date')
         ).filter(
             JobCheck.http_status.isnot(None)
         ).group_by(JobCheck.job_id).subquery()
         
-        # Get the http_status for the most recent check
-        # Use min(http_status) as tiebreaker to ensure deterministic results
-        # (in the unlikely case of multiple checks on same date)
-        latest_checks = db.query(
+        # Then find the max ID for that date (handles edge case of multiple checks same day)
+        latest_id_per_job = db.query(
             JobCheck.job_id,
-            func.min(JobCheck.http_status).label('http_status')
+            func.max(JobCheck.id).label('max_id')
         ).join(
-            latest_checks_cte,
+            latest_date_per_job,
             and_(
-                JobCheck.job_id == latest_checks_cte.c.job_id,
-                JobCheck.check_date == latest_checks_cte.c.max_date
+                JobCheck.job_id == latest_date_per_job.c.job_id,
+                JobCheck.check_date == latest_date_per_job.c.max_date
             )
         ).group_by(JobCheck.job_id).subquery()
+        
+        # Finally, get the actual http_status for that specific check
+        latest_checks = db.query(
+            JobCheck.job_id,
+            JobCheck.http_status
+        ).join(
+            latest_id_per_job,
+            and_(
+                JobCheck.job_id == latest_id_per_job.c.job_id,
+                JobCheck.id == latest_id_per_job.c.max_id
+            )
+        ).subquery()
         
         # Query jobs without description where:
         # 1. Last HTTP status check was 200 (alive), OR
         # 2. No HTTP status checks exist (never checked)
         jobs_without_description = db.query(Job).filter(
             Job.site == site,
-            Job.job_description == None  # SQL NULL only, not empty string
+            Job.job_description.is_(None)  # SQL NULL only, not empty string
         ).outerjoin(
             latest_checks,
             Job.id == latest_checks.c.job_id
