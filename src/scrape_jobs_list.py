@@ -13,9 +13,56 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import os
+import math
+from pathlib import Path
 
 # Global lock for synchronized printing
 print_lock = threading.Lock()
+
+# Path to page statistics JSON file
+PAGE_STATS_FILE = "config/page_statistics.json"
+
+def load_page_statistics():
+    """Load page statistics from JSON file"""
+    if os.path.exists(PAGE_STATS_FILE):
+        try:
+            with open(PAGE_STATS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load page statistics: {e}")
+            return {}
+    return {}
+
+def save_page_statistics(stats):
+    """Save page statistics to JSON file"""
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(PAGE_STATS_FILE), exist_ok=True)
+        with open(PAGE_STATS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(stats, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Warning: Could not save page statistics: {e}")
+
+def update_site_page_stats(site_name, pages_scraped):
+    """Update the running average of pages scraped for a site"""
+    stats = load_page_statistics()
+    
+    if site_name not in stats:
+        stats[site_name] = {
+            'total_runs': 0,
+            'total_pages': 0,
+            'average_pages': 0
+        }
+    
+    # Update statistics
+    stats[site_name]['total_runs'] += 1
+    stats[site_name]['total_pages'] += pages_scraped
+    # Calculate average and round up
+    average = stats[site_name]['total_pages'] / stats[site_name]['total_runs']
+    stats[site_name]['average_pages'] = math.ceil(average)
+    
+    save_page_statistics(stats)
+    return stats[site_name]['average_pages']
 
 class ThreadProgressTracker:
     def __init__(self, num_threads):
@@ -182,10 +229,11 @@ def print_threaded(thread_id, message):
     if progress_tracker is not None:
         progress_tracker.add_log_message(thread_id, message)
 
-def scrape_jobs_list():
+def scrape_jobs_list(full_scrape=False):
     global progress_tracker
     
-    print("Scraping data...")
+    mode_str = "Full scrape mode" if full_scrape else "Smart scrape mode (with early termination)"
+    print(f"Scraping data... {mode_str}")
     with open(Config.scraper_rules, 'r', encoding='utf-8') as file:
         ruless = json.load(file)
 
@@ -206,7 +254,7 @@ def scrape_jobs_list():
             # Submit all site scraping tasks
             futures = []
             for i, rules in enumerate(ruless):
-                future = executor.submit(scrape_single_site, i, rules, db)
+                future = executor.submit(scrape_single_site, i, rules, db, full_scrape)
                 futures.append(future)
             
             # Wait for all tasks to complete
@@ -244,9 +292,15 @@ def monitor_progress():
         
         time.sleep(1)  # Update every second
 
-def scrape_single_site(thread_id, rules, db):
+def scrape_single_site(thread_id, rules, db, full_scrape=False):
     """
     Scrape a single site with its own rules and database session
+    
+    Args:
+        thread_id: Thread identifier for progress tracking
+        rules: Scraping rules for this site
+        db: Database session (not used, each thread creates its own)
+        full_scrape: If True, scrape all pages up to max_page without early termination
     """
     # Create a new database session for this thread
     local_db = ScrapeSessionLocal()
@@ -259,13 +313,12 @@ def scrape_single_site(thread_id, rules, db):
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker") 
         print_threaded(thread_id, f"Crawl delay from robots.txt: {delay}s")
 
-        # Stage 0 binary search for page numbers
-        progress_tracker.update_progress(thread_id, site_name, 0, 0, "Finding max pages", "PAGE_DETECTION")
-        pages = find_max_pages_threaded(thread_id, site_name, rules, delay)
-        print_threaded(thread_id, f"Total pages to scrape: {pages}")
+        # Use max_page as the limit instead of binary search
+        max_pages = Config.max_page
+        progress_tracker.update_progress(thread_id, site_name, 0, max_pages, "Starting page scraping", "SCRAPING")
+        print_threaded(thread_id, f"Max pages limit: {max_pages}")
 
         # Stage 1 get job cards from paginated pages
-        progress_tracker.update_progress(thread_id, site_name, 0, pages, "Starting page scraping", "SCRAPING")
         total_start_time = time.time()
         
         # Track consecutive existing jobs for early stopping
@@ -273,44 +326,84 @@ def scrape_single_site(thread_id, rules, db):
         threshold = Config.stage1_consecutive_known_threshold
         early_stopped = False
         
-        for i in range(1, pages+1):
-            progress_tracker.update_progress(thread_id, site_name, i, pages, f"Scraping page {i}/{pages}", "SCRAPING")
+        # Track URLs from previous page to detect duplicates (infinite loop detection)
+        previous_page_urls = set()
+        
+        for i in range(1, max_pages+1):
+            progress_tracker.update_progress(thread_id, site_name, i, max_pages, f"Scraping page {i}/{max_pages}", "SCRAPING")
             
             pagination = rules[Config.scraper_pagination]
             url = pagination.replace("{page}", str(i))
             
             jobs = scrape_jobs(url, rules, delay)
-            print_threaded(thread_id, f"Found {len(jobs)} jobs on page {i}/{pages}")
+            print_threaded(thread_id, f"Found {len(jobs)} jobs on page {i}/{max_pages}")
+            
+            # Check if jobs list is empty (no more pages)
+            if len(jobs) == 0:
+                print_threaded(thread_id, f"No jobs found on page {i}, stopping")
+                total_end_time = time.time()
+                total_duration = total_end_time - total_start_time
+                progress_tracker.update_progress(thread_id, site_name, i-1, max_pages, "NO MORE PAGES", "FINISHED")
+                print_threaded(thread_id, f"Completed scraping {i-1} pages in {format_time(total_duration)}")
+                # Update statistics
+                avg_pages = update_site_page_stats(site_name, i-1)
+                print_threaded(thread_id, f"Updated average pages for {site_name}: {avg_pages}")
+                break
+            
+            # Extract URLs from current page
+            current_page_urls = set(job['url'] for job in jobs)
+            
+            # Check for duplicate pages (infinite loop detection)
+            if i > 1 and current_page_urls == previous_page_urls:
+                print_threaded(thread_id, f"Page {i} has same URLs as page {i-1}, infinite loop detected, stopping")
+                total_end_time = time.time()
+                total_duration = total_end_time - total_start_time
+                progress_tracker.update_progress(thread_id, site_name, i-1, max_pages, "DUPLICATE PAGE", "FINISHED")
+                print_threaded(thread_id, f"Completed scraping {i-1} pages in {format_time(total_duration)}")
+                # Update statistics
+                avg_pages = update_site_page_stats(site_name, i-1)
+                print_threaded(thread_id, f"Updated average pages for {site_name}: {avg_pages}")
+                break
+            
+            previous_page_urls = current_page_urls
             
             # Store jobs in database using local session
             stats = store_jobs(local_db, jobs)
             
-            # Track consecutive existing jobs
-            if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
-                # All jobs on this page were existing
-                consecutive_existing += stats['existing']
-                print_threaded(thread_id, f"Consecutive existing jobs: {consecutive_existing}/{threshold}")
-            else:
-                # Reset counter when we find new or resurrected jobs
-                consecutive_existing = 0
-            
-            # Check if we should stop early
-            if consecutive_existing >= threshold:
-                early_stopped = True
-                total_end_time = time.time()
-                total_duration = total_end_time - total_start_time
-                progress_tracker.update_progress(thread_id, site_name, i, pages, "EARLY STOP", "FINISHED")
-                print_threaded(thread_id, f"Early stop: Found {consecutive_existing} consecutive known jobs (threshold: {threshold})")
-                print_threaded(thread_id, f"Completed scraping {i}/{pages} pages in {format_time(total_duration)}")
-                break
+            # Only check for early termination if not in full_scrape mode
+            if not full_scrape:
+                # Track consecutive existing jobs
+                if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
+                    # All jobs on this page were existing
+                    consecutive_existing += stats['existing']
+                    print_threaded(thread_id, f"Consecutive existing jobs: {consecutive_existing}/{threshold}")
+                else:
+                    # Reset counter when we find new or resurrected jobs
+                    consecutive_existing = 0
+                
+                # Check if we should stop early
+                if consecutive_existing >= threshold:
+                    early_stopped = True
+                    total_end_time = time.time()
+                    total_duration = total_end_time - total_start_time
+                    progress_tracker.update_progress(thread_id, site_name, i, max_pages, "EARLY STOP", "FINISHED")
+                    print_threaded(thread_id, f"Early stop: Found {consecutive_existing} consecutive known jobs (threshold: {threshold})")
+                    print_threaded(thread_id, f"Completed scraping {i} pages in {format_time(total_duration)}")
+                    # Update statistics
+                    avg_pages = update_site_page_stats(site_name, i)
+                    print_threaded(thread_id, f"Updated average pages for {site_name}: {avg_pages}")
+                    break
             
             # The progress tracker now handles time estimation automatically
-        
-        if not early_stopped:
+        else:
+            # Loop completed without break (reached max_pages)
             total_end_time = time.time()
             total_duration = total_end_time - total_start_time
-            progress_tracker.update_progress(thread_id, site_name, pages, pages, "COMPLETED", "FINISHED")
-            print_threaded(thread_id, f"Completed scraping {pages} pages in {format_time(total_duration)}")
+            progress_tracker.update_progress(thread_id, site_name, max_pages, max_pages, "COMPLETED", "FINISHED")
+            print_threaded(thread_id, f"Completed scraping {max_pages} pages in {format_time(total_duration)}")
+            # Update statistics
+            avg_pages = update_site_page_stats(site_name, max_pages)
+            print_threaded(thread_id, f"Updated average pages for {site_name}: {avg_pages}")
     
     finally:
         local_db.close()

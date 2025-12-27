@@ -16,10 +16,19 @@ from pathlib import Path
 # Menu Item Classes
 class ScrapeJobsListItem:
     def get_item_description(self):
-        return "Scrape Job Listings (Stage 1)"
+        return "Scrape Job Listings (Stage 1 - Smart Mode)"
     
     def execute(self):
-        scrape_jobs_list()
+        scrape_jobs_list(full_scrape=False)
+        return True
+
+
+class ScrapeJobsListFullItem:
+    def get_item_description(self):
+        return "Scrape Job Listings (Stage 1 - Full Scrape)"
+    
+    def execute(self):
+        scrape_jobs_list(full_scrape=True)
         return True
 
 
@@ -283,6 +292,7 @@ def run():
     # Register all menu items
     menu.register_item(ScheduledScrapingItem())  # New scheduled scraping option
     menu.register_item(ScrapeJobsListItem())
+    menu.register_item(ScrapeJobsListFullItem())  # Full scrape without early termination
     menu.register_item(ScrapeJobDetailsItem())
     menu.register_item(RecheckAliveJobsItem())
     menu.register_item(RecheckAllJobsItem())
