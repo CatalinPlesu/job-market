@@ -171,6 +171,50 @@ class Scheduler:
             traceback.print_exc()
             return False
     
+    def _create_status_panel(self, console: Console, task_name: str, 
+                            last_run: Optional[datetime], next_run: datetime, 
+                            status_text: str, border_color: str = "blue") -> Panel:
+        """
+        Create a status panel for displaying scheduler information.
+        
+        Args:
+            console: Rich console instance
+            task_name: Name of the task
+            last_run: Last run datetime or None
+            next_run: Next scheduled run datetime
+            status_text: Status message to display
+            border_color: Color of the panel border
+        
+        Returns:
+            Panel: Rich panel with status information
+        """
+        status_table = Table.grid(padding=(0, 2))
+        status_table.add_column(style="bold cyan")
+        status_table.add_column()
+        
+        status_table.add_row("Task:", task_name)
+        if self.interval_minutes:
+            status_table.add_row("Schedule:", f"Every {self.interval_minutes} minutes")
+        else:
+            status_table.add_row("Schedule:", f"Daily at {self.schedule_time.strftime('%H:%M')}")
+        
+        if last_run:
+            status_table.add_row("Last run:", last_run.strftime('%Y-%m-%d %H:%M:%S'))
+        else:
+            status_table.add_row("Last run:", "[dim]Never[/dim]")
+        
+        status_table.add_row("Next run:", next_run.strftime('%Y-%m-%d %H:%M:%S'))
+        status_table.add_row("Status:", status_text)
+        
+        panel = Panel(
+            status_table,
+            title=f"[bold blue]Scheduler: {task_name}[/bold blue]",
+            border_style=border_color,
+            padding=(1, 2)
+        )
+        
+        return panel
+    
     def run_with_monitoring(self, task: Callable, task_name: str = "Scheduled Task", 
                           check_interval: int = 60):
         """
@@ -194,32 +238,11 @@ class Scheduler:
         last_run = self.load_last_run()
         next_run = self.get_next_run_time()
         
-        # Create initial status panel
-        status_table = Table.grid(padding=(0, 2))
-        status_table.add_column(style="bold cyan")
-        status_table.add_column()
-        
-        status_table.add_row("Task:", task_name)
-        if self.interval_minutes:
-            status_table.add_row("Schedule:", f"Every {self.interval_minutes} minutes")
-        else:
-            status_table.add_row("Schedule:", f"Daily at {self.schedule_time.strftime('%H:%M')}")
-        
-        if last_run:
-            status_table.add_row("Last run:", last_run.strftime('%Y-%m-%d %H:%M:%S'))
-        else:
-            status_table.add_row("Last run:", "[dim]Never[/dim]")
-        
-        status_table.add_row("Next run:", next_run.strftime('%Y-%m-%d %H:%M:%S'))
-        status_table.add_row("Status:", "[yellow]⏳ Waiting[/yellow]")
-        
-        panel = Panel(
-            status_table,
-            title=f"[bold blue]Scheduler: {task_name}[/bold blue]",
-            border_style="blue",
-            padding=(1, 2)
+        # Create and display initial status panel
+        panel = self._create_status_panel(
+            console, task_name, last_run, next_run,
+            "[yellow]⏳ Waiting[/yellow]", "blue"
         )
-        
         console.print(panel)
         console.print("[dim]Press Ctrl+C to stop[/dim]\n")
         
@@ -240,26 +263,10 @@ class Scheduler:
                     next_run = self.get_next_run_time()
                     
                     # Show completion status
-                    status_table = Table.grid(padding=(0, 2))
-                    status_table.add_column(style="bold cyan")
-                    status_table.add_column()
-                    
-                    status_table.add_row("Task:", task_name)
-                    if self.interval_minutes:
-                        status_table.add_row("Schedule:", f"Every {self.interval_minutes} minutes")
-                    else:
-                        status_table.add_row("Schedule:", f"Daily at {self.schedule_time.strftime('%H:%M')}")
-                    status_table.add_row("Last run:", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                    status_table.add_row("Next run:", next_run.strftime('%Y-%m-%d %H:%M:%S'))
-                    status_table.add_row("Status:", "[green]✓ Complete - Waiting for next run[/green]")
-                    
-                    panel = Panel(
-                        status_table,
-                        title=f"[bold blue]Scheduler: {task_name}[/bold blue]",
-                        border_style="green",
-                        padding=(1, 2)
+                    panel = self._create_status_panel(
+                        console, task_name, datetime.now(), next_run,
+                        "[green]✓ Complete - Waiting for next run[/green]", "green"
                     )
-                    
                     console.print(panel)
                 else:
                     # Show countdown to next run with live updates
