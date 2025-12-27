@@ -7,6 +7,10 @@ from src.generate_html_page import generate_html_page
 from src.menu import Menu
 from src.scheduled_scraper import run_all_stages_scheduled
 from src.scheduler import Scheduler
+from src.database_backup import DatabaseBackup
+from config.settings import Config
+from datetime import datetime
+from pathlib import Path
 
 
 # Menu Item Classes
@@ -70,6 +74,104 @@ class GenerateHtmlItem:
     
     def execute(self):
         generate_html_page()
+        return True
+
+
+class DatabaseRollbackItem:
+    def get_item_description(self):
+        return "Database Rollback"
+    
+    def execute(self):
+        print("\n" + "="*80)
+        print("DATABASE ROLLBACK")
+        print("="*80)
+        print("\nRestore a database from a backup copy.")
+        print()
+        
+        # Step 1: Choose database
+        print("Select database to restore:")
+        print("  1. scrape.db (raw scraped data)")
+        print("  2. data.db (processed data)")
+        print("  0. Cancel")
+        
+        db_choice = input("\nEnter choice: ").strip()
+        
+        if db_choice == "0":
+            print("\nCancelled.")
+            return True
+        
+        # Determine which database was selected
+        if db_choice == "1":
+            db_path = Config.scrape_db_path
+            db_name = "scrape.db"
+        elif db_choice == "2":
+            db_path = Config.data_db_path
+            db_name = "data.db"
+        else:
+            print("\n✗ Invalid choice.")
+            return True
+        
+        # Step 2: List available backups
+        backup_manager = DatabaseBackup(db_path, backup_dir="backups")
+        backups = backup_manager.list_backups()
+        
+        if not backups:
+            print(f"\n✗ No backups found for {db_name}")
+            return True
+        
+        print(f"\nAvailable backups for {db_name}:")
+        print("-" * 80)
+        
+        for idx, backup_path in enumerate(backups, start=1):
+            # Get file stats
+            stat_info = backup_path.stat()
+            size_mb = stat_info.st_size / (1024 * 1024)
+            created_time = datetime.fromtimestamp(stat_info.st_mtime)
+            
+            print(f"{idx}. {backup_path.name}")
+            print(f"   Created: {created_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"   Size: {size_mb:.2f} MB")
+            print()
+        
+        print("0. Cancel")
+        
+        # Step 3: Select backup to restore
+        backup_choice = input("\nSelect backup to restore: ").strip()
+        
+        if backup_choice == "0":
+            print("\nCancelled.")
+            return True
+        
+        try:
+            backup_idx = int(backup_choice)
+            if backup_idx < 1 or backup_idx > len(backups):
+                print("\n✗ Invalid selection.")
+                return True
+            
+            selected_backup = backups[backup_idx - 1]
+            
+            # Step 4: Confirm restoration
+            print(f"\nYou are about to restore {db_name} from:")
+            print(f"  {selected_backup.name}")
+            
+            confirm = input("\nAre you sure? This will overwrite the current database. (yes/no): ").strip().lower()
+            
+            if confirm not in ("yes", "y"):
+                print("\nCancelled.")
+                return True
+            
+            # Step 5: Perform restoration
+            print("\nRestoring database...")
+            backup_manager.restore_backup(selected_backup)
+            print(f"\n✓ Successfully restored {db_name}!")
+        
+        except ValueError:
+            print("\n✗ Invalid input. Please enter a number.")
+        except (FileNotFoundError, IOError) as e:
+            print(f"\n✗ Error during restoration: {e}")
+        except Exception as e:
+            print(f"\n✗ Unexpected error: {e}")
+        
         return True
 
 
@@ -187,6 +289,7 @@ def run():
     menu.register_item(StructureDataItem())
     menu.register_item(ProcessDataItem())
     menu.register_item(GenerateHtmlItem())
+    menu.register_item(DatabaseRollbackItem())
     
     # Run the menu
     menu.run()
