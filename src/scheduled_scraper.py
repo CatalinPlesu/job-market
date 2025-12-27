@@ -53,7 +53,7 @@ def run_stage1_with_stats():
     scrape_jobs_list.progress_tracker = ThreadProgressTracker(len(ruless))
     
     # Create database session
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     
     try:
         # Start progress monitor thread
@@ -229,7 +229,7 @@ def scrape_site_stage2_with_stats(rules, logger):
         Stage2Stats object
     """
     site = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     total_jobs = 0
@@ -383,7 +383,7 @@ def recheck_site_stage3_with_stats(rules, logger):
         Stage3Stats object
     """
     site = rules[Config.scraper_name]
-    db = SessionLocal()
+    db = ScrapeSessionLocal()
     today = date.today()
     
     total_checked = 0
