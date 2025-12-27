@@ -40,6 +40,10 @@ class Config:
     # Text Processing
     max_body_text_length = 30000  # characters
 
+    # Job Identification Settings
+    # After a job is marked dead/removed for this many days, treat it as a new position if it reappears
+    job_resurrection_threshold_days = 7  # days
+
     job_to_db_prompt = """
     Extract job posting data as JSON. Translate descriptive text to English; keep proper nouns original.
     Follow this schema and rules strictly:

@@ -340,27 +340,65 @@ def store_jobs(db, jobs_data):
     Store scraped jobs in the database, identifying by company + title + site.
     Add job check record for today if not already checked.
     
+    New behavior (since job resurrection feature):
+    - If a job with same (site, title, company) exists and is still alive, reuse it
+    - If a job exists but has been dead for >= job_resurrection_threshold_days, create new entry
+    - Always works with the most recently created job for a given (site, title, company)
+    
     Args:
         db: SQLAlchemy database session
         jobs_data: List of job dictionaries from scrape_jobs()
     """
+    from src.job_identification import should_create_new_job
+    
     added_count = 0
     existing_count = 0
+    resurrected_count = 0
     checked_count = 0
     today = date.today()
     
     for job_data in jobs_data:
         try:
-            # Find existing job by company + title + site
-            existing_job = db.query(Job).filter(
-                and_(
-                    Job.job_title == job_data['title'],
-                    Job.company_name == job_data['company'],
-                    Job.site == job_data['site']
-                )
-            ).first()
+            # Determine if we should create a new job or reuse existing one
+            should_create, existing_job = should_create_new_job(
+                db, 
+                job_data['site'], 
+                job_data['title'], 
+                job_data['company']
+            )
             
-            if existing_job:
+            if should_create:
+                # Create new job entry (either first time or resurrection after threshold)
+                new_job = Job(
+                    job_title=job_data['title'],
+                    company_name=job_data['company'],
+                    job_url=job_data['url'],
+                    site=job_data['site'],
+                    job_description=None,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                
+                db.add(new_job)
+                db.flush()
+                
+                # Add initial check record linked to the new job
+                initial_check = JobCheck(
+                    job_id=new_job.id,
+                    check_date=today,
+                    http_status=None
+                )
+                db.add(initial_check)
+                
+                if existing_job:
+                    # This is a resurrection - job existed before but was dead long enough
+                    resurrected_count += 1
+                else:
+                    # This is a brand new job
+                    added_count += 1
+                
+            else:
+                # Reuse existing job
                 existing_count += 1
                 
                 # Check if we've already checked this job today
@@ -385,31 +423,6 @@ def store_jobs(db, jobs_data):
                 if existing_job.job_url != job_data['url']:
                     existing_job.job_url = job_data['url']
                     existing_job.updated_at = datetime.utcnow()
-                
-            else:
-                # Create new job entry
-                new_job = Job(
-                    job_title=job_data['title'],
-                    company_name=job_data['company'],
-                    job_url=job_data['url'],
-                    site=job_data['site'],
-                    job_description=None,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
-                )
-                
-                db.add(new_job)
-                db.flush()
-                
-                # Add initial check record linked to the new job
-                initial_check = JobCheck(
-                    job_id=new_job.id,
-                    check_date=today,
-                    http_status=None
-                )
-                db.add(initial_check)
-                
-                added_count += 1
             
         except Exception as e:
             print_threaded(0, f"Error processing job {job_data.get('title', 'Unknown')}: {e}")  # Use thread 0 for errors
@@ -419,7 +432,10 @@ def store_jobs(db, jobs_data):
     # Commit all changes at once
     try:
         db.commit()
-        print_threaded(0, f"✓ {added_count} new | {existing_count} existing | {checked_count} checks added")  # Use thread 0 for general messages
+        if resurrected_count > 0:
+            print_threaded(0, f"✓ {added_count} new | {existing_count} existing | {resurrected_count} resurrected | {checked_count} checks added")
+        else:
+            print_threaded(0, f"✓ {added_count} new | {existing_count} existing | {checked_count} checks added")
     except Exception as e:
         print_threaded(0, f"✗ Error committing to database: {e}")  # Use thread 0 for errors
         db.rollback()
