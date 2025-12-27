@@ -9,6 +9,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - Database paths (scrape.db for raw data, data.db for processed data)
 - Scraping settings (default delay, max parallel sites)
 - Job identification settings (resurrection threshold for treating reopened positions as new)
+- Stage 1 efficiency settings (consecutive known jobs threshold for early stopping)
 - LLM prompts for data extraction
 
 **`config/scraper_rules.json`** - Hand-written per-site rules
@@ -49,6 +50,7 @@ Collect job URLs from listing pages:
 - Store in `scrape.db` database
 - Intelligent job identification: Jobs with same (site, title, company) are tracked
 - **Job Resurrection**: If a job dies and reappears after the threshold (default 7 days), it's treated as a new position
+- **Efficiency Optimization**: Automatically stops when finding 100+ consecutive jobs that already exist in the database (configurable via `stage1_consecutive_known_threshold`)
 
 ### 3. Scrape Job Details (Stage 2)
 Get detailed information for each job:
