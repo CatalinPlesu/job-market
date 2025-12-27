@@ -91,6 +91,10 @@ def run_improved_scheduler():
     Run the improved scheduler with separate schedules for different stages.
     - Stage 1 & 2: Every hour (fast with early stopping)
     - Stage 3: Once daily at midnight (slow)
+    
+    Note: On first startup, schedulers will wait until their scheduled time
+    before running. To run immediately, use the menu options to execute
+    stages manually, then start the scheduler.
     """
     from src.scheduled_scraper import run_stages_1_and_2, run_stage_3_only
     
