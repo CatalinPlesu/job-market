@@ -8,6 +8,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - LLM API credentials (key, endpoint, model)
 - Database paths (scrape.db for raw data, data.db for processed data)
 - Scraping settings (default delay, max parallel sites)
+- Job identification settings (resurrection threshold for treating reopened positions as new)
 - LLM prompts for data extraction
 
 **`config/scraper_rules.json`** - Hand-written per-site rules
@@ -46,7 +47,8 @@ Collect job URLs from listing pages:
 - Navigate pagination using patterns from `scraper_rules.json`
 - Extract job post URLs from listing pages
 - Store in `scrape.db` database
-- Deduplication based on job URL
+- Intelligent job identification: Jobs with same (site, title, company) are tracked
+- **Job Resurrection**: If a job dies and reappears after the threshold (default 7 days), it's treated as a new position
 
 ### 3. Scrape Job Details (Stage 2)
 Get detailed information for each job:
@@ -90,6 +92,10 @@ Create static HTML report with job listings and statistics (placeholder - not ye
 - **Two-stage scraping**: Separate collection of URLs and detail scraping
 - **Dual database architecture**: Raw data (`scrape.db`) and processed data (`data.db`)
 - **LLM-powered data extraction**: Structured extraction from unstructured job descriptions
+- **Intelligent job identification**: Jobs are identified by (site, title, company) with resurrection logic
+  - Tracks multiple postings of the same position over time
+  - Configurable threshold (default 7 days) to treat reopened positions as new
+  - Maintains backward compatibility with existing databases
 - **Job status tracking**: Monitor when jobs become inactive
 - **Scheduled execution**: Built-in scheduler for automated daily runs
 - **Database backups**: Automatic backups with retention policy
