@@ -247,8 +247,11 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
                 if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
                     # All jobs on this page were existing
                     consecutive_existing += stats['existing']
+                    logger.info(f"Stage 1 - {site_name} page {i}: All existing - consecutive count now {consecutive_existing}/{threshold}")
                 else:
                     # Reset counter when we find new or resurrected jobs
+                    if consecutive_existing > 0:
+                        logger.info(f"Stage 1 - {site_name} page {i}: Found new/resurrected jobs (added={stats['added']}, resurrected={stats['resurrected']}), resetting counter from {consecutive_existing}")
                     consecutive_existing = 0
                 
                 # Check if we should stop early
