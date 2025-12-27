@@ -162,16 +162,15 @@ class DatabaseRollbackItem:
             
             # Step 5: Perform restoration
             print("\nRestoring database...")
-            try:
-                backup_manager.restore_backup(selected_backup)
-                print(f"\n✓ Successfully restored {db_name}!")
-            except Exception as e:
-                print(f"\n✗ Error during restoration: {e}")
+            backup_manager.restore_backup(selected_backup)
+            print(f"\n✓ Successfully restored {db_name}!")
         
         except ValueError:
             print("\n✗ Invalid input. Please enter a number.")
+        except (FileNotFoundError, IOError) as e:
+            print(f"\n✗ Error during restoration: {e}")
         except Exception as e:
-            print(f"\n✗ Error: {e}")
+            print(f"\n✗ Unexpected error: {e}")
         
         return True
 
