@@ -96,23 +96,23 @@ def scrape_site_details(rules):
         # ALSO: Exclude jobs that have been identified as dead (non-200 HTTP status)
         
         # Subquery to get the most recent check WITH http_status for each job
-        # This selects both the job_id and the http_status of the most recent check
-        latest_check_subquery = db.query(
+        # This approach works reliably across different database backends
+        latest_checks_cte = db.query(
             JobCheck.job_id,
-            JobCheck.http_status,
-            func.row_number().over(
-                partition_by=JobCheck.job_id,
-                order_by=JobCheck.check_date.desc()
-            ).label('rn')
+            func.max(JobCheck.check_date).label('max_date')
         ).filter(
             JobCheck.http_status.isnot(None)
-        ).subquery()
+        ).group_by(JobCheck.job_id).subquery()
         
         latest_checks = db.query(
-            latest_check_subquery.c.job_id,
-            latest_check_subquery.c.http_status
-        ).filter(
-            latest_check_subquery.c.rn == 1
+            JobCheck.job_id,
+            JobCheck.http_status
+        ).join(
+            latest_checks_cte,
+            and_(
+                JobCheck.job_id == latest_checks_cte.c.job_id,
+                JobCheck.check_date == latest_checks_cte.c.max_date
+            )
         ).subquery()
         
         # Query jobs without description where:
@@ -125,8 +125,8 @@ def scrape_site_details(rules):
             latest_checks,
             Job.id == latest_checks.c.job_id
         ).filter(
-            # Either no check exists (job_id is NULL) OR last status was 200
-            (latest_checks.c.job_id == None) | (latest_checks.c.http_status == 200)
+            # Either no check exists (http_status is NULL) OR last status was 200
+            latest_checks.c.http_status.is_(None) | (latest_checks.c.http_status == 200)
         ).all()
         
         total_jobs = len(jobs_without_description)
