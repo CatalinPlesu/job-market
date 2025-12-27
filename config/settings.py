@@ -43,6 +43,10 @@ class Config:
     # Job Identification Settings
     # After a job is marked dead/removed for this many days, treat it as a new position if it reappears
     job_resurrection_threshold_days = 7  # days
+    
+    # Stage 1 Efficiency Settings
+    # Stop scraping when this many consecutive jobs already exist in database
+    stage1_consecutive_known_threshold = 100  # consecutive known jobs
 
     job_to_db_prompt = """
     Extract job posting data as JSON. Translate descriptive text to English; keep proper nouns original.
