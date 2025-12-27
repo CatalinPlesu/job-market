@@ -25,6 +25,7 @@ Two SQLite databases managed with SQLAlchemy:
 **`databases/scrape.db`** - Raw scraped data
 - `jobs` table: Original job postings (site, job_title, company_name, job_url, job_description)
 - `job_checks` table: Job status tracking (check_date, http_status)
+- `site_statistics` table: Scraping performance metrics per site (total_runs, total_pages, average_pages)
 
 **`databases/data.db`** - Processed and normalized data
 - `job_details` table: LLM-extracted and structured job information
@@ -43,40 +44,51 @@ Execute all scraping stages on a schedule with database backups and reporting:
 - Error-only logging (weekly log files)
 - Daily reports with statistics per site
 
-### 2. Scrape Job Listings (Stage 1)
-Collect job URLs from listing pages:
-- Navigate pagination using patterns from `scraper_rules.json`
+### 2. Scrape Job Listings (Stage 1 - Smart Mode)
+Collect job URLs from listing pages with intelligent early termination:
+- Navigate pagination starting from page 1
 - Extract job post URLs from listing pages
 - Store in `scrape.db` database
 - Intelligent job identification: Jobs with same (site, title, company) are tracked
 - **Job Resurrection**: If a job dies and reappears after the threshold (default 7 days), it's treated as a new position
 - **Efficiency Optimization**: Automatically stops when finding 100+ consecutive jobs that already exist in the database (configurable via `stage1_consecutive_known_threshold`)
+- **Duplicate Page Detection**: Stops if two consecutive pages contain identical job URLs (prevents infinite loops)
+- **Page Statistics**: Tracks average pages scraped per site in the `site_statistics` table in `scrape.db`
+- Maximum page limit: 500 pages (configurable via `max_page` in settings)
 
-### 3. Scrape Job Details (Stage 2)
+### 3. Scrape Job Listings (Stage 1 - Full Scrape)
+Full scraping mode without early termination:
+- Scrapes all available pages up to the maximum limit (500 pages)
+- No early stopping based on consecutive existing jobs
+- Useful for initial database population or when you want to ensure all jobs are captured
+- Still includes duplicate page detection to prevent infinite loops
+- Still tracks page statistics
+
+### 4. Scrape Job Details (Stage 2)
 Get detailed information for each job:
 - Visit each job URL collected in Stage 1
 - Extract full job description and details
 - Store raw HTML/text in `scrape.db`
 
-### 4. Re-check Alive Jobs
+### 5. Re-check Alive Jobs
 Verify job postings are still active:
 - Check HTTP status of previously scraped jobs
 - Track check date and status in `job_checks` table
 - Identify jobs that have been removed or expired
 
-### 5. Re-check All (Including Rotten) Jobs
+### 6. Re-check All (Including Rotten) Jobs
 Re-check all jobs including those previously marked as inactive
 
-### 6. Structure Data with LLM
+### 7. Structure Data with LLM
 Process raw job descriptions with LLM:
 - Send job descriptions to LLM with extraction prompt
 - Parse structured JSON response
 - Store normalized data in `data.db` with proper relationships
 
-### 7. Process Data
+### 8. Process Data
 Additional data processing and normalization tasks (placeholder - not yet implemented)
 
-### 8. Generate HTML Page
+### 9. Generate HTML Page
 Create static HTML report with job listings and statistics (placeholder - not yet implemented)
 
 ## Tech Stack
