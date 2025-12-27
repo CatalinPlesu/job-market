@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import json
 import time
 from datetime import datetime, date
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func
 from src.scrape_jobs_list import get_crawl_delay_with_robotparser, format_time
 import threading
 from queue import Queue
@@ -95,48 +95,39 @@ def scrape_site_details(rules):
         # Blank strings mean we already scraped them and found nothing
         # ALSO: Exclude jobs that have been identified as dead (non-200 HTTP status)
         
-        # Base query: jobs without descriptions for this site
-        base_query = db.query(Job).filter(
+        # Subquery to get the most recent check WITH http_status for each job
+        # This selects both the job_id and the http_status of the most recent check
+        latest_check_subquery = db.query(
+            JobCheck.job_id,
+            JobCheck.http_status,
+            func.row_number().over(
+                partition_by=JobCheck.job_id,
+                order_by=JobCheck.check_date.desc()
+            ).label('rn')
+        ).filter(
+            JobCheck.http_status.isnot(None)
+        ).subquery()
+        
+        latest_checks = db.query(
+            latest_check_subquery.c.job_id,
+            latest_check_subquery.c.http_status
+        ).filter(
+            latest_check_subquery.c.rn == 1
+        ).subquery()
+        
+        # Query jobs without description where:
+        # 1. Last HTTP status check was 200 (alive), OR
+        # 2. No HTTP status checks exist (never checked)
+        jobs_without_description = db.query(Job).filter(
             Job.site == site,
             Job.job_description == None  # SQL NULL only, not empty string
-        )
-        
-        # Subquery to get the most recent check WITH http_status for each job
-        subquery = db.query(
-            JobCheck.job_id,
-            func.max(JobCheck.check_date).label('last_status_check_date')
+        ).outerjoin(
+            latest_checks,
+            Job.id == latest_checks.c.job_id
         ).filter(
-            JobCheck.http_status.isnot(None)  # Only checks that have HTTP status
-        ).group_by(JobCheck.job_id).subquery()
-        
-        # Get jobs where:
-        # 1. Last HTTP status check was 200 (alive), OR
-        # 2. No HTTP status checks exist yet (never checked)
-        
-        # Jobs with successful status (200)
-        jobs_with_good_status = base_query.join(
-            subquery,
-            Job.id == subquery.c.job_id
-        ).join(
-            JobCheck,
-            and_(
-                JobCheck.job_id == subquery.c.job_id,
-                JobCheck.check_date == subquery.c.last_status_check_date,
-                JobCheck.http_status == 200
-            )
+            # Either no check exists (job_id is NULL) OR last status was 200
+            (latest_checks.c.job_id == None) | (latest_checks.c.http_status == 200)
         ).all()
-        
-        # Jobs with no HTTP status checks at all
-        jobs_without_status = base_query.outerjoin(
-            JobCheck,
-            and_(
-                Job.id == JobCheck.job_id,
-                JobCheck.http_status.isnot(None)
-            )
-        ).filter(JobCheck.id.is_(None)).all()
-        
-        # Combine both lists
-        jobs_without_description = jobs_with_good_status + jobs_without_status
         
         total_jobs = len(jobs_without_description)
         print(f"[{site:15}] Found {total_jobs} jobs without descriptions")
