@@ -70,10 +70,10 @@ Process raw job descriptions with LLM:
 - Store normalized data in `data.db` with proper relationships
 
 ### 7. Process Data
-Additional data processing and normalization tasks
+Additional data processing and normalization tasks (placeholder - not yet implemented)
 
 ### 8. Generate HTML Page
-Create static HTML report with job listings and statistics
+Create static HTML report with job listings and statistics (placeholder - not yet implemented)
 
 ## Tech Stack
 
@@ -85,7 +85,7 @@ Create static HTML report with job listings and statistics
 - **HTML Generation:** `jinja2`
 - **UI:** `rich` (terminal UI components)
 
-## Features
+## Current Features
 
 - **Two-stage scraping**: Separate collection of URLs and detail scraping
 - **Dual database architecture**: Raw data (`scrape.db`) and processed data (`data.db`)
@@ -94,4 +94,8 @@ Create static HTML report with job listings and statistics
 - **Scheduled execution**: Built-in scheduler for automated daily runs
 - **Database backups**: Automatic backups with retention policy
 - **Comprehensive data model**: 50+ normalized tables with proper relationships
-- **HTML report generation**: Static site generation for browsing results
+- **Scraping reports**: Daily JSON/text reports with per-site and aggregated statistics
+
+## Planned Features
+
+See [ANALYTICS_SPEC.md](ANALYTICS_SPEC.md) for detailed specifications of planned analytics and reporting features.
