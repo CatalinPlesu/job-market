@@ -361,9 +361,8 @@ def scrape_single_site(thread_id, rules, db, full_scrape=False):
             
             # Check if jobs list is empty (no more pages)
             if len(jobs) == 0:
-                # If first page is empty, no jobs exist; otherwise we finished previous page
-                pages_completed = max(0, i - 1)
-                finish_scraping(thread_id, site_name, pages_completed, max_pages, "NO MORE PAGES", 
+                # Report how many pages were successfully scraped (current page is empty)
+                finish_scraping(thread_id, site_name, i-1, max_pages, "NO MORE PAGES", 
                               f"No jobs found on page {i}, stopping", total_start_time)
                 break
             
@@ -374,8 +373,8 @@ def scrape_single_site(thread_id, rules, db, full_scrape=False):
             # Note: We check for exact equality to detect infinite loops where the same page
             # is returned repeatedly. Partial overlaps between pages are normal and expected.
             if i > 1 and current_page_urls == previous_page_urls:
-                pages_completed = max(0, i - 1)
-                finish_scraping(thread_id, site_name, pages_completed, max_pages, "DUPLICATE PAGE",
+                # Report how many valid pages were scraped (current page is duplicate)
+                finish_scraping(thread_id, site_name, i-1, max_pages, "DUPLICATE PAGE",
                               f"Page {i} has same URLs as page {i-1}, infinite loop detected, stopping", 
                               total_start_time)
                 break
@@ -415,6 +414,12 @@ def scrape_single_site(thread_id, rules, db, full_scrape=False):
 
 def find_max_pages_threaded(thread_id, site_name, rules, delay):
     """
+    DEPRECATED: This function uses binary search to find max pages.
+    It's kept for backward compatibility with scheduled_scraper.py and scheduled_scraper_decoupled.py
+    
+    The main scrape_jobs_list() flow no longer uses this - it now iterates directly
+    from page 1 to max_page (500) with early termination and duplicate detection.
+    
     On a given domain with pagination url, and start page,
     will find the number of pages that can be accessed from 1 to x
     """
