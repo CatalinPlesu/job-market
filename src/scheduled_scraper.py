@@ -58,7 +58,7 @@ def run_stages_1_and_2():
         print("STAGE 1: Scraping Job Listings")
         print("="*80)
         scrape_jobs_list(full_scrape=False)
-        print(f"✓ Stage 1 completed - {sum(s.links_found for s in stage1_stats)} links found\n")
+        print(f"✓ Stage 1 completed")
         
         # Run Stage 2
         print("="*80)
