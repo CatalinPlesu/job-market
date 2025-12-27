@@ -25,6 +25,7 @@ Two SQLite databases managed with SQLAlchemy:
 **`databases/scrape.db`** - Raw scraped data
 - `jobs` table: Original job postings (site, job_title, company_name, job_url, job_description)
 - `job_checks` table: Job status tracking (check_date, http_status)
+- `site_statistics` table: Scraping performance metrics per site (total_runs, total_pages, average_pages)
 
 **`databases/data.db`** - Processed and normalized data
 - `job_details` table: LLM-extracted and structured job information
@@ -52,7 +53,7 @@ Collect job URLs from listing pages with intelligent early termination:
 - **Job Resurrection**: If a job dies and reappears after the threshold (default 7 days), it's treated as a new position
 - **Efficiency Optimization**: Automatically stops when finding 100+ consecutive jobs that already exist in the database (configurable via `stage1_consecutive_known_threshold`)
 - **Duplicate Page Detection**: Stops if two consecutive pages contain identical job URLs (prevents infinite loops)
-- **Page Statistics**: Tracks average pages scraped per site in `config/page_statistics.json`
+- **Page Statistics**: Tracks average pages scraped per site in the `site_statistics` table in `scrape.db`
 - Maximum page limit: 500 pages (configurable via `max_page` in settings)
 
 ### 3. Scrape Job Listings (Stage 1 - Full Scrape)

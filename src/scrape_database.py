@@ -51,6 +51,18 @@ class JobCheck(ScrapeBase):
     job = relationship("Job", back_populates="checks")
 
 
+class SiteStatistics(ScrapeBase):
+    """Track scraping statistics per site"""
+    __tablename__ = 'site_statistics'
+    
+    id = Column(Integer, primary_key=True)
+    site_name = Column(String(200), nullable=False, unique=True, index=True)
+    total_runs = Column(Integer, default=0, nullable=False)
+    total_pages = Column(Integer, default=0, nullable=False)
+    average_pages = Column(Integer, default=0, nullable=False)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def get_scrape_db():
     """Get scrape database session"""
     db = ScrapeSessionLocal()

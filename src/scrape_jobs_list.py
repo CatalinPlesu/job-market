@@ -1,5 +1,5 @@
 from config.settings import Config
-from src.scrape_database import ScrapeSessionLocal, Job, JobCheck
+from src.scrape_database import ScrapeSessionLocal, Job, JobCheck, SiteStatistics
 from src.job_identification import should_create_new_job
 import requests
 from bs4 import BeautifulSoup
@@ -18,50 +18,51 @@ import math
 # Global lock for synchronized printing
 print_lock = threading.Lock()
 
-# Path to page statistics JSON file
-PAGE_STATS_FILE = "config/page_statistics.json"
-
-def load_page_statistics():
-    """Load page statistics from JSON file"""
-    if os.path.exists(PAGE_STATS_FILE):
-        try:
-            with open(PAGE_STATS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Warning: Could not load page statistics: {e}")
-            return {}
-    return {}
-
-def save_page_statistics(stats):
-    """Save page statistics to JSON file"""
-    try:
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(PAGE_STATS_FILE), exist_ok=True)
-        with open(PAGE_STATS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(stats, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"Warning: Could not save page statistics: {e}")
-
 def update_site_page_stats(site_name, pages_scraped):
-    """Update the running average of pages scraped for a site"""
-    stats = load_page_statistics()
+    """
+    Update the running average of pages scraped for a site in the database.
     
-    if site_name not in stats:
-        stats[site_name] = {
-            'total_runs': 0,
-            'total_pages': 0,
-            'average_pages': 0
-        }
-    
-    # Update statistics
-    stats[site_name]['total_runs'] += 1
-    stats[site_name]['total_pages'] += pages_scraped
-    # Calculate average and round up to nearest integer using ceiling function
-    average = stats[site_name]['total_pages'] / stats[site_name]['total_runs']
-    stats[site_name]['average_pages'] = math.ceil(average)
-    
-    save_page_statistics(stats)
-    return stats[site_name]['average_pages']
+    Args:
+        site_name: Name of the site being scraped
+        pages_scraped: Number of pages scraped in this run
+        
+    Returns:
+        int: The updated average pages (rounded up)
+    """
+    db = ScrapeSessionLocal()
+    try:
+        # Get or create site statistics record
+        site_stats = db.query(SiteStatistics).filter(
+            SiteStatistics.site_name == site_name
+        ).first()
+        
+        if not site_stats:
+            # Create new record
+            site_stats = SiteStatistics(
+                site_name=site_name,
+                total_runs=0,
+                total_pages=0,
+                average_pages=0
+            )
+            db.add(site_stats)
+        
+        # Update statistics
+        site_stats.total_runs += 1
+        site_stats.total_pages += pages_scraped
+        # Calculate average and round up to nearest integer using ceiling function
+        average = site_stats.total_pages / site_stats.total_runs
+        site_stats.average_pages = math.ceil(average)
+        site_stats.last_updated = datetime.utcnow()
+        
+        db.commit()
+        return site_stats.average_pages
+    except Exception as e:
+        print(f"Warning: Could not update page statistics: {e}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
 
 class ThreadProgressTracker:
     def __init__(self, num_threads):
