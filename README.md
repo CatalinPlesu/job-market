@@ -36,15 +36,28 @@ The schema uses full normalization with foreign keys and relationship mapping fo
 
 ## Menu Options
 
-### 1. Run All Stages on Schedule (with Logging & Reports)
-Execute all scraping stages on a schedule with database backups and reporting:
+### 1. Run Stages on Improved Schedule (Hourly for 1&2, Daily for 3) ⭐ NEW
+Execute scraping stages on optimized schedules based on their speed:
+- **Stage 1 & 2: Every HOUR** (fast with early stopping at 100+ consecutive existing jobs)
+  - Stage 1: Scrape job listings from all sites
+  - Stage 2: Get job details for new listings
+- **Stage 3: Daily at 00:00** (slow - rechecks all alive jobs)
+  - Stage 3: Re-check alive jobs to detect removed postings
+- Separate schedules optimize for each stage's performance characteristics
+- Database backup before each run (keeps last 3 days)
+- Error-only logging (weekly log files)
+- Daily reports with statistics per site
+- Options: Run Stages 1&2 now, Run Stage 3 now, or Start improved scheduler
+
+### 2. Run All Stages on Schedule (with Logging & Reports)
+Execute all scraping stages together on a daily schedule with database backups and reporting:
 - Run once immediately OR start scheduler for daily execution
 - Configurable schedule time (default: 00:00 midnight)
 - Database backup before each run (keeps last 3 days)
 - Error-only logging (weekly log files)
 - Daily reports with statistics per site
 
-### 2. Scrape Job Listings (Stage 1 - Smart Mode)
+### 3. Scrape Job Listings (Stage 1 - Smart Mode)
 Collect job URLs from listing pages with intelligent early termination:
 - Navigate pagination starting from page 1
 - Extract job post URLs from listing pages
@@ -56,7 +69,7 @@ Collect job URLs from listing pages with intelligent early termination:
 - **Page Statistics**: Tracks average pages scraped per site in the `site_statistics` table in `scrape.db`
 - Maximum page limit: 500 pages (configurable via `max_page` in settings)
 
-### 3. Scrape Job Listings (Stage 1 - Full Scrape)
+### 4. Scrape Job Listings (Stage 1 - Full Scrape)
 Full scraping mode without early termination:
 - Scrapes all available pages up to the maximum limit (500 pages)
 - No early stopping based on consecutive existing jobs
@@ -64,32 +77,34 @@ Full scraping mode without early termination:
 - Still includes duplicate page detection to prevent infinite loops
 - Still tracks page statistics
 
-### 4. Scrape Job Details (Stage 2)
+### 5. Scrape Job Details (Stage 2)
 Get detailed information for each job:
 - Visit each job URL collected in Stage 1
 - Extract full job description and details
 - Store raw HTML/text in `scrape.db`
 
-### 5. Re-check Alive Jobs
+### 6. Re-check Alive Jobs
 Verify job postings are still active:
 - Check HTTP status of previously scraped jobs
 - Track check date and status in `job_checks` table
 - Identify jobs that have been removed or expired
 
-### 6. Re-check All (Including Rotten) Jobs
+### 7. Re-check All (Including Rotten) Jobs
 Re-check all jobs including those previously marked as inactive
 
-### 7. Structure Data with LLM
+### 8. Structure Data with LLM
 Process raw job descriptions with LLM:
 - Send job descriptions to LLM with extraction prompt
 - Parse structured JSON response
 - Store normalized data in `data.db` with proper relationships
 
-### 8. Process Data
+### 9. Process Data
 Additional data processing and normalization tasks (placeholder - not yet implemented)
 
-### 9. Generate HTML Page
+### 10. Generate HTML Page
 Create static HTML report with job listings and statistics (placeholder - not yet implemented)
+
+### 11. Database Rollback
 
 ## Tech Stack
 
