@@ -200,16 +200,16 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
         progress_tracker.update_progress(thread_id, site_name, 0, 0, "Reading robots.txt", "CRAWL_DELAY")
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
         
-        # Find max pages
-        progress_tracker.update_progress(thread_id, site_name, 0, 0, "Finding max pages", "PAGE_DETECTION")
-        pages = find_max_pages_threaded(thread_id, site_name, rules, delay)
-        
-        # Scrape pages
+        # Use max_page as the limit (no binary search - same as menu-based Stage 1)
+        pages = Config.max_page
         progress_tracker.update_progress(thread_id, site_name, 0, pages, "Starting page scraping", "SCRAPING")
         
         # Track consecutive existing jobs for early stopping
         consecutive_existing = 0
         threshold = Config.stage1_consecutive_known_threshold
+        
+        # Track URLs from previous page to detect duplicates (infinite loop detection)
+        previous_page_urls = set()
         
         for i in range(1, pages + 1):
             try:
@@ -219,6 +219,24 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
                 url = pagination.replace("{page}", str(i))
                 
                 jobs = scrape_jobs(url, rules, delay)
+                
+                # Check if jobs list is empty (no more pages)
+                if len(jobs) == 0:
+                    logger.info(f"Stage 1 - {site_name}: No jobs found on page {i}, stopping")
+                    progress_tracker.update_progress(thread_id, site_name, i-1, pages, "NO MORE PAGES", "FINISHED")
+                    break
+                
+                # Extract URLs from current page for duplicate detection
+                current_page_urls = set(job['url'] for job in jobs)
+                
+                # Check for duplicate pages (infinite loop detection)
+                if i > 1 and current_page_urls == previous_page_urls:
+                    logger.info(f"Stage 1 - {site_name}: Duplicate page detected at page {i}, stopping")
+                    progress_tracker.update_progress(thread_id, site_name, i-1, pages, "DUPLICATE PAGE", "FINISHED")
+                    break
+                
+                previous_page_urls = current_page_urls
+                
                 links_found += len(jobs)
                 pages_scraped += 1
                 
