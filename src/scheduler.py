@@ -4,30 +4,42 @@ Self-manages scheduling without requiring cron jobs.
 """
 import time
 import json
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Callable, Optional
 import threading
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 
 class Scheduler:
     """
     Self-managing scheduler that runs tasks at specified times.
     Handles schedule tracking and execution without external cron.
+    Supports both daily schedules and interval-based schedules (e.g., hourly).
     """
     
-    def __init__(self, schedule_time_hour: int = 0, schedule_time_minute: int = 0):
+    def __init__(self, schedule_time_hour: int = 0, schedule_time_minute: int = 0, 
+                 interval_minutes: Optional[int] = None, state_file_name: str = "scheduler_state.json",
+                 run_immediately: bool = False):
         """
-        Initialize scheduler with target time.
+        Initialize scheduler with target time or interval.
         
         Args:
-            schedule_time_hour: Hour to run (0-23), default 0 (midnight)
-            schedule_time_minute: Minute to run (0-59), default 0
+            schedule_time_hour: Hour to run (0-23), default 0 (midnight). Ignored if interval_minutes is set.
+            schedule_time_minute: Minute to run (0-59), default 0. Ignored if interval_minutes is set.
+            interval_minutes: If set, run every N minutes instead of at a specific time
+            state_file_name: Name of the state file to track last run
+            run_immediately: If True, run immediately on first startup (default: False)
         """
         self.schedule_time = dt_time(schedule_time_hour, schedule_time_minute)
-        self.state_file = Path("scheduler_state.json")
+        self.interval_minutes = interval_minutes
+        self.state_file = Path(state_file_name)
         self.running = False
         self.stop_event = threading.Event()
+        self.run_immediately = run_immediately
         
     def load_last_run(self) -> Optional[datetime]:
         """Load the last run timestamp from state file."""
@@ -63,14 +75,39 @@ class Scheduler:
             datetime: Next scheduled run time
         """
         now = datetime.now()
-        scheduled = datetime.combine(now.date(), self.schedule_time)
         
-        # If scheduled time has passed today, schedule for tomorrow
-        if scheduled <= now:
-            from datetime import timedelta
-            scheduled = scheduled + timedelta(days=1)
-        
-        return scheduled
+        if self.interval_minutes:
+            # Interval-based scheduling: next run is interval_minutes from last run
+            last_run = self.load_last_run()
+            if last_run:
+                next_run = last_run + timedelta(minutes=self.interval_minutes)
+                # If next run is in the past, calculate the next future run
+                if next_run <= now:
+                    # Calculate how many intervals have passed since last run
+                    time_since_last = (now - last_run).total_seconds() / 60
+                    intervals_passed = int(time_since_last / self.interval_minutes) + 1
+                    next_run = last_run + timedelta(minutes=self.interval_minutes * intervals_passed)
+                return next_run
+            else:
+                # First run: if immediate run is enabled, run now; otherwise schedule for interval_minutes from now
+                if self.run_immediately:
+                    return now
+                else:
+                    return now + timedelta(minutes=self.interval_minutes)
+        else:
+            # Time-based scheduling: next run is at the scheduled time
+            scheduled = datetime.combine(now.date(), self.schedule_time)
+            
+            # If scheduled time has passed today, schedule for tomorrow
+            if scheduled <= now:
+                scheduled = scheduled + timedelta(days=1)
+            
+            # If first run and immediate run is enabled, run now
+            last_run = self.load_last_run()
+            if last_run is None and self.run_immediately:
+                return now
+            
+            return scheduled
     
     def should_run_now(self) -> bool:
         """
@@ -82,21 +119,31 @@ class Scheduler:
         last_run = self.load_last_run()
         now = datetime.now()
         
-        # Calculate today's scheduled time
-        today_scheduled = datetime.combine(now.date(), self.schedule_time)
-        
-        # If never run before, don't run immediately
-        # Wait for the next scheduled time instead
-        if last_run is None:
+        if self.interval_minutes:
+            # Interval-based scheduling
+            if last_run is None:
+                # Never run before - check if immediate run is enabled
+                return self.run_immediately
+            
+            # Run if interval has passed since last run
+            time_since_last = (now - last_run).total_seconds() / 60
+            return time_since_last >= self.interval_minutes
+        else:
+            # Time-based scheduling
+            # Calculate today's scheduled time
+            today_scheduled = datetime.combine(now.date(), self.schedule_time)
+            
+            # If never run before, check if immediate run is enabled
+            if last_run is None:
+                return self.run_immediately
+            
+            # Run if:
+            # 1. Current time is past scheduled time today
+            # 2. Last run was before today's scheduled time
+            if now >= today_scheduled and last_run < today_scheduled:
+                return True
+            
             return False
-        
-        # Run if:
-        # 1. Current time is past scheduled time today
-        # 2. Last run was before today's scheduled time
-        if now >= today_scheduled and last_run < today_scheduled:
-            return True
-        
-        return False
     
     def run_once(self, task: Callable, task_name: str = "Scheduled Task") -> bool:
         """
@@ -133,6 +180,49 @@ class Scheduler:
             traceback.print_exc()
             return False
     
+    def _create_status_panel(self, task_name: str, 
+                            last_run: Optional[datetime], next_run: datetime, 
+                            status_text: str, border_color: str = "blue") -> Panel:
+        """
+        Create a status panel for displaying scheduler information.
+        
+        Args:
+            task_name: Name of the task
+            last_run: Last run datetime or None
+            next_run: Next scheduled run datetime
+            status_text: Status message to display
+            border_color: Color of the panel border
+        
+        Returns:
+            Panel: Rich panel with status information
+        """
+        status_table = Table.grid(padding=(0, 2))
+        status_table.add_column(style="bold cyan")
+        status_table.add_column()
+        
+        status_table.add_row("Task:", task_name)
+        if self.interval_minutes:
+            status_table.add_row("Schedule:", f"Every {self.interval_minutes} minutes")
+        else:
+            status_table.add_row("Schedule:", f"Daily at {self.schedule_time.strftime('%H:%M')}")
+        
+        if last_run:
+            status_table.add_row("Last run:", last_run.strftime('%Y-%m-%d %H:%M:%S'))
+        else:
+            status_table.add_row("Last run:", "[dim]Never[/dim]")
+        
+        status_table.add_row("Next run:", next_run.strftime('%Y-%m-%d %H:%M:%S'))
+        status_table.add_row("Status:", status_text)
+        
+        panel = Panel(
+            status_table,
+            title=f"[bold blue]Scheduler: {task_name}[/bold blue]",
+            border_style=border_color,
+            padding=(1, 2)
+        )
+        
+        return panel
+    
     def run_with_monitoring(self, task: Callable, task_name: str = "Scheduled Task", 
                           check_interval: int = 60):
         """
@@ -146,6 +236,7 @@ class Scheduler:
             check_interval: Seconds between schedule checks (default: 60)
         """
         self.running = True
+        console = Console()
         
         # Ensure check_interval is reasonable (max 30 minutes as suggested)
         max_interval = 30 * 60  # 30 minutes in seconds
@@ -155,17 +246,13 @@ class Scheduler:
         last_run = self.load_last_run()
         next_run = self.get_next_run_time()
         
-        print(f"\n{'='*80}")
-        print(f"Scheduler started for: {task_name}")
-        print(f"Schedule time: {self.schedule_time.strftime('%H:%M')}")
-        if last_run:
-            print(f"Last run: {last_run.strftime('%Y-%m-%d %H:%M:%S')}")
-        else:
-            print(f"Last run: Never")
-        print(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Check interval: {check_interval} seconds")
-        print(f"Press Ctrl+C to stop monitoring")
-        print(f"{'='*80}\n")
+        # Create and display initial status panel
+        panel = self._create_status_panel(
+            task_name, last_run, next_run,
+            "[yellow]⏳ Waiting[/yellow]", "blue"
+        )
+        console.print(panel)
+        console.print("[dim]Press Ctrl+C to stop[/dim]\n")
         
         try:
             while self.running and not self.stop_event.is_set():
@@ -174,20 +261,41 @@ class Scheduler:
                 adaptive_interval = check_interval
                 
                 if self.should_run_now():
+                    # Update status to show execution
+                    console.print(f"\n[bold green]▶ Executing {task_name}...[/bold green]")
+                    console.print(f"[dim]Started at {datetime.now().strftime('%H:%M:%S')}[/dim]\n")
+                    
                     self.run_once(task, task_name)
+                    
                     # After running, recalculate next run
                     next_run = self.get_next_run_time()
+                    
+                    # Show completion status
+                    panel = self._create_status_panel(
+                        task_name, datetime.now(), next_run,
+                        "[green]✓ Complete - Waiting for next run[/green]", "green"
+                    )
+                    console.print(panel)
                 else:
-                    # Show countdown to next run
+                    # Show countdown to next run with live updates
                     now = datetime.now()
                     time_until_next = next_run - now
                     total_seconds = time_until_next.total_seconds()
-                    hours = int(total_seconds // 3600)
-                    minutes = int((total_seconds % 3600) // 60)
                     
-                    print(f"Waiting for next run... "
-                          f"(Next: {next_run.strftime('%Y-%m-%d %H:%M')} - "
-                          f"{hours}h {minutes}m remaining)", end='\r')
+                    if total_seconds > 0:
+                        hours = int(total_seconds // 3600)
+                        minutes = int((total_seconds % 3600) // 60)
+                        seconds = int(total_seconds % 60)
+                        
+                        # Create a compact status line
+                        time_str = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
+                        status_text = Text()
+                        status_text.append("⏳ ", style="yellow")
+                        status_text.append(f"{task_name}: ", style="bold")
+                        status_text.append(f"Next run in {time_str} ", style="cyan")
+                        status_text.append(f"(at {next_run.strftime('%H:%M')})", style="dim")
+                        
+                        console.print(status_text, end='\r')
                     
                     # Use adaptive check interval: check more frequently as we get closer
                     # If less than 5 minutes away, check every minute
@@ -200,7 +308,7 @@ class Scheduler:
                 self.stop_event.wait(adaptive_interval)
         
         except KeyboardInterrupt:
-            print("\n\nScheduler stopped by user.")
+            console.print("\n\n[yellow]⚠ Scheduler stopped by user.[/yellow]")
         finally:
             self.running = False
     

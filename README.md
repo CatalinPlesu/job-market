@@ -36,13 +36,18 @@ The schema uses full normalization with foreign keys and relationship mapping fo
 
 ## Menu Options
 
-### 1. Run All Stages on Schedule (with Logging & Reports)
-Execute all scraping stages on a schedule with database backups and reporting:
-- Run once immediately OR start scheduler for daily execution
-- Configurable schedule time (default: 00:00 midnight)
+### 1. Run Scheduled Scraping (Stages 1&2 hourly, Stage 3 daily)
+Execute scraping stages on optimized schedules based on their speed:
+- **Stage 1 & 2: Every HOUR** (fast with early stopping at 100+ consecutive existing jobs)
+  - Stage 1: Scrape job listings from all sites
+  - Stage 2: Get job details for new listings
+- **Stage 3: Daily at 00:00** (slow - rechecks all alive jobs)
+  - Stage 3: Re-check alive jobs to detect removed postings
+- Separate schedules optimize for each stage's performance characteristics
 - Database backup before each run (keeps last 3 days)
 - Error-only logging (weekly log files)
 - Daily reports with statistics per site
+- Simply select this option to start the scheduler with default settings
 
 ### 2. Scrape Job Listings (Stage 1 - Smart Mode)
 Collect job URLs from listing pages with intelligent early termination:
@@ -90,6 +95,13 @@ Additional data processing and normalization tasks (placeholder - not yet implem
 
 ### 9. Generate HTML Page
 Create static HTML report with job listings and statistics (placeholder - not yet implemented)
+
+### 10. Database Rollback
+Restore databases from previous backups:
+- Select which database to restore (scrape.db or data.db)
+- View available backups with timestamps and sizes
+- Restore database to a previous state
+- Useful for recovering from errors or testing
 
 ## Tech Stack
 

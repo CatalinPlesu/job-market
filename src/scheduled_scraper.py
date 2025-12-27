@@ -9,7 +9,7 @@ from src.scrape_jobs_list import (
     scrape_single_site, get_crawl_delay_with_robotparser, 
     find_max_pages_threaded, scrape_jobs, store_jobs,
     ThreadProgressTracker, progress_tracker as global_progress_tracker,
-    monitor_progress
+    monitor_progress, scrape_jobs_list
 )
 from src.scrape_job_details import scrape_site_details, fetch_job_description, update_job_check
 from src.scrape_job_recheck import recheck_site_jobs
@@ -31,6 +31,90 @@ def run_all_stages_scheduled():
     # Import and delegate to decoupled implementation
     from src.scheduled_scraper_decoupled import run_all_stages_decoupled
     run_all_stages_decoupled()
+
+
+def run_stages_1_and_2():
+    """
+    Run Stage 1 (scrape job listings) and Stage 2 (get job details) only.
+    Optimized for hourly execution since Stage 1 now has early stopping.
+    Does not include Stage 3 (recheck alive jobs).
+    """
+    logger = get_logger()
+    report = DailyReport()
+    
+    print("\n" + "="*80)
+    print("RUNNING STAGES 1 & 2 (Hourly Schedule)")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80 + "\n")
+    
+    try:
+        # Create database backups before starting
+        print("Creating database backups...")
+        backup_all_databases(keep_days=3)
+        print("✓ Database backups created\n")
+        
+        # Run Stage 1
+        print("="*80)
+        print("STAGE 1: Scraping Job Listings")
+        print("="*80)
+        scrape_jobs_list(full_scrape=False)
+        print(f"✓ Stage 1 completed")
+        
+        # Run Stage 2
+        print("="*80)
+        print("STAGE 2: Getting Job Details")
+        print("="*80)
+        stage2_stats = run_stage2_with_stats()
+        for stats in stage2_stats:
+            report.add_stage2_stats(stats)
+        print(f"✓ Stage 2 completed - {sum(s.total_jobs for s in stage2_stats)} jobs processed\n")
+        
+        # Save report
+        report.save()
+        print(f"\n✓ Report saved to: {report.report_file}")
+        
+    except Exception as e:
+        logger.exception(f"Stages 1 & 2 failed: {e}")
+        print(f"\n✗ ERROR: {e}")
+        raise
+
+
+def run_stage_3_only():
+    """
+    Run Stage 3 (recheck alive jobs) only.
+    Scheduled separately as this is the slowest stage.
+    """
+    logger = get_logger()
+    report = DailyReport()
+    
+    print("\n" + "="*80)
+    print("RUNNING STAGE 3 ONLY (Daily Schedule)")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80 + "\n")
+    
+    try:
+        # Create database backups before starting
+        print("Creating database backups...")
+        backup_all_databases(keep_days=3)
+        print("✓ Database backups created\n")
+        
+        # Run Stage 3
+        print("="*80)
+        print("STAGE 3: Rechecking Alive Jobs")
+        print("="*80)
+        stage3_stats = run_stage3_with_stats()
+        for stats in stage3_stats:
+            report.add_stage3_stats(stats)
+        print(f"✓ Stage 3 completed - {sum(s.total_checked for s in stage3_stats)} jobs rechecked\n")
+        
+        # Save report
+        report.save()
+        print(f"\n✓ Report saved to: {report.report_file}")
+        
+    except Exception as e:
+        logger.exception(f"Stage 3 failed: {e}")
+        print(f"\n✗ ERROR: {e}")
+        raise
 
 
 def run_stage1_with_stats():
@@ -114,16 +198,16 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
         progress_tracker.update_progress(thread_id, site_name, 0, 0, "Reading robots.txt", "CRAWL_DELAY")
         delay = get_crawl_delay_with_robotparser(site_name, user_agent="JobTaker")
         
-        # Find max pages
-        progress_tracker.update_progress(thread_id, site_name, 0, 0, "Finding max pages", "PAGE_DETECTION")
-        pages = find_max_pages_threaded(thread_id, site_name, rules, delay)
-        
-        # Scrape pages
+        # Use max_page as the limit (no binary search - same as menu-based Stage 1)
+        pages = Config.max_page
         progress_tracker.update_progress(thread_id, site_name, 0, pages, "Starting page scraping", "SCRAPING")
         
         # Track consecutive existing jobs for early stopping
         consecutive_existing = 0
         threshold = Config.stage1_consecutive_known_threshold
+        
+        # Track URLs from previous page to detect duplicates (infinite loop detection)
+        previous_page_urls = set()
         
         for i in range(1, pages + 1):
             try:
@@ -133,6 +217,24 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
                 url = pagination.replace("{page}", str(i))
                 
                 jobs = scrape_jobs(url, rules, delay)
+                
+                # Check if jobs list is empty (no more pages)
+                if len(jobs) == 0:
+                    logger.info(f"Stage 1 - {site_name}: No jobs found on page {i}, stopping")
+                    progress_tracker.update_progress(thread_id, site_name, i-1, pages, "NO MORE PAGES", "FINISHED")
+                    break
+                
+                # Extract URLs from current page for duplicate detection
+                current_page_urls = set(job['url'] for job in jobs)
+                
+                # Check for duplicate pages (infinite loop detection)
+                if i > 1 and current_page_urls == previous_page_urls:
+                    logger.info(f"Stage 1 - {site_name}: Duplicate page detected at page {i}, stopping")
+                    progress_tracker.update_progress(thread_id, site_name, i-1, pages, "DUPLICATE PAGE", "FINISHED")
+                    break
+                
+                previous_page_urls = current_page_urls
+                
                 links_found += len(jobs)
                 pages_scraped += 1
                 
@@ -143,8 +245,11 @@ def scrape_site_stage1_with_stats(thread_id, rules, db, logger):
                 if stats['added'] == 0 and stats['resurrected'] == 0 and stats['existing'] > 0:
                     # All jobs on this page were existing
                     consecutive_existing += stats['existing']
+                    logger.info(f"Stage 1 - {site_name} page {i}: All existing - consecutive count now {consecutive_existing}/{threshold}")
                 else:
                     # Reset counter when we find new or resurrected jobs
+                    if consecutive_existing > 0:
+                        logger.info(f"Stage 1 - {site_name} page {i}: Found new/resurrected jobs (added={stats['added']}, resurrected={stats['resurrected']}), resetting counter from {consecutive_existing}")
                     consecutive_existing = 0
                 
                 # Check if we should stop early
