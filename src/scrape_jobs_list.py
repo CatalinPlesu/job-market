@@ -523,8 +523,8 @@ def store_jobs(db, jobs_data):
                     job_url=job_data['url'],
                     site=job_data['site'],
                     job_description=None,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
                 )
                 
                 db.add(new_job)
@@ -570,7 +570,7 @@ def store_jobs(db, jobs_data):
                 # Update the job URL if it changed
                 if existing_job.job_url != job_data['url']:
                     existing_job.job_url = job_data['url']
-                    existing_job.updated_at = datetime.utcnow()
+                    existing_job.updated_at = datetime.now(timezone.utc)
             
         except Exception as e:
             print_threaded(0, f"Error processing job {job_data.get('title', 'Unknown')}: {e}")  # Use thread 0 for errors
