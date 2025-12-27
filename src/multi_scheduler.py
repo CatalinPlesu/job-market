@@ -5,6 +5,10 @@ Coordinates multiple schedulers to run different tasks at different intervals.
 import threading
 from typing import List, Tuple, Callable
 from src.scheduler import Scheduler
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 
 class MultiScheduler:
@@ -18,6 +22,7 @@ class MultiScheduler:
         self.schedulers: List[Tuple[Scheduler, Callable, str]] = []
         self.threads: List[threading.Thread] = []
         self.running = False
+        self.console = Console()
     
     def add_schedule(self, scheduler: Scheduler, task: Callable, task_name: str):
         """
@@ -39,17 +44,31 @@ class MultiScheduler:
         """
         self.running = True
         
-        print("\n" + "="*80)
-        print("MULTI-SCHEDULER STARTED")
-        print("="*80)
-        print(f"\nManaging {len(self.schedulers)} scheduled tasks:")
+        # Create a nice table showing the schedulers
+        table = Table(show_header=True, header_style="bold magenta", box=None)
+        table.add_column("Task", style="cyan", no_wrap=True)
+        table.add_column("Schedule", style="yellow")
+        table.add_column("Status", justify="center")
+        
         for scheduler, _, task_name in self.schedulers:
             if scheduler.interval_minutes:
-                print(f"  • {task_name}: Every {scheduler.interval_minutes} minutes")
+                schedule_str = f"Every {scheduler.interval_minutes} minutes"
             else:
-                print(f"  • {task_name}: Daily at {scheduler.schedule_time.strftime('%H:%M')}")
-        print("\nPress Ctrl+C to stop all schedulers")
-        print("="*80 + "\n")
+                schedule_str = f"Daily at {scheduler.schedule_time.strftime('%H:%M')}"
+            
+            table.add_row(task_name, schedule_str, "[green]⟳ Starting[/green]")
+        
+        panel = Panel(
+            table,
+            title="[bold cyan]Multi-Scheduler Started[/bold cyan]",
+            subtitle=f"[dim]Managing {len(self.schedulers)} scheduled tasks[/dim]",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+        
+        self.console.print()
+        self.console.print(panel)
+        self.console.print("[dim]Press Ctrl+C to stop all schedulers[/dim]\n")
         
         # Start each scheduler in its own thread
         for scheduler, task, task_name in self.schedulers:
@@ -63,7 +82,7 @@ class MultiScheduler:
     
     def stop(self):
         """Stop all schedulers."""
-        print("\nStopping all schedulers...")
+        self.console.print("\n[yellow]⚠ Stopping all schedulers...[/yellow]")
         self.running = False
         
         # Stop all schedulers
@@ -74,7 +93,7 @@ class MultiScheduler:
         for thread in self.threads:
             thread.join(timeout=5)
         
-        print("All schedulers stopped.")
+        self.console.print("[green]✓ All schedulers stopped.[/green]\n")
     
     def wait(self):
         """Wait for all scheduler threads to complete."""
@@ -82,7 +101,7 @@ class MultiScheduler:
             for thread in self.threads:
                 thread.join()
         except KeyboardInterrupt:
-            print("\n\nStopping multi-scheduler...")
+            self.console.print("\n\n[yellow]⚠ Stopping multi-scheduler...[/yellow]")
             self.stop()
 
 

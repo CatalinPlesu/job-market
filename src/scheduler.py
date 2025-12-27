@@ -8,6 +8,11 @@ from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Callable, Optional
 import threading
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.live import Live
+from rich.text import Text
 
 
 class Scheduler:
@@ -179,6 +184,7 @@ class Scheduler:
             check_interval: Seconds between schedule checks (default: 60)
         """
         self.running = True
+        console = Console()
         
         # Ensure check_interval is reasonable (max 30 minutes as suggested)
         max_interval = 30 * 60  # 30 minutes in seconds
@@ -188,20 +194,34 @@ class Scheduler:
         last_run = self.load_last_run()
         next_run = self.get_next_run_time()
         
-        print(f"\n{'='*80}")
-        print(f"Scheduler started for: {task_name}")
+        # Create initial status panel
+        status_table = Table.grid(padding=(0, 2))
+        status_table.add_column(style="bold cyan")
+        status_table.add_column()
+        
+        status_table.add_row("Task:", task_name)
         if self.interval_minutes:
-            print(f"Schedule: Every {self.interval_minutes} minutes")
+            status_table.add_row("Schedule:", f"Every {self.interval_minutes} minutes")
         else:
-            print(f"Schedule time: {self.schedule_time.strftime('%H:%M')}")
+            status_table.add_row("Schedule:", f"Daily at {self.schedule_time.strftime('%H:%M')}")
+        
         if last_run:
-            print(f"Last run: {last_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            status_table.add_row("Last run:", last_run.strftime('%Y-%m-%d %H:%M:%S'))
         else:
-            print(f"Last run: Never")
-        print(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Check interval: {check_interval} seconds")
-        print(f"Press Ctrl+C to stop monitoring")
-        print(f"{'='*80}\n")
+            status_table.add_row("Last run:", "[dim]Never[/dim]")
+        
+        status_table.add_row("Next run:", next_run.strftime('%Y-%m-%d %H:%M:%S'))
+        status_table.add_row("Status:", "[yellow]⏳ Waiting[/yellow]")
+        
+        panel = Panel(
+            status_table,
+            title=f"[bold blue]Scheduler: {task_name}[/bold blue]",
+            border_style="blue",
+            padding=(1, 2)
+        )
+        
+        console.print(panel)
+        console.print("[dim]Press Ctrl+C to stop[/dim]\n")
         
         try:
             while self.running and not self.stop_event.is_set():
@@ -210,20 +230,57 @@ class Scheduler:
                 adaptive_interval = check_interval
                 
                 if self.should_run_now():
+                    # Update status to show execution
+                    console.print(f"\n[bold green]▶ Executing {task_name}...[/bold green]")
+                    console.print(f"[dim]Started at {datetime.now().strftime('%H:%M:%S')}[/dim]\n")
+                    
                     self.run_once(task, task_name)
+                    
                     # After running, recalculate next run
                     next_run = self.get_next_run_time()
+                    
+                    # Show completion status
+                    status_table = Table.grid(padding=(0, 2))
+                    status_table.add_column(style="bold cyan")
+                    status_table.add_column()
+                    
+                    status_table.add_row("Task:", task_name)
+                    if self.interval_minutes:
+                        status_table.add_row("Schedule:", f"Every {self.interval_minutes} minutes")
+                    else:
+                        status_table.add_row("Schedule:", f"Daily at {self.schedule_time.strftime('%H:%M')}")
+                    status_table.add_row("Last run:", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    status_table.add_row("Next run:", next_run.strftime('%Y-%m-%d %H:%M:%S'))
+                    status_table.add_row("Status:", "[green]✓ Complete - Waiting for next run[/green]")
+                    
+                    panel = Panel(
+                        status_table,
+                        title=f"[bold blue]Scheduler: {task_name}[/bold blue]",
+                        border_style="green",
+                        padding=(1, 2)
+                    )
+                    
+                    console.print(panel)
                 else:
-                    # Show countdown to next run
+                    # Show countdown to next run with live updates
                     now = datetime.now()
                     time_until_next = next_run - now
                     total_seconds = time_until_next.total_seconds()
-                    hours = int(total_seconds // 3600)
-                    minutes = int((total_seconds % 3600) // 60)
                     
-                    print(f"Waiting for next run... "
-                          f"(Next: {next_run.strftime('%Y-%m-%d %H:%M')} - "
-                          f"{hours}h {minutes}m remaining)", end='\r')
+                    if total_seconds > 0:
+                        hours = int(total_seconds // 3600)
+                        minutes = int((total_seconds % 3600) // 60)
+                        seconds = int(total_seconds % 60)
+                        
+                        # Create a compact status line
+                        time_str = f"{hours}h {minutes}m {seconds}s" if hours > 0 else f"{minutes}m {seconds}s"
+                        status_text = Text()
+                        status_text.append("⏳ ", style="yellow")
+                        status_text.append(f"{task_name}: ", style="bold")
+                        status_text.append(f"Next run in {time_str} ", style="cyan")
+                        status_text.append(f"(at {next_run.strftime('%H:%M')})", style="dim")
+                        
+                        console.print(status_text, end='\r')
                     
                     # Use adaptive check interval: check more frequently as we get closer
                     # If less than 5 minutes away, check every minute
@@ -236,7 +293,7 @@ class Scheduler:
                 self.stop_event.wait(adaptive_interval)
         
         except KeyboardInterrupt:
-            print("\n\nScheduler stopped by user.")
+            console.print("\n\n[yellow]⚠ Scheduler stopped by user.[/yellow]")
         finally:
             self.running = False
     
