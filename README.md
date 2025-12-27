@@ -97,7 +97,11 @@ Additional data processing and normalization tasks (placeholder - not yet implem
 Create static HTML report with job listings and statistics (placeholder - not yet implemented)
 
 ### 10. Database Rollback
-Restore databases from backup
+Restore databases from previous backups:
+- Select which database to restore (scrape.db or data.db)
+- View available backups with timestamps and sizes
+- Restore database to a previous state
+- Useful for recovering from errors or testing
 
 ## Tech Stack
 

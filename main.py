@@ -222,7 +222,7 @@ def run():
     menu.set_footer("Enter to select")
     
     # Register all menu items
-    menu.register_item(ScheduledScrapingItem())  # Improved scheduler with hourly stages 1&2, daily stage 3
+    menu.register_item(ScheduledScrapingItem())  # Hourly stages 1&2, daily stage 3
     menu.register_item(ScrapeJobsListItem())
     menu.register_item(ScrapeJobsListFullItem())  # Full scrape without early termination
     menu.register_item(ScrapeJobDetailsItem())
