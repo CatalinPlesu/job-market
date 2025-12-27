@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import json
 import time
 from datetime import datetime, date
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from src.scrape_jobs_list import get_crawl_delay_with_robotparser, format_time
 import threading
 from queue import Queue
@@ -96,7 +96,9 @@ def scrape_site_details(rules):
         # ALSO: Exclude jobs that have been identified as dead (non-200 HTTP status)
         
         # Subquery to get the most recent check WITH http_status for each job
-        # This approach works reliably across different database backends
+        # We filter for http_status.isnot(None) because:
+        # - JobCheck records can exist without http_status (e.g., from Stage 1)
+        # - Only checks with http_status indicate an actual fetch attempt
         latest_checks_cte = db.query(
             JobCheck.job_id,
             func.max(JobCheck.check_date).label('max_date')
@@ -104,16 +106,19 @@ def scrape_site_details(rules):
             JobCheck.http_status.isnot(None)
         ).group_by(JobCheck.job_id).subquery()
         
+        # Get the http_status for the most recent check
+        # Use min(http_status) as tiebreaker to ensure deterministic results
+        # (in the unlikely case of multiple checks on same date)
         latest_checks = db.query(
             JobCheck.job_id,
-            JobCheck.http_status
+            func.min(JobCheck.http_status).label('http_status')
         ).join(
             latest_checks_cte,
             and_(
                 JobCheck.job_id == latest_checks_cte.c.job_id,
                 JobCheck.check_date == latest_checks_cte.c.max_date
             )
-        ).subquery()
+        ).group_by(JobCheck.job_id).subquery()
         
         # Query jobs without description where:
         # 1. Last HTTP status check was 200 (alive), OR
@@ -126,7 +131,10 @@ def scrape_site_details(rules):
             Job.id == latest_checks.c.job_id
         ).filter(
             # Either no check exists (http_status is NULL) OR last status was 200
-            latest_checks.c.http_status.is_(None) | (latest_checks.c.http_status == 200)
+            or_(
+                latest_checks.c.http_status.is_(None),
+                latest_checks.c.http_status == 200
+            )
         ).all()
         
         total_jobs = len(jobs_without_description)
