@@ -66,6 +66,7 @@ class MultiScheduler:
             padding=(1, 2)
         )
         
+        # Add spacing before panel
         self.console.print()
         self.console.print(panel)
         self.console.print("[dim]Press Ctrl+C to stop all schedulers[/dim]\n")

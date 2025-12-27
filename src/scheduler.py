@@ -11,7 +11,6 @@ import threading
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.live import Live
 from rich.text import Text
 
 
@@ -171,14 +170,13 @@ class Scheduler:
             traceback.print_exc()
             return False
     
-    def _create_status_panel(self, console: Console, task_name: str, 
+    def _create_status_panel(self, task_name: str, 
                             last_run: Optional[datetime], next_run: datetime, 
                             status_text: str, border_color: str = "blue") -> Panel:
         """
         Create a status panel for displaying scheduler information.
         
         Args:
-            console: Rich console instance
             task_name: Name of the task
             last_run: Last run datetime or None
             next_run: Next scheduled run datetime
@@ -240,7 +238,7 @@ class Scheduler:
         
         # Create and display initial status panel
         panel = self._create_status_panel(
-            console, task_name, last_run, next_run,
+            task_name, last_run, next_run,
             "[yellow]⏳ Waiting[/yellow]", "blue"
         )
         console.print(panel)
@@ -264,7 +262,7 @@ class Scheduler:
                     
                     # Show completion status
                     panel = self._create_status_panel(
-                        console, task_name, datetime.now(), next_run,
+                        task_name, datetime.now(), next_run,
                         "[green]✓ Complete - Waiting for next run[/green]", "green"
                     )
                     console.print(panel)
