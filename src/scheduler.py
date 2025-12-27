@@ -22,7 +22,8 @@ class Scheduler:
     """
     
     def __init__(self, schedule_time_hour: int = 0, schedule_time_minute: int = 0, 
-                 interval_minutes: Optional[int] = None, state_file_name: str = "scheduler_state.json"):
+                 interval_minutes: Optional[int] = None, state_file_name: str = "scheduler_state.json",
+                 run_immediately: bool = False):
         """
         Initialize scheduler with target time or interval.
         
@@ -31,12 +32,14 @@ class Scheduler:
             schedule_time_minute: Minute to run (0-59), default 0. Ignored if interval_minutes is set.
             interval_minutes: If set, run every N minutes instead of at a specific time
             state_file_name: Name of the state file to track last run
+            run_immediately: If True, run immediately on first startup (default: False)
         """
         self.schedule_time = dt_time(schedule_time_hour, schedule_time_minute)
         self.interval_minutes = interval_minutes
         self.state_file = Path(state_file_name)
         self.running = False
         self.stop_event = threading.Event()
+        self.run_immediately = run_immediately
         
     def load_last_run(self) -> Optional[datetime]:
         """Load the last run timestamp from state file."""
@@ -86,8 +89,11 @@ class Scheduler:
                     next_run = last_run + timedelta(minutes=self.interval_minutes * intervals_passed)
                 return next_run
             else:
-                # First run: schedule for interval_minutes from now
-                return now + timedelta(minutes=self.interval_minutes)
+                # First run: if immediate run is enabled, run now; otherwise schedule for interval_minutes from now
+                if self.run_immediately:
+                    return now
+                else:
+                    return now + timedelta(minutes=self.interval_minutes)
         else:
             # Time-based scheduling: next run is at the scheduled time
             scheduled = datetime.combine(now.date(), self.schedule_time)
@@ -95,6 +101,11 @@ class Scheduler:
             # If scheduled time has passed today, schedule for tomorrow
             if scheduled <= now:
                 scheduled = scheduled + timedelta(days=1)
+            
+            # If first run and immediate run is enabled, run now
+            last_run = self.load_last_run()
+            if last_run is None and self.run_immediately:
+                return now
             
             return scheduled
     
@@ -111,8 +122,8 @@ class Scheduler:
         if self.interval_minutes:
             # Interval-based scheduling
             if last_run is None:
-                # Never run before, don't run immediately
-                return False
+                # Never run before - check if immediate run is enabled
+                return self.run_immediately
             
             # Run if interval has passed since last run
             time_since_last = (now - last_run).total_seconds() / 60
@@ -122,10 +133,9 @@ class Scheduler:
             # Calculate today's scheduled time
             today_scheduled = datetime.combine(now.date(), self.schedule_time)
             
-            # If never run before, don't run immediately
-            # Wait for the next scheduled time instead
+            # If never run before, check if immediate run is enabled
             if last_run is None:
-                return False
+                return self.run_immediately
             
             # Run if:
             # 1. Current time is past scheduled time today

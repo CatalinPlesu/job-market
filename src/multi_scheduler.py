@@ -109,21 +109,18 @@ class MultiScheduler:
 def run_improved_scheduler():
     """
     Run the improved scheduler with separate schedules for different stages.
-    - Stage 1 & 2: Every hour (fast with early stopping)
+    - Stage 1 & 2: Every hour (fast with early stopping) - runs immediately on first startup
     - Stage 3: Once daily at midnight (slow)
-    
-    Note: On first startup, schedulers will wait until their scheduled time
-    before running. To run immediately, use the menu options to execute
-    stages manually, then start the scheduler.
     """
     from src.scheduled_scraper import run_stages_1_and_2, run_stage_3_only
     
     multi_scheduler = MultiScheduler()
     
-    # Schedule Stage 1 & 2 to run every hour
+    # Schedule Stage 1 & 2 to run every hour, with immediate first run
     hourly_scheduler = Scheduler(
         interval_minutes=60,
-        state_file_name="scheduler_state_hourly.json"
+        state_file_name="scheduler_state_hourly.json",
+        run_immediately=True  # Run stages 1 & 2 immediately on startup
     )
     multi_scheduler.add_schedule(
         hourly_scheduler,
@@ -131,11 +128,12 @@ def run_improved_scheduler():
         "Stages 1 & 2 (Hourly)"
     )
     
-    # Schedule Stage 3 to run daily at midnight
+    # Schedule Stage 3 to run daily at midnight (no immediate run)
     daily_scheduler = Scheduler(
         schedule_time_hour=0,
         schedule_time_minute=0,
-        state_file_name="scheduler_state_daily.json"
+        state_file_name="scheduler_state_daily.json",
+        run_immediately=False  # Wait for scheduled time
     )
     multi_scheduler.add_schedule(
         daily_scheduler,
