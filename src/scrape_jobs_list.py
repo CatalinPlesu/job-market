@@ -414,14 +414,22 @@ def scrape_single_site(thread_id, rules, db, full_scrape=False):
 
 def find_max_pages_threaded(thread_id, site_name, rules, delay):
     """
-    DEPRECATED: This function uses binary search to find max pages.
-    It's kept for backward compatibility with scheduled_scraper.py and scheduled_scraper_decoupled.py
+    .. deprecated::
+        This function uses binary search to find max pages.
+        The main scrape_jobs_list() flow no longer uses this.
+        Kept for backward compatibility with scheduled_scraper.py and scheduled_scraper_decoupled.py
     
-    The main scrape_jobs_list() flow no longer uses this - it now iterates directly
-    from page 1 to max_page (500) with early termination and duplicate detection.
+    Binary search algorithm to find the maximum accessible page number.
+    Now deprecated in favor of direct iteration with early termination and duplicate detection.
     
-    On a given domain with pagination url, and start page,
-    will find the number of pages that can be accessed from 1 to x
+    Args:
+        thread_id: Thread identifier for progress tracking
+        site_name: Name of the site being scraped
+        rules: Scraping rules dictionary
+        delay: Crawl delay in seconds
+        
+    Returns:
+        int: Maximum page number found
     """
     pagination_url = rules[Config.scraper_pagination]
     max_page = Config.max_page
