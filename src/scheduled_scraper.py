@@ -9,7 +9,7 @@ from src.scrape_jobs_list import (
     scrape_single_site, get_crawl_delay_with_robotparser, 
     find_max_pages_threaded, scrape_jobs, store_jobs,
     ThreadProgressTracker, progress_tracker as global_progress_tracker,
-    monitor_progress
+    monitor_progress, scrape_jobs_list
 )
 from src.scrape_job_details import scrape_site_details, fetch_job_description, update_job_check
 from src.scrape_job_recheck import recheck_site_jobs
