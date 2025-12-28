@@ -15,7 +15,7 @@ dependencies = [
 	"matplotlib",
 	"pandas",
 	"jinja2",
-	"sqlalchemy"
+	"sqlalchemy",
 ]
 
 [build-system]
