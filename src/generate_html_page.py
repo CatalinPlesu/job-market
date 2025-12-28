@@ -29,17 +29,34 @@ class HtmlGenerator:
         os.makedirs(self.jobs_dir, exist_ok=True)
         
     def generate_api_data(self):
-        """Generate API JSON files for frontend"""
-        print("Generating API data...")
+        """Generate API JSON files for frontend from data.db (LLM-processed jobs)"""
+        print("Generating API data from data.db (LLM-processed jobs)...")
         
-        # Get all processed jobs with normalized data
+        # Get all jobs from data.db - these are jobs that have been processed
+        # through the scraping pipeline and stored in the normalized database
         with DataSessionLocal() as db:
-            # Query to reconstruct full job details from normalized data
-            jobs_query = db.query(JobDetail).order_by(JobDetail.processed_at.desc())
+            # Query jobs from JobDetail table in data.db
+            # These are jobs that have been scraped and stored for LLM processing
+            jobs_query = db.query(JobDetail).filter(
+                JobDetail.job_title.isnot(None),  # Basic scraped field
+                JobDetail.company_name.isnot(None)  # Basic scraped field
+            ).order_by(JobDetail.processed_at.desc())
+            
             jobs = jobs_query.all()
             
+            print(f"Found {len(jobs)} jobs in data.db")
+            print("Note: These jobs may have original scraped data and/or LLM-structured data")
+            
+            # Filter jobs that have the basic required fields for display
+            valid_jobs = []
+            for job in jobs:
+                if job.job_title and job.company_name:
+                    valid_jobs.append(job)
+            
+            print(f"Filtered to {len(valid_jobs)} jobs with basic data for display")
+            
             # Group jobs by (site, title, company) to identify duplicates
-            deduplicated_jobs = self._deduplicate_jobs(jobs)
+            deduplicated_jobs = self._deduplicate_jobs(valid_jobs)
             
             # Generate pages
             page_size = 20
@@ -72,10 +89,17 @@ class HtmlGenerator:
                 end_idx = start_idx + page_size
                 page_jobs = deduplicated_jobs[start_idx:end_idx]
                 
+                # Serialize jobs and filter out any that failed serialization
+                serialized_jobs = []
+                for job in page_jobs:
+                    serialized_job = self._serialize_job(job)
+                    if serialized_job:  # Only include successfully serialized jobs
+                        serialized_jobs.append(serialized_job)
+                
                 page_data = {
                     "page": page_num,
                     "total_pages": total_pages,
-                    "jobs": [self._serialize_job(job) for job in page_jobs]
+                    "jobs": serialized_jobs
                 }
                 
                 with open(os.path.join(self.jobs_dir, f"page-{page_num}.json"), "w", encoding="utf-8") as f:
@@ -88,6 +112,10 @@ class HtmlGenerator:
         job_groups = {}
         
         for job in jobs:
+            # Only process jobs that have basic required fields
+            if not job.job_title or not job.company_name:
+                continue
+                
             key = (job.job_title, job.company_name)
             
             if key not in job_groups:
@@ -115,9 +143,13 @@ class HtmlGenerator:
         return result
     
     def _get_unique_values(self, jobs, field_type):
-        """Extract unique values for filtering"""
+        """Extract unique values for filtering from processed jobs"""
         values = set()
         for job in jobs:
+            # Only include jobs that have basic required fields
+            if not job.job_title or not job.company_name:
+                continue
+                
             if field_type == "sites" and hasattr(job, "sites_found"):
                 values.update(job.sites_found)
             elif field_type == "titles":
@@ -157,6 +189,10 @@ class HtmlGenerator:
     
     def _serialize_job(self, job):
         """Convert job object to serializable dict"""
+        # Ensure this job has basic required fields from data.db
+        if not job.job_title or not job.company_name:
+            return None
+            
         return {
             "id": job.id,
             "job_url": job.job_url,
@@ -164,6 +200,7 @@ class HtmlGenerator:
             "sites_found": getattr(job, "sites_found", [job.site]),
             "job_title": job.job_title,
             "company_name": job.company_name,
+            # LLM-structured fields (may be null if LLM processing not completed)
             "title": job.title.name if hasattr(job, 'title') and job.title else None,
             "job_function": job.job_function.name if hasattr(job, 'job_function') and job.job_function else None,
             "seniority_level": job.seniority_level.name if hasattr(job, 'seniority_level') and job.seniority_level else None,
