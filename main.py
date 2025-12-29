@@ -3,7 +3,7 @@ from src.scrape_job_details import scrape_job_details
 from src.scrape_job_recheck import recheck_alive_jobs, recheck_all_jobs
 from src.structure_data_with_llm import structure_data_with_llm
 from src.process_data import process_data
-from src.generate_html_page import generate_html_page
+from src.generate_html_page_fixed import generate_html_page
 from src.menu import Menu
 from src.scheduled_scraper import run_all_stages_scheduled
 from src.scheduler import Scheduler

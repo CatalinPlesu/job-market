@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moldova Job Market Board</title>
+    <meta name="description" content="Comprehensive job listings from all major Moldovan job sites">
+    <meta name="keywords" content="jobs, employment, Moldova, Chisinau, careers">
+    
+    <!-- SEO Meta Tags -->
+    <meta property="og:title" content="Moldova Job Market Board">
+    <meta property="og:description" content="Find the best job opportunities across Moldova">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-domain.github.io">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💼</text></svg>">
+    
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Styles -->
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-light: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+        
+        .btn-secondary {
+            background-color: #f1f5f9;
+            color: var(--text-main);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e2e8f0;
+        }
+        
+        .badge {
+            background-color: #eff6ff;
+            color: var(--primary);
+            border: 1px solid var(--border);
+        }
+        
+        .skill-badge {
+            background-color: #f1f5f9;
+            color: var(--text-main);
+        }
+        
+        .job-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .job-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .filter-group {
+            border-bottom: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+        
+        .filter-group.active {
+            border-bottom-color: var(--primary);
+        }
+        
+        .salary-display {
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .pagination-btn {
+            transition: all 0.2s;
+        }
+        
+        .pagination-btn:hover {
+            background-color: #e2e8f0;
+        }
+        
+        .pagination-btn.active {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .filter-count {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .empty-state {
+            border: 2px dashed var(--border);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">💼 Moldova Job Market</h1>
+                        <p class="text-gray-600 mt-1">Discover opportunities across all major job sites</p>
+                        <div class="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span>📊 {{ stats.total_jobs }} jobs</span>
+                            <span>🏢 {{ stats.companies }} companies</span>
+                            <span>📍 {{ stats.cities }} cities</span>
+                            <span>📅 Updated: {{ lastUpdated }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button @click="resetFilters" class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium">
+                            Reset Filters
+                        </button>
+                        <button @click="toggleSidebar" class="lg:hidden btn-primary px-4 py-2 rounded-lg text-sm font-medium">
+                            {{ sidebarOpen ? 'Hide Filters' : 'Show Filters' }}
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="mt-4 flex gap-2">
+                    <div class="flex-1 relative">
+                        <input
+                            type="text"
+                            v-model="filters.search"
+                            @input="debouncedSearch"
+                            placeholder="Search jobs by title, company, skills..."
+                            class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <button @click="applyFilters" class="btn-primary px-6 py-3 rounded-lg font-medium">
+                        Search
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Sidebar Filters -->
+                <aside :class="['lg:col-span-1', sidebarOpen ? 'block' : 'hidden lg:block']">
+                    <div class="bg-white rounded-lg shadow-sm border p-6 space-y-6">
+                        <!-- Quick Stats -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                <div class="text-2xl font-bold text-blue-600">{{ stats.filtered_jobs }}</div>
+                                <div class="text-sm text-blue-600">Showing</div>
+                            </div>
+                            <div class="text-center p-4 bg-green-50 rounded-lg">
+                                <div class="text-2xl font-bold text-green-600">{{ stats.avg_salary }}</div>
+                                <div class="text-sm text-green-600">Avg Salary</div>
+                            </div>
+                        </div>
+
+                        <!-- Hierarchical Filters -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Job Classification</h3>
+                            
+                            <!-- Industry -->
+                            <div class="filter-group" :class="{ active: filters.industry }">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Industry</label>
+                                <select v-model="filters.industry" @change="onIndustryChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Industries</option>
+                                    <option v-for="ind in lookups.industries" :key="ind.id" :value="ind.id">
+                                        {{ ind.name }} ({{ ind.jobs_count }})
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Department -->
+                            <div class="filter-group" :class="{ active: filters.department }">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                                <select v-model="filters.department" @change="onDepartmentChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Departments</option>
+                                    <option v-for="dept in filteredDepartments" :key="dept.id" :value="dept.id">
+                                        {{ dept.name }} ({{ dept.jobs_count }})
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Job Family -->
+                            <div class="filter-group" :class="{ active: filters.job_family }">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Job Family</label>
+                                <select v-model="filters.job_family" @change="onJobFamilyChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Job Families</option>
+                                    <option v-for="family in filteredJobFamilies" :key="family.id" :value="family.id">
+                                        {{ family.name }} ({{ family.jobs_count }})
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Specialization -->
+                            <div class="filter-group" :class="{ active: filters.specialization }">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
+                                <select v-model="filters.specialization" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">All Specializations</option>
+                                    <option v-for="spec in filteredSpecializations" :key="spec.id" :value="spec.id">
+                                        {{ spec.name }} ({{ spec.jobs_count }})
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Location Filters -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Location</h3>
+                            
+                            <div class="grid grid-cols-1 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
+                                    <select v-model="filters.city" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="">All Cities</option>
+                                        <option v-for="city in lookups.cities" :key="city.id" :value="city.id">
+                                            {{ city.name }} ({{ city.jobs_count }})
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Job Details Filters -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Job Details</h3>
+                            
+                            <div class="grid grid-cols-1 gap-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Seniority Level</label>
+                                    <select v-model="filters.seniority_level" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="">All Levels</option>
+                                        <option v-for="level in lookups.seniority_levels" :key="level.id" :value="level.id">
+                                            {{ level.name }} ({{ level.jobs_count }})
+                                        </option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Employment Type</label>
+                                    <select v-model="filters.employment_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="">All Types</option>
+                                        <option v-for="type in lookups.employment_types" :key="type.id" :value="type.id">
+                                            {{ type.name }} ({{ type.jobs_count }})
+                                        </option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Remote Work</label>
+                                    <select v-model="filters.remote_work" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="">All Options</option>
+                                        <option v-for="remote in lookups.remote_work" :key="remote.id" :value="remote.id">
+                                            {{ remote.name }} ({{ remote.jobs_count }})
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Salary Range -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Salary (MDL)</h3>
+                            <div class="space-y-2">
+                                <div class="flex gap-2">
+                                    <input type="number" v-model.number="filters.salary_min" placeholder="Min" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                    <input type="number" v-model.number="filters.salary_max" placeholder="Max" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <label class="flex items-center">
+                                    <input type="checkbox" v-model="filters.has_salary" class="mr-2">
+                                    <span class="text-sm text-gray-700">Has Salary</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Experience -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Experience</h3>
+                            <div class="flex gap-2">
+                                <input type="number" v-model.number="filters.experience_min" placeholder="Min Years" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                <input type="number" v-model.number="filters.experience_max" placeholder="Max Years" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Skills -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Skills</h3>
+                            <div class="space-y-2">
+                                <input type="text" v-model="skillsSearch" placeholder="Search skills..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                                    <label v-for="skill in filteredSkills" :key="skill.name" class="flex items-center text-sm">
+                                        <input type="checkbox" :value="skill.name" v-model="filters.skills" class="mr-2">
+                                        <span>{{ skill.name }} ({{ skill.jobs_count }})</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Companies -->
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-900">Companies</h3>
+                            <div class="space-y-2">
+                                <input type="text" v-model="companiesSearch" placeholder="Search companies..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                <div class="max-h-40 overflow-y-auto">
+                                    <label v-for="company in filteredCompanies" :key="company.name" class="flex items-center justify-between text-sm py-1">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" :value="company.name" v-model="filters.companies" class="mr-2">
+                                            <span>{{ company.name }}</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500">{{ company.jobs_count }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="space-y-3">
+                            <button @click="applyFilters" class="w-full btn-primary px-4 py-3 rounded-lg font-medium">
+                                Apply Filters
+                            </button>
+                            <button @click="resetFilters" class="w-full btn-secondary px-4 py-3 rounded-lg font-medium">
+                                Reset All
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="lg:col-span-3 space-y-6">
+                    <!-- Stats Bar -->
+                    <div class="bg-white rounded-lg shadow-sm border p-4 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-4 text-sm text-gray-600">
+                            <span>Page {{ currentPage }} of {{ totalPages }}</span>
+                            <span>•</span>
+                            <span>{{ stats.filtered_jobs }} jobs found</span>
+                            <span>•</span>
+                            <span v-if="filters.search">Search: "{{ filters.search }}"</span>
+                        </div>
+                        
+                        <!-- Sort Options -->
+                        <div class="flex gap-2">
+                            <select v-model="sortOption" @change="changeSort" class="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                                <option value="date_desc">Newest First</option>
+                                <option value="date_asc">Oldest First</option>
+                                <option value="salary_desc">Salary High to Low</option>
+                                <option value="salary_asc">Salary Low to High</option>
+                                <option value="title_asc">Title A-Z</option>
+                                <option value="company_asc">Company A-Z</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div v-if="loading" class="bg-white rounded-lg shadow-sm border p-8 text-center">
+                        <div class="loading-spinner inline-block w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full"></div>
+                        <p class="mt-4 text-gray-600">Loading jobs...</p>
+                    </div>
+
+                    <!-- Error State -->
+                    <div v-if="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="text-red-800">{{ error }}</div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-if="!loading && jobs.length === 0 && !error" class="bg-white rounded-lg shadow-sm border p-8 text-center empty-state">
+                        <div class="text-6xl mb-4">🔍</div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">No jobs found</h3>
+                        <p class="text-gray-600 mb-4">Try adjusting your filters or search terms</p>
+                        <button @click="resetFilters" class="btn-primary px-6 py-2 rounded-lg">Reset Filters</button>
+                    </div>
+
+                    <!-- Jobs Grid -->
+                    <div v-if="!loading && jobs.length > 0" class="grid grid-cols-1 gap-6">
+                        <div v-for="job in jobs" :key="job.id" class="job-card bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow">
+                            <!-- Job Header -->
+                            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-semibold text-gray-900 mb-2">{{ job.title_display }}</h3>
+                                    <div class="flex items-center gap-3 flex-wrap mb-3">
+                                        <span class="badge px-3 py-1 rounded-full text-sm font-medium">
+                                            {{ job.company }}
+                                        </span>
+                                        <span v-if="job.days_open !== null" class="text-sm text-gray-500">
+                                            {{ job.days_open }} day{{ job.days_open !== 1 ? 's' : '' }} open
+                                        </span>
+                                        <span v-if="job.posting_date" class="text-sm text-gray-500">
+                                            Posted {{ formatDate(job.posting_date) }}
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Sites -->
+                                    <div class="flex items-center gap-2 flex-wrap mb-3">
+                                        <span class="text-xs text-gray-500">Found on:</span>
+                                        <span v-for="site in job.sites" :key="site" class="badge px-2 py-1 rounded-full text-xs">
+                                            {{ site }}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Salary -->
+                                <div class="lg:text-right">
+                                    <div v-if="job.min_salary_mdl || job.max_salary_mdl" class="salary-display">
+                                        <div class="text-2xl font-bold text-green-600">
+                                            {{ formatSalaryRange(job.min_salary_mdl, job.max_salary_mdl) }}
+                                        </div>
+                                        <div class="text-sm text-gray-500">
+                                            {{ job.salary_period || 'month' }}
+                                            <span v-if="job.original_currency && job.original_currency !== 'MDL'" class="ml-2 text-orange-600">
+                                                ({{ job.original_min_salary }}-{{ job.original_max_salary }} {{ job.original_currency }})
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div v-else class="text-gray-400 text-sm">Salary not specified</div>
+                                </div>
+                            </div>
+
+                            <!-- Job Details -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                                <div v-if="job.city" class="text-sm">
+                                    <span class="text-gray-500">Location:</span>
+                                    <div class="font-medium">{{ job.city }}</div>
+                                </div>
+                                <div v-if="job.seniority_level" class="text-sm">
+                                    <span class="text-gray-500">Level:</span>
+                                    <div class="font-medium">{{ job.seniority_level }}</div>
+                                </div>
+                                <div v-if="job.employment_type" class="text-sm">
+                                    <span class="text-gray-500">Type:</span>
+                                    <div class="font-medium">{{ job.employment_type }}</div>
+                                </div>
+                                <div v-if="job.experience_years !== null" class="text-sm">
+                                    <span class="text-gray-500">Experience:</span>
+                                    <div class="font-medium">{{ job.experience_years }} year{{ job.experience_years !== 1 ? 's' : '' }}</div>
+                                </div>
+                            </div>
+
+                            <!-- Skills Preview -->
+                            <div v-if="job.skills_preview && job.skills_preview.length > 0" class="mt-4">
+                                <div class="text-sm text-gray-500 mb-2">Key Skills:</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <span v-for="skill in job.skills_preview" :key="skill" class="skill-badge px-2 py-1 rounded-full text-sm">
+                                        {{ skill }}
+                                    </span>
+                                    <span v-if="job.total_skills > job.skills_preview.length" class="text-sm text-gray-500">
+                                        +{{ job.total_skills - job.skills_preview.length }} more
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Badges -->
+                            <div class="mt-4 flex items-center gap-2 flex-wrap">
+                                <span v-if="job.has_salary" class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    💰 Salary Listed
+                                </span>
+                                <span v-if="job.has_certifications" class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    📜 Certifications Required
+                                </span>
+                                <span v-if="job.has_benefits" class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    💼 Benefits Included
+                                </span>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="mt-6 flex flex-wrap gap-3">
+                                <a 
+                                    v-for="site in job.sites" 
+                                    :key="site" 
+                                    :href="job.urls[site]" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    class="btn-primary px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                                >
+                                    Apply on {{ site }}
+                                </a>
+                                <button 
+                                    @click="openJobDetail(job.id)"
+                                    class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium"
+                                >
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div v-if="!loading && jobs.length > 0" class="bg-white rounded-lg shadow-sm border p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <button 
+                                    @click="goToPage(1)" 
+                                    :disabled="currentPage === 1"
+                                    class="pagination-btn px-3 py-2 rounded text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    First
+                                </button>
+                                <button 
+                                    @click="goToPage(currentPage - 1)" 
+                                    :disabled="currentPage === 1"
+                                    class="pagination-btn px-3 py-2 rounded text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Previous
+                                </button>
+                            </div>
+                            
+                            <div class="flex items-center gap-1">
+                                <span class="text-sm text-gray-600">Page {{ currentPage }} of {{ totalPages }}</span>
+                            </div>
+                            
+                            <div class="flex items-center gap-2">
+                                <button 
+                                    @click="goToPage(currentPage + 1)" 
+                                    :disabled="currentPage === totalPages"
+                                    class="pagination-btn px-3 py-2 rounded text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Next
+                                </button>
+                                <button 
+                                    @click="goToPage(totalPages)" 
+                                    :disabled="currentPage === totalPages"
+                                    class="pagination-btn px-3 py-2 rounded text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Last
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Page Navigation -->
+                        <div class="mt-4 flex justify-center gap-1">
+                            <button 
+                                v-for="page in visiblePages" 
+                                :key="page"
+                                @click="goToPage(page)"
+                                :class="['pagination-btn px-3 py-2 rounded', { 'active': page === currentPage }]"
+                            >
+                                {{ page }}
+                            </button>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Job Detail Modal -->
+        <div v-if="selectedJob" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <div class="flex items-center justify-between p-6 border-b">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">{{ selectedJob.title_display }}</h2>
+                        <p class="text-gray-600">{{ selectedJob.company }}</p>
+                    </div>
+                    <button @click="closeJobDetail" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="flex border-b">
+                    <button 
+                        @click="detailTab = 'structured'"
+                        :class="['flex-1 py-3 px-4 text-center font-medium', detailTab === 'structured' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500']"
+                    >
+                        Structured Details
+                    </button>
+                    <button 
+                        @click="detailTab = 'raw'"
+                        :class="['flex-1 py-3 px-4 text-center font-medium', detailTab === 'raw' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500']"
+                    >
+                        Raw Data
+                    </button>
+                </div>
+                
+                <div class="p-6 overflow-y-auto max-h-[60vh]">
+                    <!-- Structured Details -->
+                    <div v-if="detailTab === 'structured'" class="space-y-6">
+                        <!-- Basic Info -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-gray-900 mb-2">Basic Information</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div><span class="text-gray-600">Title:</span> {{ selectedJob.title_display }}</div>
+                                    <div><span class="text-gray-600">Company:</span> {{ selectedJob.company }}</div>
+                                    <div><span class="text-gray-600">Location:</span> {{ selectedJob.city || 'Not specified' }}</div>
+                                    <div><span class="text-gray-600">Level:</span> {{ selectedJob.seniority_level || 'Not specified' }}</div>
+                                    <div><span class="text-gray-600">Experience:</span> {{ selectedJob.experience_years || 'Not specified' }} years</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <h4 class="font-semibold text-gray-900 mb-2">Job Details</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div><span class="text-gray-600">Type:</span> {{ selectedJob.employment_type || 'Not specified' }}</div>
+                                    <div><span class="text-gray-600">Schedule:</span> {{ selectedJob.work_schedule || 'Not specified' }}</div>
+                                    <div><span class="text-gray-600">Remote:</span> {{ selectedJob.remote_work || 'Not specified' }}</div>
+                                    <div><span class="text-gray-600">Contract:</span> {{ selectedJob.contract_type || 'Not specified' }}</div>
+                                    <div><span class="text-gray-600">Travel:</span> {{ selectedJob.travel_required || 'Not specified' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Classification -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-900 mb-2">Classification</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                <div><span class="text-gray-600">Industry:</span> {{ selectedJob.industry || 'Not specified' }}</div>
+                                <div><span class="text-gray-600">Department:</span> {{ selectedJob.department || 'Not specified' }}</div>
+                                <div><span class="text-gray-600">Job Family:</span> {{ selectedJob.job_family || 'Not specified' }}</div>
+                                <div><span class="text-gray-600">Specialization:</span> {{ selectedJob.specialization || 'Not specified' }}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Salary -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-900 mb-2">Compensation</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <span class="text-gray-600">Range:</span>
+                                    <div class="font-medium">{{ formatSalaryRange(selectedJob.min_salary_mdl, selectedJob.max_salary_mdl) }} MDL</div>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600">Period:</span>
+                                    <div class="font-medium">{{ selectedJob.salary_period || 'Not specified' }}</div>
+                                </div>
+                                <div v-if="selectedJob.original_currency && selectedJob.original_currency !== 'MDL'">
+                                    <span class="text-gray-600">Original:</span>
+                                    <div class="font-medium">{{ selectedJob.original_min_salary }}-{{ selectedJob.original_max_salary }} {{ selectedJob.original_currency }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Skills -->
+                        <div v-if="selectedJob.skills_preview && selectedJob.skills_preview.length > 0" class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-900 mb-2">Skills</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="skill in selectedJob.skills_preview" :key="skill" class="skill-badge px-3 py-1 rounded-full text-sm">
+                                    {{ skill }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Languages -->
+                        <div v-if="selectedJob.languages_required && selectedJob.languages_required.length > 0" class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-900 mb-2">Languages</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <span v-for="lang in selectedJob.languages_required" :key="lang" class="badge px-3 py-1 rounded-full text-sm">
+                                    {{ lang }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Benefits -->
+                        <div v-if="selectedJob.has_benefits" class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-900 mb-2">Benefits</h4>
+                            <p class="text-sm text-gray-600">Benefits information available in raw data</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Raw Data -->
+                    <div v-else class="space-y-6">
+                        <div v-for="(siteData, site) in selectedJob.raw_data.sites" :key="site" class="border rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                                <span class="badge px-2 py-1 rounded-full text-xs">{{ site }}</span>
+                                <span class="text-sm text-gray-500">{{ siteData.url }}</span>
+                            </h4>
+                            <div class="text-sm text-gray-600 mb-3">
+                                <div><strong>Job Title:</strong> {{ siteData.job_title }}</div>
+                                <div><strong>Company:</strong> {{ siteData.company_name }}</div>
+                                <div><strong>Scraped:</strong> {{ new Date(siteData.scraped_at).toLocaleString() }}</div>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
+                                {{ siteData.job_description }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, watch, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                // State
+                const jobs = ref([]);
+                const loading = ref(false);
+                const error = ref('');
+                const currentPage = ref(1);
+                const totalPages = ref(1);
+                const metadata = ref({});
+                const lookups = ref({});
+                const selectedJob = ref(null);
+                const detailTab = ref('structured');
+                const sidebarOpen = ref(true);
+                
+                // Filter State
+                const filters = reactive({
+                    search: '',
+                    industry: '',
+                    department: '',
+                    job_family: '',
+                    specialization: '',
+                    city: '',
+                    seniority_level: '',
+                    employment_type: '',
+                    remote_work: '',
+                    salary_min: null,
+                    salary_max: null,
+                    has_salary: false,
+                    experience_min: null,
+                    experience_max: null,
+                    skills: [],
+                    companies: []
+                });
+                
+                const skillsSearch = ref('');
+                const companiesSearch = ref('');
+                const sortOption = ref('date_desc');
+                
+                // Computed Properties
+                const stats = computed(() => {
+                    const total = metadata.value.total_jobs || 0;
+                    const filtered = jobs.value.length;
+                    const companies = new Set(jobs.value.map(j => j.company)).size;
+                    const cities = new Set(jobs.value.map(j => j.city)).size;
+                    
+                    // Calculate average salary
+                    let salarySum = 0;
+                    let salaryCount = 0;
+                    jobs.value.forEach(job => {
+                        if (job.min_salary_mdl) { salarySum += job.min_salary_mdl; salaryCount++; }
+                        if (job.max_salary_mdl) { salarySum += job.max_salary_mdl; salaryCount++; }
+                    });
+                    const avgSalary = salaryCount > 0 ? Math.round(salarySum / salaryCount) : 0;
+                    
+                    return {
+                        total_jobs: total,
+                        filtered_jobs: filtered,
+                        companies,
+                        cities,
+                        avg_salary: avgSalary.toLocaleString() + ' MDL'
+                    };
+                });
+                
+                const filteredDepartments = computed(() => {
+                    if (!filters.industry) return lookups.value.departments || [];
+                    const industryId = parseInt(filters.industry);
+                    return (lookups.value.departments || []).filter(d => 
+                        d.parent_industry === industryId
+                    );
+                });
+                
+                const filteredJobFamilies = computed(() => {
+                    if (!filters.department) return lookups.value.job_families || [];
+                    const departmentId = parseInt(filters.department);
+                    return (lookups.value.job_families || []).filter(f => 
+                        f.parent_department === departmentId
+                    );
+                });
+                
+                const filteredSpecializations = computed(() => {
+                    if (!filters.job_family) return lookups.value.specializations || [];
+                    const familyId = parseInt(filters.job_family);
+                    return (lookups.value.specializations || []).filter(s => 
+                        s.parent_job_family === familyId
+                    );
+                });
+                
+                const filteredSkills = computed(() => {
+                    const search = skillsSearch.value.toLowerCase();
+                    return (lookups.value.skills || [])
+                        .filter(skill => skill.name.toLowerCase().includes(search))
+                        .sort((a, b) => b.jobs_count - a.jobs_count)
+                        .slice(0, 50);
+                });
+                
+                const filteredCompanies = computed(() => {
+                    const search = companiesSearch.value.toLowerCase();
+                    return (lookups.value.companies || [])
+                        .filter(company => company.name.toLowerCase().includes(search))
+                        .sort((a, b) => b.jobs_count - a.jobs_count)
+                        .slice(0, 50);
+                });
+                
+                const visiblePages = computed(() => {
+                    const pages = [];
+                    const start = Math.max(1, currentPage.value - 2);
+                    const end = Math.min(totalPages.value, currentPage.value + 2);
+                    
+                    for (let i = start; i <= end; i++) {
+                        pages.push(i);
+                    }
+                    
+                    return pages;
+                });
+                
+                const lastUpdated = computed(() => {
+                    return metadata.value.generated_at 
+                        ? new Date(metadata.value.generated_at).toLocaleString()
+                        : 'Never';
+                });
+                
+                // Methods
+                const formatDate = (dateString) => {
+                    if (!dateString) return '';
+                    return new Date(dateString).toLocaleDateString();
+                };
+                
+                const formatSalaryRange = (min, max) => {
+                    if (!min && !max) return 'Not specified';
+                    if (min && max) return `${min.toLocaleString()} - ${max.toLocaleString()}`;
+                    if (min) return `From ${min.toLocaleString()}`;
+                    if (max) return `Up to ${max.toLocaleString()}`;
+                    return 'Not specified';
+                };
+                
+                const fetchMetadata = async () => {
+                    try {
+                        const response = await fetch('/api/jobs/index.json');
+                        if (!response.ok) throw new Error('Failed to fetch metadata');
+                        metadata.value = await response.json();
+                    } catch (err) {
+                        console.error('Error fetching metadata:', err);
+                        error.value = 'Failed to load job data. Please try again later.';
+                    }
+                };
+                
+                const fetchLookups = async () => {
+                    try {
+                        const [industries, departments, jobFamilies, specializations, cities, companies, skills] = await Promise.all([
+                            fetch('/api/lookups/industries.json').then(r => r.json()).then(d => d.industries),
+                            fetch('/api/lookups/departments.json').then(r => r.json()).then(d => d.departments),
+                            fetch('/api/lookups/job_families.json').then(r => r.json()).then(d => d.job_families),
+                            fetch('/api/lookups/specializations.json').then(r => r.json()).then(d => d.specializations),
+                            fetch('/api/lookups/cities.json').then(r => r.json()).then(d => d.cities),
+                            fetch('/api/lookups/companies.json').then(r => r.json()).then(d => d.companies),
+                            fetch('/api/lookups/skills.json').then(r => r.json()).then(d => d.skills)
+                        ]);
+                        
+                        lookups.value = {
+                            industries: industries || [],
+                            departments: departments || [],
+                            job_families: jobFamilies || [],
+                            specializations: specializations || [],
+                            cities: cities || [],
+                            companies: companies || [],
+                            skills: skills || [],
+                            seniority_levels: metadata.value.filter_metadata?.seniority_levels ? 
+                                Object.values(metadata.value.filter_metadata.seniority_levels).map(l => ({ id: l.name, name: l.name, jobs_count: l.jobs_count })) : [],
+                            employment_types: metadata.value.filter_metadata?.employment_types ? 
+                                Object.values(metadata.value.filter_metadata.employment_types).map(t => ({ id: t.name, name: t.name, jobs_count: t.jobs_count })) : [],
+                            remote_work: metadata.value.filter_metadata?.remote_work ? 
+                                Object.values(metadata.value.filter_metadata.remote_work).map(r => ({ id: r.name, name: r.name, jobs_count: r.jobs_count })) : []
+                        };
+                    } catch (err) {
+                        console.error('Error fetching lookups:', err);
+                    }
+                };
+                
+                const fetchJobs = async (page = 1) => {
+                    loading.value = true;
+                    error.value = '';
+                    
+                    try {
+                        const response = await fetch(`/api/jobs/page-${page}.json`);
+                        if (!response.ok) throw new Error('Failed to fetch jobs');
+                        
+                        const data = await response.json();
+                        jobs.value = data.jobs || [];
+                        currentPage.value = data.page || page;
+                        totalPages.value = Math.ceil((metadata.value.total_jobs || 0) / 100);
+                        
+                        // Update URL with current page
+                        updateURL();
+                    } catch (err) {
+                        console.error('Error fetching jobs:', err);
+                        error.value = 'Failed to load jobs. Please try again.';
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+                
+                const applyFilters = async () => {
+                    // Apply filters by updating URL and fetching jobs
+                    updateURL();
+                    await fetchJobs(1);
+                };
+                
+                const resetFilters = () => {
+                    Object.assign(filters, {
+                        search: '',
+                        industry: '',
+                        department: '',
+                        job_family: '',
+                        specialization: '',
+                        city: '',
+                        seniority_level: '',
+                        employment_type: '',
+                        remote_work: '',
+                        salary_min: null,
+                        salary_max: null,
+                        has_salary: false,
+                        experience_min: null,
+                        experience_max: null,
+                        skills: [],
+                        companies: []
+                    });
+                    skillsSearch.value = '';
+                    companiesSearch.value = '';
+                    updateURL();
+                    fetchJobs(1);
+                };
+                
+                const goToPage = async (page) => {
+                    if (page >= 1 && page <= totalPages.value && page !== currentPage.value) {
+                        currentPage.value = page;
+                        await fetchJobs(page);
+                    }
+                };
+                
+                const changeSort = () => {
+                    updateURL();
+                    fetchJobs(currentPage.value);
+                };
+                
+                const onIndustryChange = () => {
+                    // Reset dependent filters
+                    filters.department = '';
+                    filters.job_family = '';
+                    filters.specialization = '';
+                    applyFilters();
+                };
+                
+                const onDepartmentChange = () => {
+                    filters.job_family = '';
+                    filters.specialization = '';
+                    applyFilters();
+                };
+                
+                const onJobFamilyChange = () => {
+                    filters.specialization = '';
+                    applyFilters();
+                };
+                
+                const openJobDetail = (jobId) => {
+                    selectedJob.value = jobs.value.find(j => j.id === jobId);
+                    detailTab.value = 'structured';
+                };
+                
+                const closeJobDetail = () => {
+                    selectedJob.value = null;
+                };
+                
+                const toggleSidebar = () => {
+                    sidebarOpen.value = !sidebarOpen.value;
+                };
+                
+                const debouncedSearch = (() => {
+                    let timeoutId;
+                    return () => {
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(() => {
+                            applyFilters();
+                        }, 500);
+                    };
+                })();
+                
+                const updateURL = () => {
+                    const params = new URLSearchParams();
+                    
+                    // Add filters to URL
+                    Object.entries(filters).forEach(([key, value]) => {
+                        if (value !== '' && value !== null && value !== false && (Array.isArray(value) ? value.length > 0 : true)) {
+                            if (Array.isArray(value)) {
+                                params.set(key, value.join(','));
+                            } else {
+                                params.set(key, value.toString());
+                            }
+                        }
+                    });
+                    
+                    // Add pagination and sorting
+                    if (currentPage.value > 1) params.set('page', currentPage.value.toString());
+                    if (sortOption.value !== 'date_desc') params.set('sort', sortOption.value);
+                    
+                    const newUrl = `${window.location.pathname}?${params.toString()}`;
+                    history.replaceState({}, '', newUrl);
+                };
+                
+                const parseURL = () => {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    
+                    // Parse filters
+                    Object.keys(filters).forEach(key => {
+                        const value = urlParams.get(key);
+                        if (value) {
+                            if (Array.isArray(filters[key])) {
+                                filters[key] = value.split(',');
+                            } else if (typeof filters[key] === 'number') {
+                                filters[key] = parseInt(value);
+                            } else if (typeof filters[key] === 'boolean') {
+                                filters[key] = value === 'true';
+                            } else {
+                                filters[key] = value;
+                            }
+                        }
+                    });
+                    
+                    // Parse pagination and sorting
+                    const page = parseInt(urlParams.get('page') || '1');
+                    const sort = urlParams.get('sort') || 'date_desc';
+                    
+                    currentPage.value = Math.max(1, page);
+                    sortOption.value = sort;
+                };
+                
+                // Watchers
+                watch(() => filters.search, (newVal) => {
+                    if (newVal) {
+                        debouncedSearch();
+                    }
+                });
+                
+                // Lifecycle
+                onMounted(async () => {
+                    await fetchMetadata();
+                    await fetchLookups();
+                    parseURL();
+                    await fetchJobs(currentPage.value);
+                });
+                
+                return {
+                    jobs,
+                    loading,
+                    error,
+                    currentPage,
+                    totalPages,
+                    metadata,
+                    lookups,
+                    selectedJob,
+                    detailTab,
+                    sidebarOpen,
+                    filters,
+                    skillsSearch,
+                    companiesSearch,
+                    sortOption,
+                    stats,
+                    filteredDepartments,
+                    filteredJobFamilies,
+                    filteredSpecializations,
+                    filteredSkills,
+                    filteredCompanies,
+                    visiblePages,
+                    lastUpdated,
+                    formatDate,
+                    formatSalaryRange,
+                    fetchJobs,
+                    applyFilters,
+                    resetFilters,
+                    goToPage,
+                    changeSort,
+                    onIndustryChange,
+                    onDepartmentChange,
+                    onJobFamilyChange,
+                    openJobDetail,
+                    closeJobDetail,
+                    toggleSidebar,
+                    debouncedSearch
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

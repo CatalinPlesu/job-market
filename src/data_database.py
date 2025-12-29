@@ -167,6 +167,50 @@ class JobDetail(DataBase):
     posting_date = Column(Date)
     original_language = Column(String(10))
     processed_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    title = relationship("Titles")
+    job_function = relationship("JobFunctions")
+    seniority_level = relationship("SeniorityLevels")
+    industry = relationship("Industries")
+    department = relationship("Departments")
+    job_family = relationship("JobFamilies")
+    specialization = relationship("Specializations")
+    required_education = relationship("EducationLevels")
+    salary_currency = relationship("Currencies")
+    salary_period = relationship("SalaryPeriods")
+    employment_type = relationship("EmploymentTypes")
+    contract_type = relationship("ContractTypes")
+    work_schedule = relationship("WorkSchedules")
+    shift_details = relationship("ShiftDetails")
+    remote_work = relationship("RemoteWorkOptions")
+    travel_required = relationship("TravelRequirements")
+    city = relationship("Cities")
+    region = relationship("Regions")
+    country = relationship("Countries")
+    full_address = relationship("FullAddresses")
+    company_name_rel = relationship("Companies")
+    company_size = relationship("CompanySizes")
+    contact_person = relationship("ContactPersons")
+    
+    # Many-to-many relationships
+    hard_skills = relationship("HardSkills", secondary=job_hard_skills)
+    soft_skills = relationship("SoftSkills", secondary=job_soft_skills)
+    certifications = relationship("Certifications", secondary=job_certifications)
+    licenses = relationship("Licenses", secondary=job_licenses)
+    benefits = relationship("Benefits", secondary=job_benefits)
+    work_environment = relationship("WorkEnvironment", secondary=job_work_environment)
+    professional_development = relationship("ProfessionalDevelopment", secondary=job_professional_development)
+    work_life_balance = relationship("WorkLifeBalance", secondary=job_work_life_balance)
+    physical_requirements = relationship("PhysicalRequirements", secondary=job_physical_requirements)
+    work_conditions = relationship("WorkConditions", secondary=job_work_conditions)
+    special_requirements = relationship("SpecialRequirements", secondary=job_special_requirements)
+    
+    # Child relationships
+    responsibilities = relationship("Responsibility", backref="job_detail")
+    languages = relationship("JobLanguage", backref="job_detail")
+    contact_emails = relationship("ContactEmail", backref="job_detail")
+    contact_phones = relationship("ContactPhone", backref="job_detail")
 
 
 # ============ Child Tables (One-to-Many) ============
