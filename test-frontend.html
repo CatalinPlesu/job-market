@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>Frontend Test</h1>
+    
+    <div id="test-results"></div>
+    
+    <script>
+        const results = document.getElementById('test-results');
+        
+        function addResult(type, message) {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+        
+        // Test 1: Check if Vue.js is loaded
+        if (typeof Vue !== 'undefined') {
+            addResult('success', '✅ Vue.js is loaded');
+        } else {
+            addResult('error', '❌ Vue.js is not loaded');
+        }
+        
+        // Test 2: Check if Lodash is loaded
+        if (typeof _ !== 'undefined') {
+            addResult('success', '✅ Lodash is loaded');
+        } else {
+            addResult('error', '❌ Lodash is not loaded');
+        }
+        
+        // Test 3: Check if main HTML file exists
+        fetch('/pages/index.html')
+            .then(response => {
+                if (response.ok) {
+                    addResult('success', '✅ Main HTML file exists');
+                } else {
+                    addResult('error', '❌ Main HTML file not found');
+                }
+            })
+            .catch(error => {
+                addResult('error', '❌ Failed to check main HTML file: ' + error.message);
+            });
+        
+        // Test 4: Check if API endpoints exist
+        const endpoints = [
+            '/pages/api/jobs/index.json',
+            '/pages/api/lookups/industries.json',
+            '/pages/api/lookups/hard_skills.json',
+            '/pages/api/lookups/soft_skills.json'
+        ];
+        
+        Promise.allSettled(endpoints.map(url => 
+            fetch(url).then(response => {
+                if (response.ok) {
+                    return { url, success: true };
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            })
+        )).then(results => {
+            results.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                    addResult('success', `✅ API endpoint exists: ${endpoints[index]}`);
+                } else {
+                    addResult('error', `❌ API endpoint missing: ${endpoints[index]} - ${result.reason.message}`);
+                }
+            });
+        });
+        
+        addResult('info', '🔍 Testing complete. Check the main index.html file for full functionality.');
+    </script>
+</body>
+</html>
