@@ -1551,13 +1551,179 @@
                     error.value = '';
                     
                     try {
-                        const response = await fetch(`/api/jobs/page-${page}.json`);
-                        if (!response.ok) throw new Error('Failed to fetch jobs');
+                        // Fetch all jobs for client-side filtering
+                        let allJobs = [];
+                        const totalPagesFromMetadata = Math.ceil((metadata.value.total_jobs || 0) / 100);
                         
-                        const data = await response.json();
-                        jobs.value = data.jobs || [];
-                        currentPage.value = data.page || page;
-                        totalPages.value = Math.ceil((metadata.value.total_jobs || 0) / 100);
+                        // Fetch all pages
+                        const promises = [];
+                        for (let i = 1; i <= totalPagesFromMetadata; i++) {
+                            promises.push(fetch(`/api/jobs/page-${i}.json`).then(r => r.json()));
+                        }
+                        
+                        const pages = await Promise.all(promises);
+                        pages.forEach(pageData => {
+                            allJobs = allJobs.concat(pageData.jobs || []);
+                        });
+                        
+                        // Apply filters
+                        const filteredJobs = allJobs.filter(job => {
+                            // Search filter (title, company, skills)
+                            if (filters.search) {
+                                const searchLower = filters.search.toLowerCase();
+                                const matchesSearch = 
+                                    (job.title || '').toLowerCase().includes(searchLower) ||
+                                    (job.company || '').toLowerCase().includes(searchLower) ||
+                                    (job.hard_skills || []).some(skill => skill.toLowerCase().includes(searchLower)) ||
+                                    (job.soft_skills || []).some(skill => skill.toLowerCase().includes(searchLower));
+                                if (!matchesSearch) return false;
+                            }
+
+                            // Hierarchical filters (industry -> department -> job_family -> specialization)
+                            if (filters.industry && job.industry_id !== parseInt(filters.industry)) return false;
+                            if (filters.department && job.department_id !== parseInt(filters.department)) return false;
+                            if (filters.job_family && job.job_family_id !== parseInt(filters.job_family)) return false;
+                            if (filters.specialization && job.specialization_id !== parseInt(filters.specialization)) return false;
+                            
+                            // Job function
+                            if (filters.job_function && job.job_function_id !== parseInt(filters.job_function)) return false;
+                            
+                            // Seniority level
+                            if (filters.seniority_level && job.seniority_level_id !== parseInt(filters.seniority_level)) return false;
+                            
+                            // Required education
+                            if (filters.required_education && job.required_education_id !== parseInt(filters.required_education)) return false;
+                            
+                            // Experience filters
+                            if (filters.experience_min !== null && job.experience_years < filters.experience_min) return false;
+                            if (filters.experience_max !== null && job.experience_years > filters.experience_max) return false;
+                            
+                            // Skills filters (multi-select)
+                            if (filters.hard_skills.length > 0) {
+                                const jobSkills = (job.hard_skills || []).map(s => s.toLowerCase());
+                                const hasRequiredSkill = filters.hard_skills.some(skill => 
+                                    jobSkills.includes(skill.toLowerCase())
+                                );
+                                if (!hasRequiredSkill) return false;
+                            }
+                            
+                            if (filters.soft_skills.length > 0) {
+                                const jobSkills = (job.soft_skills || []).map(s => s.toLowerCase());
+                                const hasRequiredSkill = filters.soft_skills.some(skill => 
+                                    jobSkills.includes(skill.toLowerCase())
+                                );
+                                if (!hasRequiredSkill) return false;
+                            }
+                            
+                            if (filters.certifications.length > 0) {
+                                const jobCerts = (job.certifications || []).map(c => c.toLowerCase());
+                                const hasRequiredCert = filters.certifications.some(cert => 
+                                    jobCerts.includes(cert.toLowerCase())
+                                );
+                                if (!hasRequiredCert) return false;
+                            }
+                            
+                            if (filters.licenses.length > 0) {
+                                const jobLicenses = (job.licenses || []).map(l => l.toLowerCase());
+                                const hasRequiredLicense = filters.licenses.some(license => 
+                                    jobLicenses.includes(license.toLowerCase())
+                                );
+                                if (!hasRequiredLicense) return false;
+                            }
+                            
+                            // Work arrangement filters
+                            if (filters.employment_type && job.employment_type_id !== parseInt(filters.employment_type)) return false;
+                            if (filters.contract_type && job.contract_type_id !== parseInt(filters.contract_type)) return false;
+                            if (filters.work_schedule && job.work_schedule_id !== parseInt(filters.work_schedule)) return false;
+                            if (filters.shift_details && job.shift_details_id !== parseInt(filters.shift_details)) return false;
+                            if (filters.remote_work && job.remote_work_id !== parseInt(filters.remote_work)) return false;
+                            if (filters.travel_required && job.travel_required_id !== parseInt(filters.travel_required)) return false;
+                            
+                            // Location filters
+                            if (filters.country && job.country_id !== parseInt(filters.country)) return false;
+                            if (filters.region && job.region_id !== parseInt(filters.region)) return false;
+                            if (filters.city && job.city_id !== parseInt(filters.city)) return false;
+                            
+                            // Company filters
+                            if (filters.company_size && job.company_size_id !== parseInt(filters.company_size)) return false;
+                            if (filters.companies.length > 0 && !filters.companies.includes(job.company)) return false;
+                            
+                            // Salary filters
+                            if (filters.has_salary && (!job.min_salary_mdl && !job.max_salary_mdl)) return false;
+                            if (filters.salary_min !== null && job.min_salary_mdl && job.min_salary_mdl < filters.salary_min) return false;
+                            if (filters.salary_max !== null && job.max_salary_mdl && job.max_salary_mdl > filters.salary_max) return false;
+                            if (filters.salary_currency && job.salary_currency_id !== parseInt(filters.salary_currency)) return false;
+                            if (filters.salary_period && job.salary_period_id !== parseInt(filters.salary_period)) return false;
+                            
+                            // Benefits and perks filters
+                            if (filters.benefits.length > 0) {
+                                const jobBenefits = (job.benefits || []).map(b => b.toLowerCase());
+                                const hasRequiredBenefit = filters.benefits.some(benefit => 
+                                    jobBenefits.includes(benefit.toLowerCase())
+                                );
+                                if (!hasRequiredBenefit) return false;
+                            }
+                            
+                            if (filters.work_environment.length > 0) {
+                                const jobEnv = (job.work_environment || []).map(e => e.toLowerCase());
+                                const hasRequiredEnv = filters.work_environment.some(env => 
+                                    jobEnv.includes(env.toLowerCase())
+                                );
+                                if (!hasRequiredEnv) return false;
+                            }
+                            
+                            if (filters.professional_development.length > 0) {
+                                const jobDev = (job.professional_development || []).map(d => d.toLowerCase());
+                                const hasRequiredDev = filters.professional_development.some(dev => 
+                                    jobDev.includes(dev.toLowerCase())
+                                );
+                                if (!hasRequiredDev) return false;
+                            }
+                            
+                            if (filters.work_life_balance.length > 0) {
+                                const jobBalance = (job.work_life_balance || []).map(b => b.toLowerCase());
+                                const hasRequiredBalance = filters.work_life_balance.some(balance => 
+                                    jobBalance.includes(balance.toLowerCase())
+                                );
+                                if (!hasRequiredBalance) return false;
+                            }
+                            
+                            // Work conditions filters
+                            if (filters.physical_requirements.length > 0) {
+                                const jobPhysical = (job.physical_requirements || []).map(p => p.toLowerCase());
+                                const hasRequiredPhysical = filters.physical_requirements.some(physical => 
+                                    jobPhysical.includes(physical.toLowerCase())
+                                );
+                                if (!hasRequiredPhysical) return false;
+                            }
+                            
+                            if (filters.work_conditions.length > 0) {
+                                const jobConditions = (job.work_conditions || []).map(c => c.toLowerCase());
+                                const hasRequiredCondition = filters.work_conditions.some(condition => 
+                                    jobConditions.includes(condition.toLowerCase())
+                                );
+                                if (!hasRequiredCondition) return false;
+                            }
+                            
+                            if (filters.special_requirements.length > 0) {
+                                const jobSpecial = (job.special_requirements || []).map(s => s.toLowerCase());
+                                const hasRequiredSpecial = filters.special_requirements.some(special => 
+                                    jobSpecial.includes(special.toLowerCase())
+                                );
+                                if (!hasRequiredSpecial) return false;
+                            }
+                            
+                            return true;
+                        });
+                        
+                        // Apply pagination
+                        const jobsPerPage = 100;
+                        const startIndex = (page - 1) * jobsPerPage;
+                        const endIndex = startIndex + jobsPerPage;
+                        
+                        jobs.value = filteredJobs.slice(startIndex, endIndex);
+                        currentPage.value = page;
+                        totalPages.value = Math.ceil(filteredJobs.length / jobsPerPage);
                         
                         // Update URL with current page
                         updateURL();

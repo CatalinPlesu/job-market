@@ -3,13 +3,14 @@
  * Main Vue component for the job board
  */
 
-import { Utils } from './utils.js';
+import { FilterManager, FilterUtils } from './core/filters.js';
+import { BrowserAPI } from './core/api.js';
 
 export class JobBoardComponent {
     constructor() {
-        this.utils = Utils;
-        this.api = window.JobMarketAPI;
-        this.filters = window.FilterManager;
+        this.utils = FilterUtils;
+        this.api = new BrowserAPI();
+        this.filterManager = new FilterManager(this.api);
         
         this.state = {
             jobs: [],
@@ -47,16 +48,16 @@ export class JobBoardComponent {
                 });
 
                 // Initialize filter manager and set up reactive filters
-                const filterManager = window.FilterManager;
+                const filterManager = window.jobBoard.filterManager;
                 const filters = reactive(filterManager.filters);
 
                 // Computed properties
                 const stats = computed(() => {
-                    return Utils.calculateStats(state.jobs, filterManager.metadata);
+                    return FilterUtils.calculateStats(state.jobs, filterManager.metadata);
                 });
 
                 const visiblePages = computed(() => {
-                    return Utils.getVisiblePages(state.currentPage, state.totalPages);
+                    return FilterUtils.getVisiblePages(state.currentPage, state.totalPages);
                 });
 
                 const lastUpdated = computed(() => {
@@ -74,8 +75,8 @@ export class JobBoardComponent {
                 });
 
                 // Methods
-                const formatDate = Utils.formatDate;
-                const formatSalaryRange = Utils.formatSalaryRange;
+                const formatDate = FilterUtils.formatDate;
+                const formatSalaryRange = FilterUtils.formatSalaryRange;
 
                 const fetchMetadata = async () => {
                     try {
@@ -101,10 +102,18 @@ export class JobBoardComponent {
                     state.error = '';
                     
                     try {
-                        const data = await filterManager.api.fetchJobs(page);
-                        state.jobs = data.jobs;
-                        state.currentPage = data.page;
-                        state.totalPages = data.totalPages;
+                        // Fetch all jobs if not already loaded
+                        const allJobs = await filterManager.api.fetchAllJobs();
+                        
+                        // Apply filters to get filtered jobs
+                        const filteredJobs = filterManager.api.filterJobs(allJobs, filterManager.filters);
+                        
+                        // Apply pagination to filtered jobs
+                        const paginatedData = filterManager.api.paginateJobs(filteredJobs, page);
+                        
+                        state.jobs = paginatedData.jobs;
+                        state.currentPage = paginatedData.page;
+                        state.totalPages = paginatedData.totalPages;
                     } catch (err) {
                         state.error = 'Failed to load jobs. Please try again.';
                     } finally {
@@ -167,7 +176,7 @@ export class JobBoardComponent {
                     state.sidebarOpen = !state.sidebarOpen;
                 };
 
-                const handleSearch = Utils.debounce(() => {
+                const handleSearch = FilterUtils.debounce(() => {
                     applyFiltersInstant();
                 }, 300);
 
@@ -185,12 +194,62 @@ export class JobBoardComponent {
                     }
                 });
 
+                // URL parsing and updating
+                const updateURL = () => {
+                    const params = new URLSearchParams();
+                    
+                    // Add filters to URL
+                    Object.entries(filters).forEach(([key, value]) => {
+                        if (value !== '' && value !== null && value !== false && (Array.isArray(value) ? value.length > 0 : true)) {
+                            if (Array.isArray(value)) {
+                                params.set(key, value.join(','));
+                            } else {
+                                params.set(key, value.toString());
+                            }
+                        }
+                    });
+                    
+                    // Add pagination and sorting
+                    if (state.currentPage > 1) params.set('page', state.currentPage.toString());
+                    if (state.sortOption !== 'date_desc') params.set('sort', state.sortOption);
+                    
+                    const newUrl = `${window.location.pathname}?${params.toString()}`;
+                    history.replaceState({}, '', newUrl);
+                };
+
+                const parseURL = () => {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    
+                    // Parse filters
+                    Object.keys(filters).forEach(key => {
+                        const value = urlParams.get(key);
+                        if (value) {
+                            if (Array.isArray(filters[key])) {
+                                filters[key] = value.split(',');
+                            } else if (typeof filters[key] === 'number') {
+                                filters[key] = parseInt(value);
+                            } else if (typeof filters[key] === 'boolean') {
+                                filters[key] = value === 'true';
+                            } else {
+                                filters[key] = value;
+                            }
+                        }
+                    });
+                    
+                    // Parse pagination and sorting
+                    const page = parseInt(urlParams.get('page') || '1');
+                    const sort = urlParams.get('sort') || 'date_desc';
+                    
+                    state.currentPage = Math.max(1, page);
+                    state.sortOption = sort;
+                };
+
                 // Lifecycle
                 onMounted(async () => {
                     await fetchMetadata();
                     await fetchLookups();
-                    filterManager.parseURL();
-                    await fetchJobs(filterManager.filters.page || 1);
+                    parseURL();
+                    await fetchJobs(state.currentPage);
                 });
 
                 return {
@@ -213,7 +272,9 @@ export class JobBoardComponent {
                     openJobDetail,
                     closeJobDetail,
                     toggleSidebar,
-                    handleSearch
+                    handleSearch,
+                    updateURL,
+                    parseURL
                 };
             }
         });
@@ -221,4 +282,4 @@ export class JobBoardComponent {
 }
 
 // Create global component instance
-window.JobBoardComponent = new JobBoardComponent();
+window.jobBoard = new JobBoardComponent();

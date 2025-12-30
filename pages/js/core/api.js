@@ -1,130 +1,89 @@
 /**
- * API Module
- * Handles all API calls and data fetching
+ * Browser API Module
+ * Handles API calls and data fetching for browser environment
  */
 
-export class JobMarketAPI {
+export class BrowserAPI {
     constructor() {
         this.baseURL = '';
-        this.allJobs = []; // Cache all jobs for client-side filtering
-        this.currentPage = 1;
-        this.totalPages = 1;
-        this.totalJobs = 0;
+        this.allJobs = [];
+        this.metadata = {};
+        this.lookups = {};
     }
 
+    /**
+     * Fetch metadata
+     */
     async fetchMetadata() {
         try {
             const response = await fetch(`${this.baseURL}/api/jobs/index.json`);
             if (!response.ok) throw new Error('Failed to fetch metadata');
-            return await response.json();
+            this.metadata = await response.json();
+            return this.metadata;
         } catch (err) {
             console.error('Error fetching metadata:', err);
             throw err;
         }
     }
 
+    /**
+     * Fetch all lookups in parallel
+     */
     async fetchLookups() {
         try {
-            const [
-                industries, departments, jobFamilies, specializations, 
-                cities, companies, skills, hardSkills, softSkills,
-                certifications, licenses, benefits, workEnvironment,
-                professionalDevelopment, workLifeBalance, physicalRequirements,
-                workConditions, specialRequirements, jobFunctions,
-                requiredEducation, employmentTypes, contractTypes,
-                workSchedules, shiftDetails, remoteWorkOptions, travelRequired,
-                countries, regions, companySizes, salaryCurrencies, salaryPeriods
-            ] = await Promise.all([
-                this.fetchJSON('/api/lookups/industries.json', 'industries'),
-                this.fetchJSON('/api/lookups/departments.json', 'departments'),
-                this.fetchJSON('/api/lookups/job_families.json', 'job_families'),
-                this.fetchJSON('/api/lookups/specializations.json', 'specializations'),
-                this.fetchJSON('/api/lookups/cities.json', 'cities'),
-                this.fetchJSON('/api/lookups/companies.json', 'companies'),
-                this.fetchJSON('/api/lookups/skills.json', 'skills'),
-                this.fetchJSON('/api/lookups/hard_skills.json', 'hard_skills'),
-                this.fetchJSON('/api/lookups/soft_skills.json', 'soft_skills'),
-                this.fetchJSON('/api/lookups/certifications.json', 'certifications'),
-                this.fetchJSON('/api/lookups/licenses.json', 'licenses'),
-                this.fetchJSON('/api/lookups/benefits.json', 'benefits'),
-                this.fetchJSON('/api/lookups/work_environment.json', 'work_environment'),
-                this.fetchJSON('/api/lookups/professional_development.json', 'professional_development'),
-                this.fetchJSON('/api/lookups/work_life_balance.json', 'work_life_balance'),
-                this.fetchJSON('/api/lookups/physical_requirements.json', 'physical_requirements'),
-                this.fetchJSON('/api/lookups/work_conditions.json', 'work_conditions'),
-                this.fetchJSON('/api/lookups/special_requirements.json', 'special_requirements'),
-                this.fetchJSON('/api/lookups/job_functions.json', 'job_functions'),
-                this.fetchJSON('/api/lookups/required_education.json', 'required_education'),
-                this.fetchJSON('/api/lookups/employment_types.json', 'employment_types'),
-                this.fetchJSON('/api/lookups/contract_types.json', 'contract_types'),
-                this.fetchJSON('/api/lookups/work_schedules.json', 'work_schedules'),
-                this.fetchJSON('/api/lookups/shift_details.json', 'shift_details'),
-                this.fetchJSON('/api/lookups/remote_work_options.json', 'remote_work_options'),
-                this.fetchJSON('/api/lookups/travel_required.json', 'travel_required'),
-                this.fetchJSON('/api/lookups/countries.json', 'countries'),
-                this.fetchJSON('/api/lookups/regions.json', 'regions'),
-                this.fetchJSON('/api/lookups/company_sizes.json', 'company_sizes'),
-                this.fetchJSON('/api/lookups/salary_currencies.json', 'salary_currencies'),
-                this.fetchJSON('/api/lookups/salary_periods.json', 'salary_periods')
-            ]);
+            const lookupPromises = [
+                'industries', 'departments', 'job_families', 'specializations',
+                'cities', 'companies', 'skills', 'hard_skills', 'soft_skills',
+                'certifications', 'licenses', 'benefits', 'work_environment',
+                'professional_development', 'work_life_balance', 'physical_requirements',
+                'work_conditions', 'special_requirements', 'job_functions',
+                'required_education', 'employment_types', 'contract_types',
+                'work_schedules', 'shift_details', 'remote_work_options', 'travel_required',
+                'countries', 'regions', 'company_sizes', 'salary_currencies', 'salary_periods'
+            ].map(async (lookupType) => {
+                try {
+                    const response = await fetch(`${this.baseURL}/api/lookups/${lookupType}.json`);
+                    if (!response.ok) throw new Error(`Failed to fetch ${lookupType}`);
+                    const data = await response.json();
+                    return [lookupType, data[lookupType] || []];
+                } catch (err) {
+                    console.error(`Error fetching ${lookupType}:`, err);
+                    return [lookupType, []];
+                }
+            });
 
-            return {
-                industries: industries || [],
-                departments: departments || [],
-                job_families: jobFamilies || [],
-                specializations: specializations || [],
-                cities: cities || [],
-                companies: companies || [],
-                skills: skills || [],
-                hard_skills: hardSkills || [],
-                soft_skills: softSkills || [],
-                certifications: certifications || [],
-                licenses: licenses || [],
-                benefits: benefits || [],
-                work_environment: workEnvironment || [],
-                professional_development: professionalDevelopment || [],
-                work_life_balance: workLifeBalance || [],
-                physical_requirements: physicalRequirements || [],
-                work_conditions: workConditions || [],
-                special_requirements: specialRequirements || [],
-                job_functions: jobFunctions || [],
-                required_education: requiredEducation || [],
-                employment_types: employmentTypes || [],
-                contract_types: contractTypes || [],
-                work_schedules: workSchedules || [],
-                shift_details: shiftDetails || [],
-                remote_work: remoteWorkOptions || [],
-                travel_required: travelRequired || [],
-                countries: countries || [],
-                regions: regions || [],
-                company_sizes: companySizes || [],
-                salary_currencies: salaryCurrencies || [],
-                salary_periods: salaryPeriods || []
-            };
+            const results = await Promise.all(lookupPromises);
+            this.lookups = Object.fromEntries(results);
+            return this.lookups;
         } catch (err) {
             console.error('Error fetching lookups:', err);
             throw err;
         }
     }
 
+    /**
+     * Fetch all jobs for client-side filtering
+     */
     async fetchAllJobs() {
         try {
-            // Fetch metadata to get total pages
-            const metadata = await this.fetchMetadata();
-            this.totalJobs = metadata.total_jobs;
-            this.totalPages = metadata.total_pages;
+            // Get metadata first to know total pages
+            if (Object.keys(this.metadata).length === 0) {
+                await this.fetchMetadata();
+            }
 
-            // Fetch all pages and cache them
+            const totalPages = Math.ceil(this.metadata.total_jobs / 100);
             const promises = [];
-            for (let i = 1; i <= metadata.total_pages; i++) {
+
+            // Fetch all pages in parallel
+            for (let i = 1; i <= totalPages; i++) {
                 promises.push(this.fetchPage(i));
             }
 
             const pages = await Promise.all(promises);
             this.allJobs = [];
-            
+
             pages.forEach(page => {
-                this.allJobs = this.allJobs.concat(page.jobs);
+                this.allJobs = this.allJobs.concat(page.jobs || []);
             });
 
             return this.allJobs;
@@ -134,41 +93,48 @@ export class JobMarketAPI {
         }
     }
 
-    getJobsForPage(page = 1, jobs = null) {
-        const jobsToUse = jobs || this.allJobs;
-        const jobsPerPage = 100;
-        const startIndex = (page - 1) * jobsPerPage;
-        const endIndex = startIndex + jobsPerPage;
-        
-        return {
-            jobs: jobsToUse.slice(startIndex, endIndex),
-            page: page,
-            totalPages: Math.ceil(jobsToUse.length / jobsPerPage),
-            totalJobs: jobsToUse.length
-        };
+    /**
+     * Fetch a specific page
+     */
+    async fetchPage(page) {
+        try {
+            const response = await fetch(`${this.baseURL}/api/jobs/page-${page}.json`);
+            if (!response.ok) throw new Error(`Failed to fetch page ${page}`);
+            return await response.json();
+        } catch (err) {
+            console.error(`Error fetching page ${page}:`, err);
+            throw err;
+        }
     }
 
+    /**
+     * Fetch jobs with filters - uses client-side filtering
+     */
     async fetchJobs(page = 1, filters = {}) {
         try {
-            // If we haven't loaded all jobs yet, load them
+            // Load all jobs if not already loaded
             if (this.allJobs.length === 0) {
                 await this.fetchAllJobs();
             }
-            
-            // Apply filters to get filtered jobs
+
+            // Apply filters using the same logic as the Node.js server
             const filteredJobs = this.filterJobs(this.allJobs, filters);
-            
-            // Apply client-side pagination
-            return this.getJobsForPage(page, filteredJobs);
+
+            // Apply pagination
+            const result = this.paginateJobs(filteredJobs, page);
+            return result;
         } catch (err) {
             console.error('Error fetching jobs:', err);
             throw err;
         }
     }
 
+    /**
+     * Apply filters to jobs array
+     */
     filterJobs(jobs, filters) {
         return jobs.filter(job => {
-            // Search filter (title, company, skills)
+            // Search filter
             if (filters.search) {
                 const searchLower = filters.search.toLowerCase();
                 const matchesSearch = 
@@ -179,19 +145,15 @@ export class JobMarketAPI {
                 if (!matchesSearch) return false;
             }
 
-            // Hierarchical filters (industry -> department -> job_family -> specialization)
+            // Hierarchical filters
             if (filters.industry && job.industry_id !== parseInt(filters.industry)) return false;
             if (filters.department && job.department_id !== parseInt(filters.department)) return false;
             if (filters.job_family && job.job_family_id !== parseInt(filters.job_family)) return false;
             if (filters.specialization && job.specialization_id !== parseInt(filters.specialization)) return false;
             
-            // Job function
+            // Job details
             if (filters.job_function && job.job_function_id !== parseInt(filters.job_function)) return false;
-            
-            // Seniority level
             if (filters.seniority_level && job.seniority_level_id !== parseInt(filters.seniority_level)) return false;
-            
-            // Required education
             if (filters.required_education && job.required_education_id !== parseInt(filters.required_education)) return false;
             
             // Experience filters
@@ -199,7 +161,7 @@ export class JobMarketAPI {
             if (filters.experience_max !== null && job.experience_years_max > filters.experience_max) return false;
             
             // Skills filters (multi-select)
-            if (filters.hard_skills.length > 0) {
+            if (filters.hard_skills && filters.hard_skills.length > 0) {
                 const jobSkills = (job.hard_skills || []).map(s => s.toLowerCase());
                 const hasRequiredSkill = filters.hard_skills.some(skill => 
                     jobSkills.includes(skill.toLowerCase())
@@ -207,7 +169,7 @@ export class JobMarketAPI {
                 if (!hasRequiredSkill) return false;
             }
             
-            if (filters.soft_skills.length > 0) {
+            if (filters.soft_skills && filters.soft_skills.length > 0) {
                 const jobSkills = (job.soft_skills || []).map(s => s.toLowerCase());
                 const hasRequiredSkill = filters.soft_skills.some(skill => 
                     jobSkills.includes(skill.toLowerCase())
@@ -215,7 +177,7 @@ export class JobMarketAPI {
                 if (!hasRequiredSkill) return false;
             }
             
-            if (filters.certifications.length > 0) {
+            if (filters.certifications && filters.certifications.length > 0) {
                 const jobCerts = (job.certifications || []).map(c => c.toLowerCase());
                 const hasRequiredCert = filters.certifications.some(cert => 
                     jobCerts.includes(cert.toLowerCase())
@@ -223,7 +185,7 @@ export class JobMarketAPI {
                 if (!hasRequiredCert) return false;
             }
             
-            if (filters.licenses.length > 0) {
+            if (filters.licenses && filters.licenses.length > 0) {
                 const jobLicenses = (job.licenses || []).map(l => l.toLowerCase());
                 const hasRequiredLicense = filters.licenses.some(license => 
                     jobLicenses.includes(license.toLowerCase())
@@ -246,7 +208,7 @@ export class JobMarketAPI {
             
             // Company filters
             if (filters.company_size && job.company_size_id !== parseInt(filters.company_size)) return false;
-            if (filters.companies.length > 0 && !filters.companies.includes(job.company)) return false;
+            if (filters.companies && filters.companies.length > 0 && !filters.companies.includes(job.company)) return false;
             
             // Salary filters
             if (filters.has_salary && (!job.min_salary_mdl && !job.max_salary_mdl)) return false;
@@ -256,7 +218,7 @@ export class JobMarketAPI {
             if (filters.salary_period && job.salary_period_id !== parseInt(filters.salary_period)) return false;
             
             // Benefits and perks filters
-            if (filters.benefits.length > 0) {
+            if (filters.benefits && filters.benefits.length > 0) {
                 const jobBenefits = (job.benefits || []).map(b => b.toLowerCase());
                 const hasRequiredBenefit = filters.benefits.some(benefit => 
                     jobBenefits.includes(benefit.toLowerCase())
@@ -264,7 +226,7 @@ export class JobMarketAPI {
                 if (!hasRequiredBenefit) return false;
             }
             
-            if (filters.work_environment.length > 0) {
+            if (filters.work_environment && filters.work_environment.length > 0) {
                 const jobEnv = (job.work_environment || []).map(e => e.toLowerCase());
                 const hasRequiredEnv = filters.work_environment.some(env => 
                     jobEnv.includes(env.toLowerCase())
@@ -272,7 +234,7 @@ export class JobMarketAPI {
                 if (!hasRequiredEnv) return false;
             }
             
-            if (filters.professional_development.length > 0) {
+            if (filters.professional_development && filters.professional_development.length > 0) {
                 const jobDev = (job.professional_development || []).map(d => d.toLowerCase());
                 const hasRequiredDev = filters.professional_development.some(dev => 
                     jobDev.includes(dev.toLowerCase())
@@ -280,7 +242,7 @@ export class JobMarketAPI {
                 if (!hasRequiredDev) return false;
             }
             
-            if (filters.work_life_balance.length > 0) {
+            if (filters.work_life_balance && filters.work_life_balance.length > 0) {
                 const jobBalance = (job.work_life_balance || []).map(b => b.toLowerCase());
                 const hasRequiredBalance = filters.work_life_balance.some(balance => 
                     jobBalance.includes(balance.toLowerCase())
@@ -289,7 +251,7 @@ export class JobMarketAPI {
             }
             
             // Work conditions filters
-            if (filters.physical_requirements.length > 0) {
+            if (filters.physical_requirements && filters.physical_requirements.length > 0) {
                 const jobPhysical = (job.physical_requirements || []).map(p => p.toLowerCase());
                 const hasRequiredPhysical = filters.physical_requirements.some(physical => 
                     jobPhysical.includes(physical.toLowerCase())
@@ -297,7 +259,7 @@ export class JobMarketAPI {
                 if (!hasRequiredPhysical) return false;
             }
             
-            if (filters.work_conditions.length > 0) {
+            if (filters.work_conditions && filters.work_conditions.length > 0) {
                 const jobConditions = (job.work_conditions || []).map(c => c.toLowerCase());
                 const hasRequiredCondition = filters.work_conditions.some(condition => 
                     jobConditions.includes(condition.toLowerCase())
@@ -305,7 +267,7 @@ export class JobMarketAPI {
                 if (!hasRequiredCondition) return false;
             }
             
-            if (filters.special_requirements.length > 0) {
+            if (filters.special_requirements && filters.special_requirements.length > 0) {
                 const jobSpecial = (job.special_requirements || []).map(s => s.toLowerCase());
                 const hasRequiredSpecial = filters.special_requirements.some(special => 
                     jobSpecial.includes(special.toLowerCase())
@@ -317,32 +279,88 @@ export class JobMarketAPI {
         });
     }
 
-    getJobsForPage(page = 1, jobs = null) {
-        const jobsToUse = jobs || this.allJobs;
-        const jobsPerPage = 100;
-        const startIndex = (page - 1) * jobsPerPage;
-        const endIndex = startIndex + jobsPerPage;
+    /**
+     * Paginate filtered jobs
+     */
+    paginateJobs(jobs, page = 1, pageSize = 100) {
+        const startIndex = (page - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
         
         return {
-            jobs: jobsToUse.slice(startIndex, endIndex),
+            jobs: jobs.slice(startIndex, endIndex),
             page: page,
-            totalPages: Math.ceil(jobsToUse.length / jobsPerPage),
-            totalJobs: jobsToUse.length
+            totalPages: Math.ceil(jobs.length / pageSize),
+            totalJobs: jobs.length
         };
     }
 
-    async fetchJSON(url, key) {
-        try {
-            const response = await fetch(this.baseURL + url);
-            if (!response.ok) throw new Error(`Failed to fetch ${key}`);
-            const data = await response.json();
-            return data[key];
-        } catch (err) {
-            console.error(`Error fetching ${key}:`, err);
-            return [];
-        }
+    /**
+     * Get filter statistics
+     */
+    getFilterStats(jobs) {
+        const filteredJobs = this.filterJobs(jobs, {});
+        
+        return {
+            totalJobs: jobs.length,
+            filteredJobs: filteredJobs.length,
+            companies: new Set(filteredJobs.map(j => j.company)).size,
+            cities: new Set(filteredJobs.map(j => j.city)).size
+        };
+    }
+
+    /**
+     * Get filter metadata
+     */
+    getFilterMetadata(jobs) {
+        const metadata = {};
+        
+        // Count occurrences for each filter dimension
+        const dimensions = [
+            'industry_id', 'department_id', 'job_family_id', 'specialization_id',
+            'job_function_id', 'seniority_level_id', 'required_education_id',
+            'employment_type_id', 'contract_type_id', 'work_schedule_id',
+            'shift_details_id', 'remote_work_id', 'travel_required_id',
+            'country_id', 'region_id', 'city_id', 'company_size_id',
+            'salary_currency_id', 'salary_period_id'
+        ];
+
+        dimensions.forEach(dim => {
+            metadata[dim] = {};
+            jobs.forEach(job => {
+                const value = job[dim];
+                if (value) {
+                    metadata[dim][value] = (metadata[dim][value] || 0) + 1;
+                }
+            });
+        });
+
+        // Count skills
+        const skillTypes = [
+            'hard_skills', 'soft_skills', 'certifications', 'licenses',
+            'benefits', 'work_environment', 'professional_development',
+            'work_life_balance', 'physical_requirements', 'work_conditions',
+            'special_requirements'
+        ];
+
+        skillTypes.forEach(skillType => {
+            metadata[skillType] = {};
+            jobs.forEach(job => {
+                (job[skillType] || []).forEach(item => {
+                    if (item) {
+                        const key = item.toLowerCase();
+                        metadata[skillType][key] = (metadata[skillType][key] || 0) + 1;
+                    }
+                });
+            });
+        });
+
+        return metadata;
     }
 }
 
-// Create global API instance
-window.JobMarketAPI = new JobMarketAPI();
+// Export for browser environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { BrowserAPI };
+} else {
+    window.BrowserAPI = BrowserAPI;
+}
