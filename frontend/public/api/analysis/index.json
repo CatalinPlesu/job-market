@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "available_analyses": [
+    {
+      "id": "salary-overview",
+      "title": "Salary Analysis Overview",
+      "endpoint": "/api/analysis/salary-overview.json",
+      "last_updated": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "market-trends",
+      "title": "Job Market Trends Over Time",
+      "endpoint": "/api/analysis/market-trends.json",
+      "temporal": true
+    }
+  ],
+  "data_summary": {
+    "total_jobs": 150,
+    "date_range": {"start": "2025-12-01", "end": "2026-01-01"},
+    "jobs_with_salary": 120,
+    "unique_companies": 25,
+    "unique_skills": 50
+  }
+}

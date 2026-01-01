@@ -1,0 +1,104 @@
+{
+  "version": "1.0",
+  "page": 1,
+  "total_pages": 2,
+  "jobs_per_page": 100,
+  "jobs": [
+    {
+      "id": 1,
+      "title": "Software Engineer",
+      "job_function": "Engineering",
+      "specialization": "Software Development",
+      "seniority_level": "mid",
+      "industry": "Technology",
+      "department": "Engineering",
+      "job_family": "Technical",
+      "company": "TechCorp SRL",
+      "company_size": "medium",
+      "location": {
+        "city": "Chișinău",
+        "region": "Chișinău",
+        "country": "Moldova",
+        "remote_work": "hybrid"
+      },
+      "salary": {
+        "min": 15000,
+        "max": 25000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "flexible"
+      },
+      "requirements": {
+        "education": "bachelor",
+        "experience_years": 3,
+        "languages": ["Romanian", "English"],
+        "hard_skills": ["Python", "JavaScript", "SQL"],
+        "soft_skills": ["Communication", "Teamwork"],
+        "certifications": []
+      },
+      "benefits": ["Health insurance", "Training budget"],
+      "posting_date": "2025-12-15",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/1"
+      },
+      "parsed_view": {
+        "responsibilities": ["Develop applications", "Collaborate with team"],
+        "work_environment": ["Modern office"],
+        "professional_development": ["Training budget"]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Senior Frontend Developer",
+      "job_function": "Engineering",
+      "specialization": "Software Development",
+      "seniority_level": "senior",
+      "industry": "Technology",
+      "department": "Engineering",
+      "job_family": "Technical",
+      "company": "TechCorp SRL",
+      "company_size": "medium",
+      "location": {
+        "city": "Chișinău",
+        "region": "Chișinău",
+        "country": "Moldova",
+        "remote_work": "remote"
+      },
+      "salary": {
+        "min": 25000,
+        "max": 35000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "flexible"
+      },
+      "requirements": {
+        "education": "bachelor",
+        "experience_years": 5,
+        "languages": ["English"],
+        "hard_skills": ["React", "TypeScript", "CSS"],
+        "soft_skills": ["Leadership", "Communication"],
+        "certifications": []
+      },
+      "benefits": ["Health insurance", "Remote work"],
+      "posting_date": "2025-12-20",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/2"
+      },
+      "parsed_view": {
+        "responsibilities": ["Lead frontend development", "Mentor junior developers"],
+        "work_environment": ["Remote-friendly"],
+        "professional_development": ["Conference attendance"]
+      }
+    }
+  ]
+}
