@@ -154,59 +154,134 @@ const JobListItem = {
     }
 };
 
-// Filter matching logic
+// Filter matching logic - ALL filters work as AND (combined)
 const matchesFilters = (job, filters) => {
     for (const [key, value] of Object.entries(filters)) {
         if (value === null || value === undefined || value === '') continue;
         
         switch (key) {
+            // Job Details
             case 'job_function':
                 if (job.job_function !== value) return false;
                 break;
             case 'seniority_level':
                 if (job.seniority_level !== value) return false;
                 break;
-            case 'city':
-                if (job.location && job.location.city !== value) return false;
-                break;
-            case 'remote_work':
-                if (job.location && job.location.remote_work !== value) return false;
-                break;
             case 'industry':
                 if (job.industry !== value) return false;
                 break;
+            case 'department':
+                if (job.department !== value) return false;
+                break;
+            case 'job_family':
+                if (job.job_family !== value) return false;
+                break;
+            case 'specialization':
+                if (job.specialization !== value) return false;
+                break;
+            
+            // Requirements
+            case 'education_level':
+                if (job.requirements?.education !== value) return false;
+                break;
+            case 'languages':
+                if (!job.requirements?.languages || !job.requirements.languages.includes(value)) return false;
+                break;
+            case 'hard_skills':
+                if (!job.requirements?.hard_skills || !job.requirements.hard_skills.some(skill => skill.includes(value))) return false;
+                break;
+            case 'soft_skills':
+                if (!job.requirements?.soft_skills || !job.requirements.soft_skills.some(skill => skill.includes(value))) return false;
+                break;
+            case 'certifications':
+                if (!job.requirements?.certifications || !job.requirements.certifications.includes(value)) return false;
+                break;
+            case 'licenses_required':
+                if (!job.requirements?.licenses || !job.requirements.licenses.includes(value)) return false;
+                break;
+            
+            // Work Arrangement
+            case 'employment_type':
+                if (job.employment?.type !== value) return false;
+                break;
+            case 'contract_type':
+                if (job.employment?.contract !== value) return false;
+                break;
+            case 'work_schedule':
+                if (job.employment?.schedule !== value) return false;
+                break;
+            case 'shift_details':
+                if (job.employment?.shift !== value) return false;
+                break;
+            case 'remote_work':
+                if (job.location?.remote_work !== value) return false;
+                break;
+            case 'travel_required':
+                if (job.requirements?.travel !== value) return false;
+                break;
+            
+            // Location
+            case 'city':
+                if (job.location?.city !== value) return false;
+                break;
+            case 'region':
+                if (job.location?.region !== value) return false;
+                break;
+            case 'country':
+                if (job.location?.country !== value) return false;
+                break;
+            
+            // Company
             case 'company':
                 if (job.company !== value) return false;
                 break;
-            case 'employment_type':
-                if (job.employment && job.employment.type !== value) return false;
+            case 'company_size':
+                if (job.company_size !== value) return false;
                 break;
-            case 'contract_type':
-                if (job.employment && job.employment.contract !== value) return false;
+            
+            // Benefits & Culture
+            case 'benefits':
+                if (!job.benefits || !job.benefits.includes(value)) return false;
                 break;
+            case 'work_environment':
+                if (!job.work_environment || !job.work_environment.includes(value)) return false;
+                break;
+            case 'professional_development':
+                if (!job.professional_development || !job.professional_development.includes(value)) return false;
+                break;
+            case 'work_life_balance':
+                if (!job.work_life_balance || !job.work_life_balance.includes(value)) return false;
+                break;
+            
+            // Conditions
+            case 'physical_requirements':
+                if (!job.requirements?.physical || !job.requirements.physical.includes(value)) return false;
+                break;
+            case 'work_conditions':
+                if (!job.work_conditions || !job.work_conditions.includes(value)) return false;
+                break;
+            case 'special_requirements':
+                if (!job.requirements?.special || !job.requirements.special.includes(value)) return false;
+                break;
+            
+            // Numeric Filters
             case 'salaryMin':
-                // Check if job's min salary (in MDL if available, otherwise convert) is >= filter min
                 const jobMinSalary = job.salary?.min_mdl || job.salary?.min;
-                // Exclude jobs with no salary when salary filter is active
                 if (!jobMinSalary) return false;
                 if (jobMinSalary < value) return false;
                 break;
             case 'salaryMax':
-                // Check if job's max salary (in MDL if available, otherwise convert) is <= filter max
                 const jobMaxSalary = job.salary?.max_mdl || job.salary?.max;
-                // Exclude jobs with no salary when salary filter is active
                 if (!jobMaxSalary) return false;
                 if (jobMaxSalary > value) return false;
                 break;
             case 'experienceMin':
                 const jobExpYears = job.requirements?.experience_years;
-                // Exclude jobs with no experience data when experience filter is active
                 if (jobExpYears === null || jobExpYears === undefined) return false;
                 if (jobExpYears < value) return false;
                 break;
             case 'experienceMax':
                 const jobExpYearsMax = job.requirements?.experience_years;
-                // Exclude jobs with no experience data when experience filter is active
                 if (jobExpYearsMax === null || jobExpYearsMax === undefined) return false;
                 if (jobExpYearsMax > value) return false;
                 break;
@@ -416,8 +491,20 @@ const FilterPanel = {
                 ).map(([section, fields]) => 
                     m('div', { class: 'space-y-2' }, [
                         m('div', { class: 'text-xs font-semibold opacity-60 uppercase tracking-wide' }, section),
-                        ...fields.map(field => 
-                            m('div', { class: 'form-control' }, [
+                        ...fields.map(field => {
+                            // Calculate counts for each option based on currently filtered jobs
+                            const optionCounts = {};
+                            const availableOptions = state.jobsIndex.filters[field.key] || [];
+                            
+                            availableOptions.forEach(option => {
+                                // Create temporary filter state with this option
+                                const tempFilters = { ...state.filters, [field.key]: option };
+                                // Count how many jobs match with this option
+                                const count = state.allLoadedJobs.filter(job => matchesFilters(job, tempFilters)).length;
+                                optionCounts[option] = count;
+                            });
+                            
+                            return m('div', { class: 'form-control' }, [
                                 m('label', { class: 'label py-1' }, [
                                     m('span', { class: 'label-text text-sm' }, field.label)
                                 ]),
@@ -434,12 +521,12 @@ const FilterPanel = {
                                     }
                                 }, [
                                     m('option', { value: '' }, 'All'),
-                                    ...(state.jobsIndex.filters[field.key] || []).map(f => 
-                                        m('option', { value: f }, f)
+                                    ...availableOptions.map(f => 
+                                        m('option', { value: f }, `${f} (${optionCounts[f] || 0})`)
                                     )
                                 ])
-                            ])
-                        )
+                            ]);
+                        })
                     ])
                 )
             )
