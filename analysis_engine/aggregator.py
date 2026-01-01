@@ -164,7 +164,7 @@ class Aggregator:
         """
         # Calculate average in original currency
         avg_salary = None
-        if job.max_salary and job.min_salary:
+        if job.max_salary is not None and job.min_salary is not None:
             avg_salary = float((job.min_salary + job.max_salary) / 2)
         elif job.min_salary is not None:
             avg_salary = float(job.min_salary)
