@@ -154,6 +154,43 @@ const JobListItem = {
     }
 };
 
+// Helper function to get field value from a job object
+const getJobFieldValue = (job, fieldKey) => {
+    switch (fieldKey) {
+        case 'job_function': return job.job_function;
+        case 'seniority_level': return job.seniority_level;
+        case 'industry': return job.industry;
+        case 'department': return job.department;
+        case 'job_family': return job.job_family;
+        case 'specialization': return job.specialization;
+        case 'education_level': return job.requirements?.education;
+        case 'languages': return job.requirements?.languages;
+        case 'hard_skills': return job.requirements?.hard_skills;
+        case 'soft_skills': return job.requirements?.soft_skills;
+        case 'certifications': return job.requirements?.certifications;
+        case 'licenses_required': return job.requirements?.licenses;
+        case 'employment_type': return job.employment?.type;
+        case 'contract_type': return job.employment?.contract_type;
+        case 'work_schedule': return job.employment?.work_schedule;
+        case 'shift_details': return job.employment?.shift_details;
+        case 'remote_work': return job.employment?.remote_work;
+        case 'travel_required': return job.employment?.travel_required;
+        case 'city': return job.location?.city;
+        case 'region': return job.location?.region;
+        case 'country': return job.location?.country;
+        case 'company_name': return job.company;
+        case 'company_size': return job.company_size;
+        case 'benefits': return job.benefits;
+        case 'work_environment': return job.work_environment;
+        case 'professional_development': return job.professional_development;
+        case 'work_life_balance': return job.work_life_balance;
+        case 'physical_requirements': return job.physical_requirements;
+        case 'work_conditions': return job.work_conditions;
+        case 'special_requirements': return job.special_requirements;
+        default: return null;
+    }
+};
+
 // Filter matching logic - ALL filters work as AND (combined)
 const matchesFilters = (job, filters) => {
     for (const [key, value] of Object.entries(filters)) {
@@ -490,10 +527,27 @@ const FilterPanel = {
                     m('div', { class: 'space-y-2' }, [
                         m('div', { class: 'text-xs font-semibold opacity-60 uppercase tracking-wide' }, section),
                         ...fields.map(field => {
-                            // Calculate counts for each option based on currently filtered jobs
-                            const optionCounts = {};
-                            const availableOptions = state.jobsIndex.filters[field.key] || [];
+                            // Get jobs filtered by all OTHER filters (excluding this field)
+                            const filtersWithoutThisField = { ...state.filters };
+                            delete filtersWithoutThisField[field.key];
+                            const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filtersWithoutThisField));
                             
+                            // Extract unique values from filtered jobs for this field
+                            const availableValuesSet = new Set();
+                            baseFilteredJobs.forEach(job => {
+                                const value = getJobFieldValue(job, field.key);
+                                if (value !== null && value !== undefined && value !== '') {
+                                    if (Array.isArray(value)) {
+                                        value.forEach(v => availableValuesSet.add(v));
+                                    } else {
+                                        availableValuesSet.add(value);
+                                    }
+                                }
+                            });
+                            const availableOptions = Array.from(availableValuesSet).sort();
+                            
+                            // Calculate counts for each option
+                            const optionCounts = {};
                             availableOptions.forEach(option => {
                                 // Create temporary filter state with this option
                                 const tempFilters = { ...state.filters, [field.key]: option };
