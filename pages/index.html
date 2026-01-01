@@ -52,7 +52,62 @@
     </style>
 </head>
 <body>
-    <div id="app"></div>
+    <div id="app">
+        <!-- Fallback content shown if JavaScript fails to load -->
+        <div style="max-width: 800px; margin: 50px auto; padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
+            <h1 style="font-size: 2em; margin-bottom: 20px;">💼 Moldova Job Market</h1>
+            <div style="padding: 20px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; margin-bottom: 20px;">
+                <strong>⚠️ Loading Application...</strong>
+                <p style="margin-top: 10px;">If this message persists, please check:</p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>JavaScript is enabled in your browser</li>
+                    <li>CDN resources are not blocked (check browser console)</li>
+                    <li>You're accessing via HTTP server (not file:// protocol)</li>
+                </ul>
+            </div>
+            <div style="padding: 20px; background: #e0f2fe; border: 1px solid #38bdf8; border-radius: 8px;">
+                <strong>📋 Quick Setup:</strong>
+                <pre style="background: white; padding: 10px; border-radius: 4px; margin-top: 10px; overflow-x: auto;">cd pages
+python3 -m http.server 8080</pre>
+                <p style="margin-top: 10px;">Then open <code>http://localhost:8080</code></p>
+                <p style="margin-top: 10px;">See <strong>SETUP.md</strong> for full documentation.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Check if Mithril loaded -->
+    <script>
+        // Wait for all CDN scripts to load
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (typeof m === 'undefined') {
+                    console.error('Mithril.js failed to load from CDN');
+                    document.getElementById('app').innerHTML = `
+                        <div style="max-width: 800px; margin: 50px auto; padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
+                            <h1 style="font-size: 2em; margin-bottom: 20px; color: #dc2626;">❌ Failed to Load Application</h1>
+                            <div style="padding: 20px; background: #fee2e2; border: 1px solid #dc2626; border-radius: 8px;">
+                                <strong>CDN resources could not be loaded.</strong>
+                                <p style="margin-top: 10px;">This usually happens due to:</p>
+                                <ul style="margin-left: 20px; margin-top: 10px;">
+                                    <li>Ad blockers or tracking protection blocking CDN domains</li>
+                                    <li>Corporate firewall restrictions</li>
+                                    <li>No internet connection</li>
+                                    <li>Sandboxed environment restrictions</li>
+                                </ul>
+                                <p style="margin-top: 15px;"><strong>Solutions:</strong></p>
+                                <ul style="margin-left: 20px; margin-top: 10px;">
+                                    <li>Disable ad blockers for this page</li>
+                                    <li>Check browser console (F12) for specific errors</li>
+                                    <li>Ensure internet connection is active</li>
+                                    <li>Try a different browser</li>
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 1000);
+        });
+    </script>
     
     <!-- Load modules in order -->
     <script type="module">
@@ -72,7 +127,19 @@
         // Load main app after core modules
         import('./js/main.js').then(module => {
             // Main app will initialize Mithril
-            console.log('App loaded');
+            console.log('App loaded successfully');
+        }).catch(error => {
+            console.error('Failed to load app:', error);
+            document.getElementById('app').innerHTML = `
+                <div style="max-width: 800px; margin: 50px auto; padding: 20px; font-family: system-ui, -apple-system, sans-serif;">
+                    <h1 style="font-size: 2em; margin-bottom: 20px; color: #dc2626;">❌ Application Error</h1>
+                    <div style="padding: 20px; background: #fee2e2; border: 1px solid #dc2626; border-radius: 8px;">
+                        <strong>Failed to initialize application.</strong>
+                        <p style="margin-top: 10px;">Error: ${error.message}</p>
+                        <p style="margin-top: 15px;">Check browser console (F12) for details.</p>
+                    </div>
+                </div>
+            `;
         });
     </script>
 </body>
