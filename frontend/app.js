@@ -285,7 +285,7 @@ const FilterPanel = {
             m.redraw();
         };
         
-        return m('div', { class: 'bg-base-200 p-4 rounded-lg h-full overflow-y-auto' }, [
+        return m('div', { class: 'bg-base-200 p-4 h-full' }, [
             m('div', { class: 'flex justify-between items-center mb-4' }, [
                 m('h3', { class: 'font-bold text-lg' }, 'Filters'),
                 m('button', { 
@@ -306,34 +306,28 @@ const FilterPanel = {
             m('div', { class: 'form-control mb-6' }, [
                 m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Salary Range (MDL)')),
                 m('div', { class: 'space-y-2' }, [
-                    m('div', { class: 'flex gap-2 items-center' }, [
-                        m('input', { 
-                            type: 'number',
-                            class: 'input input-bordered input-sm flex-1',
-                            placeholder: 'Min',
-                            value: state.filters.salaryMin || '',
-                            oninput: (e) => {
-                                state.filters.salaryMin = e.target.value ? parseInt(e.target.value) : null;
-                                handleFilterChange();
-                            }
-                        }),
-                        m('span', '-'),
-                        m('input', { 
-                            type: 'number',
-                            class: 'input input-bordered input-sm flex-1',
-                            placeholder: 'Max',
-                            value: state.filters.salaryMax || '',
-                            oninput: (e) => {
-                                state.filters.salaryMax = e.target.value ? parseInt(e.target.value) : null;
-                                handleFilterChange();
-                            }
-                        })
-                    ]),
-                    state.filters.salaryMin && m('div', { class: 'text-xs opacity-70' }, 
-                        `Min: ${state.filters.salaryMin.toLocaleString()} MDL`
-                    ),
-                    state.filters.salaryMax && m('div', { class: 'text-xs opacity-70' }, 
-                        `Max: ${state.filters.salaryMax.toLocaleString()} MDL`
+                    m('input', { 
+                        type: 'number',
+                        class: 'input input-bordered input-sm w-full',
+                        placeholder: 'Minimum',
+                        value: state.filters.salaryMin || '',
+                        oninput: (e) => {
+                            state.filters.salaryMin = e.target.value ? parseInt(e.target.value) : null;
+                            handleFilterChange();
+                        }
+                    }),
+                    m('input', { 
+                        type: 'number',
+                        class: 'input input-bordered input-sm w-full',
+                        placeholder: 'Maximum',
+                        value: state.filters.salaryMax || '',
+                        oninput: (e) => {
+                            state.filters.salaryMax = e.target.value ? parseInt(e.target.value) : null;
+                            handleFilterChange();
+                        }
+                    }),
+                    (state.filters.salaryMin || state.filters.salaryMax) && m('div', { class: 'text-xs opacity-70' }, 
+                        `${state.filters.salaryMin ? state.filters.salaryMin.toLocaleString() : '0'} - ${state.filters.salaryMax ? state.filters.salaryMax.toLocaleString() : '∞'} MDL`
                     )
                 ])
             ]),
@@ -342,31 +336,28 @@ const FilterPanel = {
             m('div', { class: 'form-control mb-6' }, [
                 m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Experience (Years)')),
                 m('div', { class: 'space-y-2' }, [
-                    m('div', { class: 'flex gap-2 items-center' }, [
-                        m('input', { 
-                            type: 'number',
-                            class: 'input input-bordered input-sm flex-1',
-                            placeholder: 'Min',
-                            min: 0,
-                            value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
-                            oninput: (e) => {
-                                state.filters.experienceMin = e.target.value ? parseInt(e.target.value) : null;
-                                handleFilterChange();
-                            }
-                        }),
-                        m('span', '-'),
-                        m('input', { 
-                            type: 'number',
-                            class: 'input input-bordered input-sm flex-1',
-                            placeholder: 'Max',
-                            min: 0,
-                            value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
-                            oninput: (e) => {
-                                state.filters.experienceMax = e.target.value ? parseInt(e.target.value) : null;
-                                handleFilterChange();
-                            }
-                        })
-                    ]),
+                    m('input', { 
+                        type: 'number',
+                        class: 'input input-bordered input-sm w-full',
+                        placeholder: 'Minimum',
+                        min: 0,
+                        value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
+                        oninput: (e) => {
+                            state.filters.experienceMin = e.target.value ? parseInt(e.target.value) : null;
+                            handleFilterChange();
+                        }
+                    }),
+                    m('input', { 
+                        type: 'number',
+                        class: 'input input-bordered input-sm w-full',
+                        placeholder: 'Maximum',
+                        min: 0,
+                        value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
+                        oninput: (e) => {
+                            state.filters.experienceMax = e.target.value ? parseInt(e.target.value) : null;
+                            handleFilterChange();
+                        }
+                    }),
                     (state.filters.experienceMin !== null || state.filters.experienceMax !== null) && 
                         m('div', { class: 'text-xs opacity-70' }, 
                             `${state.filters.experienceMin || 0} - ${state.filters.experienceMax || '∞'} years`
@@ -376,45 +367,13 @@ const FilterPanel = {
             
             m('div', { class: 'divider' }),
             
-            // Basic filters
-            m('div', { class: 'space-y-4 mb-4' },
-                basicFilters.map(field => 
+            // All filters (no more basic/advanced split)
+            m('div', { class: 'space-y-4' },
+                [...basicFilters, ...advancedFilters].map(field => 
                     m('div', { class: 'form-control' }, [
                         m('label', { class: 'label' }, [
                             m('span', { class: 'label-text' }, field.label)
                         ]),
-                        m('select', { 
-                            class: 'select select-bordered select-sm w-full',
-                            value: state.filters[field.key] || '',
-                            onchange: (e) => {
-                                if (e.target.value) {
-                                    state.filters[field.key] = e.target.value;
-                                } else {
-                                    delete state.filters[field.key];
-                                }
-                                handleFilterChange();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All'),
-                            ...(state.jobsIndex.filters[field.key] || []).map(f => 
-                                m('option', { value: f }, f)
-                            )
-                        ])
-                    ])
-                )
-            ),
-            
-            // Show/hide advanced filters toggle
-            m('button', { 
-                class: 'btn btn-sm btn-ghost w-full mb-2',
-                onclick: () => FilterPanel.showAdvanced = !FilterPanel.showAdvanced
-            }, FilterPanel.showAdvanced ? 'Hide Advanced ▲' : 'Show Advanced ▼'),
-            
-            // Advanced filters (collapsible)
-            FilterPanel.showAdvanced && m('div', { class: 'space-y-4' },
-                advancedFilters.map(field => 
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text' }, field.label)),
                         m('select', { 
                             class: 'select select-bordered select-sm w-full',
                             value: state.filters[field.key] || '',
@@ -573,7 +532,7 @@ const JobsPage = {
         
         return m('div', { class: 'flex h-screen' }, [
             // Left Sidebar - Filters
-            state.jobsIndex && m('div', { class: 'w-80 border-r border-base-300 overflow-y-auto' }, [
+            state.jobsIndex && m('div', { class: 'w-80 border-r border-base-300' }, [
                 m(FilterPanel)
             ]),
             
