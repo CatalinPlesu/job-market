@@ -80,21 +80,29 @@ class ProcessDataItem:
     def get_item_description(self):
         return "Process Data (Generate Analysis)"
     
-    def _get_positive_int_input(self, prompt, default_value):
-        """Helper method to get and validate positive integer input."""
+    def _get_positive_int_input(self, prompt, default_value_int):
+        """Helper method to get and validate positive integer input.
+        
+        Args:
+            prompt: The input prompt to display
+            default_value_int: The default value as an integer
+            
+        Returns:
+            A positive integer (user input or default)
+        """
         user_input = input(prompt).strip()
         if not user_input:
-            user_input = default_value
+            return default_value_int
         
         try:
             value = int(user_input)
             if value <= 0:
-                print(f"Invalid input (must be positive), using default: {default_value}")
-                return int(default_value)
+                print(f"Invalid input (must be positive), using default: {default_value_int}")
+                return default_value_int
             return value
         except ValueError:
-            print(f"Invalid input, using default: {default_value}")
-            return int(default_value)
+            print(f"Invalid input, using default: {default_value_int}")
+            return default_value_int
     
     def execute(self):
         if not ANALYSIS_ENGINE_AVAILABLE:
@@ -132,22 +140,25 @@ class ProcessDataItem:
         }
         granularity = granularity_map.get(granularity_choice, "monthly")
         
+        # Use AnalysisConfig defaults
+        config_defaults = AnalysisConfig()
+        
         # Min sample size
         min_sample_size = self._get_positive_int_input(
-            "\nMinimum sample size for analysis [10]: ",
-            "10"
+            f"\nMinimum sample size for analysis [{config_defaults.MIN_SAMPLE_SIZE}]: ",
+            config_defaults.MIN_SAMPLE_SIZE
         )
         
         # Top N skills
         top_n_skills = self._get_positive_int_input(
-            "Top N skills to include [20]: ",
-            "20"
+            f"Top N skills to include [{config_defaults.TOP_N_SKILLS}]: ",
+            config_defaults.TOP_N_SKILLS
         )
         
         # Top N companies
         top_n_companies = self._get_positive_int_input(
-            "Top N companies to include [50]: ",
-            "50"
+            f"Top N companies to include [{config_defaults.TOP_N_COMPANIES}]: ",
+            config_defaults.TOP_N_COMPANIES
         )
         
         # Confirm
