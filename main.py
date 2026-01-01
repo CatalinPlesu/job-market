@@ -119,10 +119,11 @@ class ProcessDataItem:
         print()
         
         # Output directory
-        default_output = "pages/api/analysis"
-        output_dir = input(f"Output directory [{default_output}]: ").strip()
-        if not output_dir:
-            output_dir = default_output
+        default_base = "frontend/api"
+        base_dir = input(f"Output directory (default: {default_base}): ").strip()
+        if not base_dir:
+            base_dir = default_base
+        output_dir = f"{base_dir}/analysis"
         
         # Time granularity
         print("\nTime granularity for temporal analyses:")
@@ -218,9 +219,9 @@ class GenerateJsonApiItem:
         print("  • Sanitizes contact information (emails, phones, person names)")
         print()
         
-        output_dir = input("Enter output directory (default: pages/api): ").strip()
+        output_dir = input("Enter output directory (default: frontend/api): ").strip()
         if not output_dir:
-            output_dir = "pages/api"
+            output_dir = "frontend/api"
         
         print(f"\nGenerating JSON API to {output_dir}...")
         print()

@@ -15,6 +15,7 @@ const state = {
     currentPage: 1,
     jobs: [],
     allLoadedJobs: [], // Cache of all jobs loaded so far
+    loadedJobIds: new Set(), // Track job IDs for fast duplicate checking
     loadedPages: new Set(), // Track which pages have been loaded
     filters: {
         salaryMin: null,
@@ -463,6 +464,8 @@ const FilterPanel = {
         
         const handleFilterChange = () => {
             JobsPage.displayPage = 1;
+            // Trigger auto-load after filter change
+            setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
             m.redraw();
         };
         
@@ -644,34 +647,102 @@ const FilterPanel = {
 // Jobs Page
 const JobsPage = {
     displayPage: 1, // Current display page for filtered results
+    loadingMore: false,
+    autoLoadThreshold: 2, // Auto-load when within 2 pages of the end
     
-    oninit: async () => {
-        // Skip if data is already loaded
-        if (state.allLoadedJobs && state.allLoadedJobs.length > 0) {
-            return;
+    // Load a single page of jobs
+    loadPage: async (pageNum) => {
+        if (state.loadedPages.has(pageNum)) {
+            return; // Already loaded
         }
         
+        try {
+            const pageData = await api.getJobsPage(pageNum);
+            // Add jobs, avoiding duplicates
+            const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
+            state.allLoadedJobs.push(...newJobs);
+            newJobs.forEach(j => state.loadedJobIds.add(j.id));
+            state.loadedPages.add(pageNum);
+            return newJobs;
+        } catch (err) {
+            console.error(`Error loading page ${pageNum}:`, err);
+            return [];
+        }
+    },
+    
+    // Automatically load more pages if needed
+    autoLoadMoreIfNeeded: async () => {
+        if (JobsPage.loadingMore || !state.jobsIndex) return;
+        
+        // Check if all pages are already loaded
+        if (state.loadedPages.size >= state.jobsIndex.total_pages) return;
+        
+        // Limit automatic loading to prevent excessive memory use
+        // Max 15 pages (1500 jobs) loaded automatically
+        const maxAutoLoadPages = 15;
+        if (state.loadedPages.size >= maxAutoLoadPages) return;
+        
+        const { total, totalPages } = JobsPage.getDisplayedJobs();
+        const currentPage = JobsPage.displayPage;
+        
+        // Auto-load if we're near the end of available filtered results
+        // OR if we have very few results due to filtering
+        const nearEnd = currentPage >= totalPages - JobsPage.autoLoadThreshold;
+        const needsMoreData = total < state.itemsPerPage * 3; // Less than 3 pages worth of results
+        
+        if (nearEnd || needsMoreData) {
+            await JobsPage.loadMorePages(3);
+        }
+    },
+    
+    // Load next batch of pages
+    loadMorePages: async (numPages = 3) => {
+        if (JobsPage.loadingMore || !state.jobsIndex) return;
+        
+        // Find the first unloaded page
+        let nextPage = 1;
+        while (nextPage <= state.jobsIndex.total_pages && state.loadedPages.has(nextPage)) {
+            nextPage++;
+        }
+        
+        if (nextPage > state.jobsIndex.total_pages) return;
+        
+        JobsPage.loadingMore = true;
+        const promises = [];
+        let pagesLoaded = 0;
+        
+        // Load up to numPages starting from nextPage
+        for (let page = nextPage; page <= state.jobsIndex.total_pages && pagesLoaded < numPages; page++) {
+            if (!state.loadedPages.has(page)) {
+                promises.push(JobsPage.loadPage(page));
+                pagesLoaded++;
+            }
+        }
+        
+        await Promise.all(promises);
+        JobsPage.loadingMore = false;
+        m.redraw();
+    },
+    
+    oninit: async () => {
+        // Load index and first page only
         state.loading = true;
         try {
-            // Load index first to know how many pages we need
+            // Load index first to know metadata
             const index = await api.getJobsIndex();
             state.jobsIndex = index;
-            state.loadedPages = new Set();
             
-            // Automatically load ALL pages from the API
-            const pagePromises = [];
-            for (let i = 1; i <= index.total_pages; i++) {
-                pagePromises.push(api.getJobsPage(i));
+            // Initialize if needed
+            if (!state.allLoadedJobs) {
+                state.allLoadedJobs = [];
+                state.loadedJobIds = new Set();
+                state.loadedPages = new Set();
             }
             
-            // Load all pages in parallel for speed
-            const pages = await Promise.all(pagePromises);
-            
-            // Combine all jobs from all pages efficiently
-            state.allLoadedJobs = pages.flatMap(page => page.jobs);
-            pages.forEach((page, idx) => {
-                state.loadedPages.add(idx + 1);
-            });
+            // Load only the first page initially for fast initial load
+            if (state.allLoadedJobs.length === 0) {
+                await JobsPage.loadPage(1);
+            }
             
             state.loading = false;
             m.redraw();
@@ -696,6 +767,10 @@ const JobsPage = {
     navigateToPage: async (pageNumber) => {
         JobsPage.displayPage = pageNumber;
         window.scrollTo(0, 0);
+        
+        // Trigger auto-load check after navigation
+        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
+        
         m.redraw();
     },
     
@@ -769,9 +844,11 @@ const JobsPage = {
         const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
         const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
         
+        // Auto-load more data if needed (non-blocking)
+        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 0);
+        
         // Calculate accurate job counts
         const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
-        const loadedJobsCount = state.allLoadedJobs.length;
         
         return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
@@ -802,7 +879,7 @@ const JobsPage = {
                         m('div', { class: 'text-sm opacity-70' }, [
                             hasActiveFilters ? 
                                 `Showing ${jobs.length} of ${total} filtered jobs` :
-                                `Showing ${jobs.length} of ${totalJobsInAPI} jobs`
+                                `Showing ${jobs.length} of ${totalJobsInAPI} total jobs`
                         ])
                     ]),
                     
@@ -834,48 +911,56 @@ const JobsPage = {
 const JobDetailPage = {
     job: null,
     activeTab: 'parsed',
-    oninit: (vnode) => {
+    oninit: async (vnode) => {
         const jobId = parseInt(vnode.attrs.id);
         
-        // Find job in already loaded pages or load the page containing this job
-        // First check if job is in current state.jobs
-        let foundJob = state.jobs.find(j => j.id === jobId);
+        // First, check if job is already in loaded jobs
+        let foundJob = state.allLoadedJobs?.find(j => j.id === jobId);
         
         if (foundJob) {
             JobDetailPage.job = foundJob;
-        } else {
-            // Need to load pages to find the job
-            // For now, try to find it across all pages
-            // In production, index.json would tell us which page
-            JobDetailPage.job = null;
-            
-            // Try loading pages until we find the job
-            const loadPages = async () => {
-                if (state.jobsIndex) {
-                    for (let page = 1; page <= state.jobsIndex.total_pages; page++) {
-                        try {
-                            const pageData = await api.getJobsPage(page);
-                            const job = pageData.jobs.find(j => j.id === jobId);
-                            if (job) {
-                                JobDetailPage.job = job;
-                                m.redraw();
-                                return;
-                            }
-                        } catch (err) {
-                            console.error(`Error loading page ${page}:`, err);
-                        }
-                    }
-                }
-            };
-            
-            if (state.jobsIndex) {
-                loadPages();
-            } else {
-                api.getJobsIndex().then(index => {
-                    state.jobsIndex = index;
-                    loadPages();
-                });
+            return;
+        }
+        
+        // Job not in loaded pages, need to search for it
+        JobDetailPage.job = null;
+        
+        // Load index if not already loaded
+        if (!state.jobsIndex) {
+            try {
+                state.jobsIndex = await api.getJobsIndex();
+            } catch (err) {
+                console.error('Error loading index:', err);
+                return;
             }
+        }
+        
+        // Search through pages efficiently - load one page at a time
+        // Start with pages not yet loaded
+        try {
+            for (let page = 1; page <= state.jobsIndex.total_pages; page++) {
+                // Skip if already loaded and checked
+                if (state.loadedPages?.has(page)) continue;
+                
+                const pageData = await api.getJobsPage(page);
+                const job = pageData.jobs.find(j => j.id === jobId);
+                
+                if (job) {
+                    JobDetailPage.job = job;
+                    // Also add to loaded jobs for caching, avoiding duplicates using the Set
+                    if (!state.allLoadedJobs) state.allLoadedJobs = [];
+                    if (!state.loadedJobIds) state.loadedJobIds = new Set();
+                    const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
+                    state.allLoadedJobs.push(...newJobs);
+                    newJobs.forEach(j => state.loadedJobIds.add(j.id));
+                    if (!state.loadedPages) state.loadedPages = new Set();
+                    state.loadedPages.add(page);
+                    m.redraw();
+                    return;
+                }
+            }
+        } catch (err) {
+            console.error('Error searching for job:', err);
         }
     },
     view: () => {
