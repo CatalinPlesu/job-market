@@ -462,8 +462,50 @@ const FilterPanel = {
             { key: 'special_requirements', label: 'Special Requirements', section: 'Conditions' }
         ];
         
-        const handleFilterChange = () => {
+        const handleFilterChange = async () => {
             JobsPage.displayPage = 1;
+            
+            // Determine which pages we need to load based on active filters using metadata
+            if (state.jobsIndex && state.jobsIndex.metadata) {
+                const pagesToLoad = new Set();
+                
+                // Check each active filter and find which pages contain matching jobs
+                for (const [filterKey, filterValue] of Object.entries(state.filters)) {
+                    if (filterValue === null || filterValue === undefined || filterValue === '') continue;
+                    
+                    // Map filter keys to metadata keys
+                    const metadataKey = filterKey === 'city' ? 'location' : 
+                                       filterKey === 'company' ? 'company_name' : filterKey;
+                    
+                    if (state.jobsIndex.metadata[metadataKey]) {
+                        const metadataItems = state.jobsIndex.metadata[metadataKey];
+                        
+                        // Find metadata entries that match the filter
+                        for (const item of metadataItems) {
+                            if (item.name === filterValue && item.pages) {
+                                // Add all pages that contain this filter value
+                                for (const pageInfo of item.pages) {
+                                    pagesToLoad.add(pageInfo.page);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // If we have specific pages to load, load them
+                if (pagesToLoad.size > 0) {
+                    const promises = [];
+                    for (const page of pagesToLoad) {
+                        if (!state.loadedPages.has(page)) {
+                            promises.push(JobsPage.loadPage(page));
+                        }
+                    }
+                    if (promises.length > 0) {
+                        await Promise.all(promises);
+                    }
+                }
+            }
+            
             // Trigger auto-load after filter change
             setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
             m.redraw();
@@ -754,19 +796,64 @@ const JobsPage = {
     },
     
     getDisplayedJobs: () => {
-        const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
-        const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
-        const end = start + state.itemsPerPage;
-        return {
-            jobs: filtered.slice(start, end),
-            total: filtered.length,
-            totalPages: Math.ceil(filtered.length / state.itemsPerPage)
-        };
+        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
+        
+        if (hasActiveFilters) {
+            // When filtering, work with loaded jobs only
+            const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
+            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
+            const end = start + state.itemsPerPage;
+            return {
+                jobs: filtered.slice(start, end),
+                total: filtered.length,
+                totalPages: Math.ceil(filtered.length / state.itemsPerPage),
+                isFiltered: true
+            };
+        } else {
+            // When not filtering, use metadata to show total available
+            const totalJobsFromMetadata = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
+            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
+            const end = start + state.itemsPerPage;
+            const displayJobs = state.allLoadedJobs.slice(start, end);
+            
+            return {
+                jobs: displayJobs,
+                total: totalJobsFromMetadata,
+                totalPages: Math.ceil(totalJobsFromMetadata / state.itemsPerPage),
+                isFiltered: false
+            };
+        }
     },
     
     navigateToPage: async (pageNumber) => {
         JobsPage.displayPage = pageNumber;
         window.scrollTo(0, 0);
+        
+        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
+        
+        // If not filtering, we need to ensure the actual page from metadata is loaded
+        if (!hasActiveFilters && state.jobsIndex) {
+            // Calculate which metadata page contains the jobs we need
+            const jobsPerApiPage = 100; // From index.json: "jobs_per_page": 100
+            const startJobIndex = (pageNumber - 1) * state.itemsPerPage;
+            const endJobIndex = startJobIndex + state.itemsPerPage;
+            
+            // Determine which API pages we need
+            const startApiPage = Math.floor(startJobIndex / jobsPerApiPage) + 1;
+            const endApiPage = Math.floor((endJobIndex - 1) / jobsPerApiPage) + 1;
+            
+            // Load any missing pages
+            const pagesToLoad = [];
+            for (let apiPage = startApiPage; apiPage <= Math.min(endApiPage, state.jobsIndex.total_pages); apiPage++) {
+                if (!state.loadedPages.has(apiPage)) {
+                    pagesToLoad.push(JobsPage.loadPage(apiPage));
+                }
+            }
+            
+            if (pagesToLoad.length > 0) {
+                await Promise.all(pagesToLoad);
+            }
+        }
         
         // Trigger auto-load check after navigation
         setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
@@ -841,14 +928,11 @@ const JobsPage = {
     },
     
     view: () => {
-        const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
-        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
+        const displayData = JobsPage.getDisplayedJobs();
+        const { jobs, total, totalPages, isFiltered } = displayData;
         
         // Auto-load more data if needed (non-blocking)
         setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 0);
-        
-        // Calculate accurate job counts
-        const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
         
         return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
@@ -877,9 +961,9 @@ const JobsPage = {
                             )
                         ]),
                         m('div', { class: 'text-sm opacity-70' }, [
-                            hasActiveFilters ? 
+                            isFiltered ? 
                                 `Showing ${jobs.length} of ${total} filtered jobs` :
-                                `Showing ${jobs.length} of ${totalJobsInAPI} total jobs`
+                                `Showing ${jobs.length} of ${total.toLocaleString()} total jobs`
                         ])
                     ]),
                     
@@ -894,7 +978,7 @@ const JobsPage = {
                                     index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
                                 })) :
                                 m('div', { class: 'text-center py-8 opacity-70' }, 
-                                    hasActiveFilters ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
+                                    isFiltered ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
                                 )
                         ]),
                         
