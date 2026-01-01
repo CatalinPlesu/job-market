@@ -26,7 +26,6 @@ const state = {
     analysisIndex: null,
     selectedAnalysis: null,
     selectedAnalysisData: null,
-    showAnalysisModal: false,
     itemsPerPage: 20, // User-configurable items per page for display
     availablePageSizes: [10, 20, 50, 100]
 };
@@ -1019,6 +1018,25 @@ const JobDetailPage = {
     }
 };
 
+// Chart Helper Functions
+const ChartHelpers = {
+    createChart: (canvas, config) => {
+        if (!canvas) return null;
+        // Destroy existing chart if present
+        if (canvas.chart) {
+            canvas.chart.destroy();
+        }
+        canvas.chart = new Chart(canvas, config);
+        return canvas.chart;
+    },
+    destroyChart: (canvas) => {
+        if (canvas && canvas.chart) {
+            canvas.chart.destroy();
+            canvas.chart = null;
+        }
+    }
+};
+
 // Analysis Page
 const AnalysisPage = {
     oninit: () => {
@@ -1029,26 +1047,318 @@ const AnalysisPage = {
             state.analysisIndex = { error: true };
         });
     },
-    viewAnalysis: (analysis) => {
-        state.selectedAnalysis = analysis;
-        state.showAnalysisModal = true;
-        const filename = `${analysis.id}.json`;
-        api.getAnalysis(filename).then(response => {
-            // Extract the data field from the response
-            state.selectedAnalysisData = response.data || response;
-            m.redraw();
-        }).catch(err => {
-            console.error(`Error loading ${filename}:`, err);
-            state.selectedAnalysisData = { error: `Failed to load ${filename}` };
-            m.redraw();
-        });
+    renderDistributionChart: (data) => {
+        if (!data || !data.distribution || data.distribution.length === 0) return null;
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, 'Distribution Chart'),
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = data.distribution.map(item => item.range || `${item.min}-${item.max}`);
+                            const values = data.distribution.map(item => item.count);
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Number of Jobs',
+                                        data: values,
+                                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                                        borderColor: 'rgba(99, 102, 241, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                precision: 0
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: (context) => {
+                                                    const item = data.distribution[context.dataIndex];
+                                                    return item.percentage ? `${item.percentage.toFixed(1)}% of total` : '';
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
+    renderTimeSeriesChart: (data) => {
+        if (!data || !data.time_series || data.time_series.length === 0) {
+            if (!data || !data.trends || data.trends.length === 0) return null;
+            // Use trends if time_series is not available
+            const trends = data.trends;
+            
+            return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                m('div', { class: 'card-body' }, [
+                    m('h3', { class: 'card-title' }, 'Trend Over Time'),
+                    m('div', { class: 'chart-container' }, [
+                        m('canvas', {
+                            oncreate: (vnode) => {
+                                const labels = trends.map(item => item.date || item.period);
+                                const newJobs = trends.map(item => item.new_jobs || item.count || 0);
+                                const closedJobs = trends.map(item => item.closed_jobs || 0);
+                                
+                                const datasets = [{
+                                    label: 'New Jobs',
+                                    data: newJobs,
+                                    borderColor: 'rgba(34, 197, 94, 1)',
+                                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                    fill: true,
+                                    tension: 0.4
+                                }];
+                                
+                                if (closedJobs.some(v => v > 0)) {
+                                    datasets.push({
+                                        label: 'Closed Jobs',
+                                        data: closedJobs,
+                                        borderColor: 'rgba(239, 68, 68, 1)',
+                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                        fill: true,
+                                        tension: 0.4
+                                    });
+                                }
+                                
+                                ChartHelpers.createChart(vnode.dom, {
+                                    type: 'line',
+                                    data: {
+                                        labels: labels,
+                                        datasets: datasets
+                                    },
+                                    options: {
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        scales: {
+                                            y: {
+                                                beginAtZero: true,
+                                                ticks: {
+                                                    precision: 0
+                                                }
+                                            }
+                                        },
+                                        plugins: {
+                                            legend: {
+                                                display: datasets.length > 1
+                                            }
+                                        }
+                                    }
+                                });
+                            },
+                            onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                        })
+                    ])
+                ])
+            ]);
+        }
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, 'Trend Over Time'),
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = data.time_series.map(item => item.date || item.period);
+                            const values = data.time_series.map(item => item.average || item.count || 0);
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'line',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Average',
+                                        data: values,
+                                        borderColor: 'rgba(99, 102, 241, 1)',
+                                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                        fill: true,
+                                        tension: 0.4
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
+    renderTopItemsChart: (data, key, title) => {
+        const items = data[key];
+        if (!items || items.length === 0) return null;
+        
+        const topItems = items.slice(0, 15); // Show top 15
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, title),
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = topItems.map(item => 
+                                item.name || item.skill || item.company || item.function || item.seniority || item.location || 'Unknown'
+                            );
+                            const values = topItems.map(item => item.count);
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Count',
+                                        data: values,
+                                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                                        borderColor: 'rgba(168, 85, 247, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y', // Horizontal bars
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                precision: 0
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: (context) => {
+                                                    const item = topItems[context.dataIndex];
+                                                    return item.percentage ? `${item.percentage.toFixed(1)}% of total` : '';
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
+    renderBreakdownChart: (data) => {
+        const breakdownKey = data.by_function ? 'by_function' : 
+                            data.by_seniority ? 'by_seniority' : 
+                            data.by_location ? 'by_location' : 
+                            data.by_company_size ? 'by_company_size' : 
+                            data.by_education ? 'by_education' : null;
+        
+        if (!breakdownKey || !data[breakdownKey] || data[breakdownKey].length === 0) return null;
+        
+        const items = data[breakdownKey].slice(0, 10); // Top 10
+        const title = breakdownKey.replace('by_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, `Breakdown by ${title}`),
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = items.map(item => 
+                                item.function || item.seniority || item.location || item.size || item.education || 'Unknown'
+                            );
+                            const values = items.map(item => item.count);
+                            
+                            // Generate colors
+                            const backgroundColors = items.map((_, i) => {
+                                const hue = (i * 360 / items.length);
+                                return `hsla(${hue}, 70%, 60%, 0.7)`;
+                            });
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        data: values,
+                                        backgroundColor: backgroundColors,
+                                        borderWidth: 2,
+                                        borderColor: '#fff'
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'right',
+                                            labels: {
+                                                boxWidth: 12,
+                                                font: {
+                                                    size: 11
+                                                }
+                                            }
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const item = items[context.dataIndex];
+                                                    const label = context.label || '';
+                                                    const count = item.count || 0;
+                                                    const avg = item.average ? ` (Avg: ${Math.round(item.average).toLocaleString()} MDL)` : '';
+                                                    return `${label}: ${count}${avg}`;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
     },
     renderAnalysisData: (data) => {
         if (!data) return m(Loading);
         if (data.error) return m('div', { class: 'alert alert-error' }, data.error);
         
-        // Render based on analysis type
-        return m('div', { class: 'space-y-4' }, [
+        // Render based on analysis type - CHARTS FIRST, then tables as fallback
+        return m('div', { class: 'space-y-6' }, [
             // Overall stats if present
             data.overall && m('div', { class: 'stats stats-vertical lg:stats-horizontal shadow w-full' }, [
                 data.overall.count && m('div', { class: 'stat' }, [
@@ -1070,10 +1380,27 @@ const AnalysisPage = {
                 ])
             ]),
             
-            // Distribution chart
-            data.distribution && m('div', { class: 'card bg-base-100 shadow-xl' }, [
-                m('div', { class: 'card-body' }, [
-                    m('h3', { class: 'card-title' }, 'Distribution'),
+            // === CHARTS FIRST (Primary Visualizations) ===
+            
+            // Distribution chart (if available)
+            AnalysisPage.renderDistributionChart(data),
+            
+            // Time series chart (for temporal data)
+            AnalysisPage.renderTimeSeriesChart(data),
+            
+            // Top items charts (skills, companies, etc.)
+            data.top_skills && AnalysisPage.renderTopItemsChart(data, 'top_skills', 'Top In-Demand Skills'),
+            data.top_companies && AnalysisPage.renderTopItemsChart(data, 'top_companies', 'Top Companies'),
+            
+            // Breakdown pie chart
+            AnalysisPage.renderBreakdownChart(data),
+            
+            // === TABLES AS FALLBACK (Collapsible for detail) ===
+            
+            // Distribution table (detailed view, collapsed by default)
+            data.distribution && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
+                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Distribution Table (Detailed)'),
+                m('div', { class: 'collapse-content' }, [
                     m('div', { class: 'overflow-x-auto' }, [
                         m('table', { class: 'table table-zebra' }, [
                             m('thead', [
@@ -1105,11 +1432,11 @@ const AnalysisPage = {
                 ])
             ]),
             
-            // By function/category data
+            // Breakdown table (collapsed by default)
             (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education) && 
-            m('div', { class: 'card bg-base-100 shadow-xl' }, [
-                m('div', { class: 'card-body' }, [
-                    m('h3', { class: 'card-title' }, 'Breakdown'),
+            m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
+                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Breakdown Table (Detailed)'),
+                m('div', { class: 'collapse-content' }, [
                     m('div', { class: 'overflow-x-auto' }, [
                         m('table', { class: 'table table-zebra' }, [
                             m('thead', [
@@ -1137,10 +1464,10 @@ const AnalysisPage = {
                 ])
             ]),
             
-            // Top skills/companies
-            (data.top_skills || data.top_companies) && m('div', { class: 'card bg-base-100 shadow-xl' }, [
-                m('div', { class: 'card-body' }, [
-                    m('h3', { class: 'card-title' }, data.top_skills ? 'Top Skills' : 'Top Companies'),
+            // Top skills/companies table (collapsed by default)
+            (data.top_skills || data.top_companies) && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
+                m('summary', { class: 'collapse-title font-bold text-lg' }, data.top_skills ? 'Top Skills Table (Detailed)' : 'Top Companies Table (Detailed)'),
+                m('div', { class: 'collapse-content' }, [
                     m('div', { class: 'overflow-x-auto' }, [
                         m('table', { class: 'table table-zebra' }, [
                             m('thead', [
@@ -1173,10 +1500,10 @@ const AnalysisPage = {
                 ])
             ]),
             
-            // Time series data
-            data.time_series && m('div', { class: 'card bg-base-100 shadow-xl' }, [
-                m('div', { class: 'card-body' }, [
-                    m('h3', { class: 'card-title' }, 'Trend Over Time'),
+            // Time series table (collapsed by default)
+            data.time_series && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
+                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Time Series Table (Detailed)'),
+                m('div', { class: 'collapse-content' }, [
                     m('div', { class: 'overflow-x-auto' }, [
                         m('table', { class: 'table table-sm' }, [
                             m('thead', [
@@ -1265,40 +1592,66 @@ const AnalysisPage = {
                             m('p', { class: 'text-xs text-gray-500' }, `${analysis.id}.json`),
                             analysis.temporal && m('span', { class: 'badge badge-secondary mt-2' }, 'Time Series'),
                             m('div', { class: 'card-actions justify-end mt-4' }, [
-                                m('button', { 
+                                m('a', { 
                                     class: 'btn btn-primary btn-sm',
-                                    onclick: () => AnalysisPage.viewAnalysis(analysis)
-                                }, 'View Data')
+                                    href: `#!/analysis/${analysis.id}`,
+                                    oncreate: m.route.link
+                                }, 'View Analysis')
                             ])
                         ])
                     ])
                 )
             )
-        ] : m(Loading),
+        ] : m(Loading)
+    ])
+};
+
+// Analysis Detail Page (Full Page View)
+const AnalysisDetailPage = {
+    oninit: (vnode) => {
+        const analysisId = vnode.attrs.id;
+        state.selectedAnalysisData = null;
+        state.selectedAnalysis = null;
         
-        // Analysis Modal
-        state.showAnalysisModal && m('div', { class: 'modal modal-open' }, [
-            m('div', { class: 'modal-box max-w-4xl max-h-[90vh] overflow-y-auto' }, [
-                m('div', { class: 'flex justify-between items-start mb-4' }, [
-                    m('h3', { class: 'font-bold text-2xl' }, state.selectedAnalysis?.title),
-                    m('button', { 
-                        class: 'btn btn-sm btn-circle btn-ghost',
-                        onclick: () => {
-                            state.showAnalysisModal = false;
-                            state.selectedAnalysisData = null;
-                        }
-                    }, '✕')
-                ]),
-                AnalysisPage.renderAnalysisData(state.selectedAnalysisData)
-            ]),
-            m('div', { 
-                class: 'modal-backdrop', 
-                onclick: () => {
-                    state.showAnalysisModal = false;
-                    state.selectedAnalysisData = null;
-                }
-            })
-        ])
+        // Load analysis index if not already loaded
+        if (!state.analysisIndex) {
+            api.getAnalysisIndex().then(data => {
+                state.analysisIndex = data;
+                // Find the analysis
+                state.selectedAnalysis = data.analyses?.find(a => a.id === analysisId);
+                m.redraw();
+            });
+        } else {
+            state.selectedAnalysis = state.analysisIndex.analyses?.find(a => a.id === analysisId);
+        }
+        
+        // Load analysis data
+        const filename = `${analysisId}.json`;
+        api.getAnalysis(filename).then(response => {
+            state.selectedAnalysisData = response.data || response;
+            m.redraw();
+        }).catch(err => {
+            console.error(`Error loading ${filename}:`, err);
+            state.selectedAnalysisData = { error: `Failed to load ${filename}` };
+            m.redraw();
+        });
+    },
+    view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
+        // Breadcrumb navigation
+        m('div', { class: 'text-sm breadcrumbs mb-4' }, [
+            m('ul', [
+                m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Analysis')),
+                m('li', state.selectedAnalysis?.title || 'Loading...')
+            ])
+        ]),
+        
+        // Title
+        state.selectedAnalysis && m('h1', { class: 'text-4xl font-bold mb-6' }, state.selectedAnalysis.title),
+        
+        // Analysis data
+        state.selectedAnalysisData ? 
+            AnalysisPage.renderAnalysisData(state.selectedAnalysisData) :
+            m(Loading)
     ])
 };
 
@@ -1324,5 +1677,8 @@ m.route(document.getElementById('app'), '/', {
     },
     '/analysis': {
         render: () => m(Layout, m(AnalysisPage))
+    },
+    '/analysis/:id': {
+        render: (vnode) => m(Layout, m(AnalysisDetailPage, { id: vnode.attrs.id }))
     }
 });
