@@ -31,6 +31,9 @@ const state = {
     availablePageSizes: [10, 20, 50, 100]
 };
 
+// Configuration constants
+const DEFAULT_JOBS_PER_API_PAGE = 100;
+
 // Utility Functions
 // Helper to check if filters are active
 const hasActiveFilters = (filters) => {
@@ -848,7 +851,7 @@ const JobsPage = {
         // If not filtering, we need to ensure the actual page from metadata is loaded
         if (!isFiltered && state.jobsIndex) {
             // Calculate which metadata page contains the jobs we need
-            const jobsPerApiPage = state.jobsIndex.jobs_per_page || 100;
+            const jobsPerApiPage = state.jobsIndex.jobs_per_page || DEFAULT_JOBS_PER_API_PAGE;
             const startJobIndex = (pageNumber - 1) * state.itemsPerPage;
             const endJobIndex = startJobIndex + state.itemsPerPage;
             
