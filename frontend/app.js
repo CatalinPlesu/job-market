@@ -413,22 +413,112 @@ const JobsPage = {
         };
     },
     
+    renderPagination: (totalPages) => {
+        if (totalPages <= 1) return null;
+        
+        const currentPage = JobsPage.displayPage;
+        const pageButtons = [];
+        
+        // First page button
+        pageButtons.push(
+            m('button', {
+                class: `btn btn-sm ${currentPage === 1 ? 'btn-disabled' : ''}`,
+                disabled: currentPage === 1,
+                onclick: async () => {
+                    JobsPage.displayPage = 1;
+                    await JobsPage.ensureSufficientJobs();
+                    window.scrollTo(0, 0);
+                }
+            }, '« First')
+        );
+        
+        // Previous button
+        pageButtons.push(
+            m('button', {
+                class: `btn btn-sm ${currentPage === 1 ? 'btn-disabled' : ''}`,
+                disabled: currentPage === 1,
+                onclick: async () => {
+                    JobsPage.displayPage--;
+                    await JobsPage.ensureSufficientJobs();
+                    window.scrollTo(0, 0);
+                }
+            }, '‹ Prev')
+        );
+        
+        // Page number buttons: show current, -3 to +3
+        const startPage = Math.max(1, currentPage - 3);
+        const endPage = Math.min(totalPages, currentPage + 3);
+        
+        if (startPage > 1) {
+            pageButtons.push(m('span', { class: 'btn btn-sm btn-ghost btn-disabled' }, '...'));
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons.push(
+                m('button', {
+                    class: `btn btn-sm ${i === currentPage ? 'btn-primary' : ''}`,
+                    onclick: async () => {
+                        JobsPage.displayPage = i;
+                        await JobsPage.ensureSufficientJobs();
+                        window.scrollTo(0, 0);
+                    }
+                }, i)
+            );
+        }
+        
+        if (endPage < totalPages) {
+            pageButtons.push(m('span', { class: 'btn btn-sm btn-ghost btn-disabled' }, '...'));
+        }
+        
+        // Next button
+        pageButtons.push(
+            m('button', {
+                class: `btn btn-sm ${currentPage === totalPages ? 'btn-disabled' : ''}`,
+                disabled: currentPage === totalPages,
+                onclick: async () => {
+                    JobsPage.displayPage++;
+                    await JobsPage.ensureSufficientJobs();
+                    window.scrollTo(0, 0);
+                }
+            }, 'Next ›')
+        );
+        
+        // Last page button
+        pageButtons.push(
+            m('button', {
+                class: `btn btn-sm ${currentPage === totalPages ? 'btn-disabled' : ''}`,
+                disabled: currentPage === totalPages,
+                onclick: async () => {
+                    JobsPage.displayPage = totalPages;
+                    await JobsPage.ensureSufficientJobs();
+                    window.scrollTo(0, 0);
+                }
+            }, 'Last »')
+        );
+        
+        return m('div', { class: 'flex justify-center gap-1 items-center flex-wrap' }, pageButtons);
+    },
+    
     view: () => {
         const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
         const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k]);
+        
+        // Calculate accurate job counts
+        const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
+        const loadedJobsCount = state.allLoadedJobs.length;
         
         return m('div', { class: 'container mx-auto px-4 py-8' }, [
             m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
             
             state.jobsIndex && m(FilterPanel),
             
-            // Page size selector
-            state.jobsIndex && m('div', { class: 'flex justify-between items-center mb-4' }, [
-                m('div', { class: 'text-sm' }, [
-                    m('span', { class: 'mr-2' }, 'Items per page:'),
+            // Page size selector and status
+            state.jobsIndex && m('div', { class: 'flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4' }, [
+                m('div', { class: 'text-sm flex items-center gap-2' }, [
+                    m('span', 'Items per page:'),
                     state.availablePageSizes.map(size =>
                         m('button', {
-                            class: `btn btn-xs ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'} mr-1`,
+                            class: `btn btn-xs ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'}`,
                             onclick: () => {
                                 state.itemsPerPage = size;
                                 JobsPage.displayPage = 1;
@@ -439,13 +529,37 @@ const JobsPage = {
                 ]),
                 m('div', { class: 'text-sm text-gray-600' }, [
                     hasActiveFilters ? 
-                        `Showing ${jobs.length} of ${total} filtered jobs` :
-                        `Showing ${jobs.length} of ${state.allLoadedJobs.length} jobs (${state.loadedPages.size} of ${state.jobsIndex.total_pages} pages loaded)`
-                ])
+                        `Showing ${jobs.length} of ${total} filtered jobs (from ${loadedJobsCount} loaded / ${totalJobsInAPI} total)` :
+                        `Showing ${jobs.length} of ${totalJobsInAPI} total jobs (${loadedJobsCount} loaded, ${state.loadedPages.size}/${state.jobsIndex.total_pages} pages)`
+                ]),
+                // Load more from API button
+                state.loadedPages.size < state.jobsIndex.total_pages && m('button', {
+                    class: 'btn btn-xs btn-outline',
+                    onclick: async () => {
+                        state.loading = true;
+                        // Find next unloaded page
+                        let nextPage = 1;
+                        while (state.loadedPages.has(nextPage) && nextPage <= state.jobsIndex.total_pages) {
+                            nextPage++;
+                        }
+                        try {
+                            const pageData = await api.getJobsPage(nextPage);
+                            state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
+                            state.loadedPages.add(nextPage);
+                        } catch (err) {
+                            console.error(`Error loading page ${nextPage}:`, err);
+                        }
+                        state.loading = false;
+                        m.redraw();
+                    }
+                }, `Load More API Pages (${state.loadedPages.size}/${state.jobsIndex.total_pages})`)
             ]),
             
+            // Top pagination
+            state.jobsIndex && JobsPage.renderPagination(totalPages),
+            
             state.loading ? m(Loading) : [
-                m('div', { class: 'bg-base-100 rounded-lg shadow mb-4 p-4' }, [
+                m('div', { class: 'bg-base-100 rounded-lg shadow my-4 p-4' }, [
                     jobs.length > 0 ? 
                         jobs.map((job, idx) => m(JobListItem, { 
                             job, 
@@ -456,49 +570,8 @@ const JobsPage = {
                         )
                 ]),
                 
-                // Pagination for display
-                totalPages > 1 && m('div', { class: 'flex justify-center gap-2 items-center' }, [
-                    m('button', { 
-                        class: 'btn btn-sm',
-                        disabled: JobsPage.displayPage === 1,
-                        onclick: () => {
-                            JobsPage.displayPage--;
-                            window.scrollTo(0, 0);
-                            m.redraw();
-                        }
-                    }, 'Previous'),
-                    m('span', { class: 'btn btn-sm btn-ghost' }, `Page ${JobsPage.displayPage} of ${totalPages}`),
-                    m('button', { 
-                        class: 'btn btn-sm',
-                        disabled: JobsPage.displayPage === totalPages,
-                        onclick: async () => {
-                            JobsPage.displayPage++;
-                            await JobsPage.ensureSufficientJobs();
-                            window.scrollTo(0, 0);
-                        }
-                    }, 'Next'),
-                    // Load more from API button
-                    state.loadedPages.size < state.jobsIndex.total_pages && m('button', {
-                        class: 'btn btn-sm btn-outline ml-4',
-                        onclick: async () => {
-                            state.loading = true;
-                            // Find next unloaded page
-                            let nextPage = 1;
-                            while (state.loadedPages.has(nextPage) && nextPage <= state.jobsIndex.total_pages) {
-                                nextPage++;
-                            }
-                            try {
-                                const pageData = await api.getJobsPage(nextPage);
-                                state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
-                                state.loadedPages.add(nextPage);
-                            } catch (err) {
-                                console.error(`Error loading page ${nextPage}:`, err);
-                            }
-                            state.loading = false;
-                            m.redraw();
-                        }
-                    }, `Load More (${state.loadedPages.size}/${state.jobsIndex.total_pages} pages)`)
-                ])
+                // Bottom pagination
+                JobsPage.renderPagination(totalPages)
             ]
         ]);
     }
