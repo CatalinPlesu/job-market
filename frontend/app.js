@@ -34,25 +34,40 @@ const state = {
 const formatSalary = (salary) => {
     if (!salary) return 'Not specified';
     
-    // Prioritize MDL values for display
-    const minMdl = salary.min_mdl || salary.min;
-    const maxMdl = salary.max_mdl || salary.max;
+    // Check if we have MDL values
+    const hasMdlValues = salary.min_mdl !== null && salary.min_mdl !== undefined;
     
-    if (!minMdl) return 'Not specified';
-    
-    const minStr = minMdl.toLocaleString();
-    const maxStr = maxMdl ? maxMdl.toLocaleString() : '';
-    const mdlRange = maxStr ? `${minStr} - ${maxStr} MDL` : `${minStr} MDL`;
-    
-    // Show original currency if different from MDL
-    if (salary.currency && salary.currency !== 'MDL' && salary.min) {
-        const origMin = salary.min.toLocaleString();
-        const origMax = salary.max ? salary.max.toLocaleString() : '';
-        const origRange = origMax ? `${origMin} - ${origMax} ${salary.currency}` : `${origMin} ${salary.currency}`;
-        return `${mdlRange} (${origRange})`;
+    if (hasMdlValues) {
+        // Use MDL values
+        const minMdl = salary.min_mdl;
+        const maxMdl = salary.max_mdl;
+        
+        if (!minMdl) return 'Not specified';
+        
+        const minStr = minMdl.toLocaleString();
+        const maxStr = maxMdl ? maxMdl.toLocaleString() : '';
+        const mdlRange = maxStr ? `${minStr} - ${maxStr} MDL` : `${minStr} MDL`;
+        
+        // Show original currency if different from MDL
+        if (salary.currency && salary.currency.toUpperCase() !== 'MDL' && salary.min) {
+            const origMin = salary.min.toLocaleString();
+            const origMax = salary.max ? salary.max.toLocaleString() : '';
+            const origRange = origMax ? `${origMin} - ${origMax} ${salary.currency.toUpperCase()}` : `${origMin} ${salary.currency.toUpperCase()}`;
+            return `${mdlRange} (${origRange})`;
+        }
+        
+        return mdlRange;
+    } else {
+        // Fallback: no MDL conversion available
+        // Only use if currency is MDL or not specified (assume MDL for Moldova market)
+        const currency = salary.currency ? salary.currency.toUpperCase() : 'MDL';
+        
+        if (!salary.min) return 'Not specified';
+        
+        const minStr = salary.min.toLocaleString();
+        const maxStr = salary.max ? salary.max.toLocaleString() : '';
+        return maxStr ? `${minStr} - ${maxStr} ${currency}` : `${minStr} ${currency}`;
     }
-    
-    return mdlRange;
 };
 
 const formatDate = (dateStr) => {

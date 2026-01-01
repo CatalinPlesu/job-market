@@ -162,11 +162,6 @@ class Aggregator:
         Returns:
             Average salary in MDL, or None if no salary data
         """
-        # Get currency code
-        currency_code = 'MDL'
-        if job.salary_currency and hasattr(job.salary_currency, 'code'):
-            currency_code = job.salary_currency.code
-        
         # Calculate average in original currency
         avg_salary = None
         if job.max_salary and job.min_salary:
@@ -176,11 +171,17 @@ class Aggregator:
         elif job.max_salary:
             avg_salary = float(job.max_salary)
         
-        # Convert to MDL
-        if avg_salary:
-            return Aggregator.convert_to_mdl(avg_salary, currency_code)
+        if not avg_salary:
+            return None
         
-        return None
+        # Get currency code - default to MDL if not specified
+        # This is a reasonable default for Moldova job market data
+        currency_code = 'MDL'
+        if job.salary_currency and hasattr(job.salary_currency, 'code'):
+            currency_code = job.salary_currency.code
+        
+        # Convert to MDL
+        return Aggregator.convert_to_mdl(avg_salary, currency_code)
     
     @staticmethod
     def sort_checks_by_date(checks):
