@@ -1,3 +1,4 @@
+/frontend/api/*
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -15,6 +16,9 @@ wheels/
 data.db*
 databases/
 
+# Generated JSON API files
+pages/
+
 # State files
 state.json
 
@@ -28,3 +32,8 @@ scheduler_state_*.json
 # Test files
 test_*.py
 *_test.py
+
+# Generated analysis JSON files
+pages/
+# Exclude generated analysis files from frontend/api
+/frontend/api/*.json

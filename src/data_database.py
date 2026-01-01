@@ -167,6 +167,47 @@ class JobDetail(DataBase):
     posting_date = Column(Date)
     original_language = Column(String(10))
     processed_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships (One-to-One via Foreign Keys)
+    # Using 'select' (lazy loading) to avoid massive JOIN queries that consume memory
+    title = relationship("Titles", foreign_keys=[title_id], lazy='select')
+    job_function = relationship("JobFunctions", foreign_keys=[job_function_id], lazy='select')
+    seniority_level = relationship("SeniorityLevels", foreign_keys=[seniority_level_id], lazy='select')
+    industry = relationship("Industries", foreign_keys=[industry_id], lazy='select')
+    department = relationship("Departments", foreign_keys=[department_id], lazy='select')
+    job_family = relationship("JobFamilies", foreign_keys=[job_family_id], lazy='select')
+    specialization = relationship("Specializations", foreign_keys=[specialization_id], lazy='select')
+    education_level = relationship("EducationLevels", foreign_keys=[required_education_id], lazy='select')
+    employment_type = relationship("EmploymentTypes", foreign_keys=[employment_type_id], lazy='select')
+    contract_type = relationship("ContractTypes", foreign_keys=[contract_type_id], lazy='select')
+    work_schedule = relationship("WorkSchedules", foreign_keys=[work_schedule_id], lazy='select')
+    shift_details = relationship("ShiftDetails", foreign_keys=[shift_details_id], lazy='select')
+    remote_work = relationship("RemoteWorkOptions", foreign_keys=[remote_work_id], lazy='select')
+    travel_requirements = relationship("TravelRequirements", foreign_keys=[travel_required_id], lazy='select')
+    salary_currency = relationship("Currencies", foreign_keys=[salary_currency_id], lazy='select')
+    salary_period = relationship("SalaryPeriods", foreign_keys=[salary_period_id], lazy='select')
+    city = relationship("Cities", foreign_keys=[city_id], lazy='select')
+    region = relationship("Regions", foreign_keys=[region_id], lazy='select')
+    country = relationship("Countries", foreign_keys=[country_id], lazy='select')
+    company = relationship("Companies", foreign_keys=[company_name_id], lazy='select')
+    company_size = relationship("CompanySizes", foreign_keys=[company_size_id], lazy='select')
+    
+    # Relationships (One-to-Many)
+    responsibilities = relationship("Responsibility", back_populates="job_detail", lazy='select')
+    languages = relationship("JobLanguage", back_populates="job_detail", lazy='select')
+    
+    # Relationships (Many-to-Many)
+    hard_skills = relationship("HardSkills", secondary=job_hard_skills, lazy='select')
+    soft_skills = relationship("SoftSkills", secondary=job_soft_skills, lazy='select')
+    certifications = relationship("Certifications", secondary=job_certifications, lazy='select')
+    licenses = relationship("Licenses", secondary=job_licenses, lazy='select')
+    benefits = relationship("Benefits", secondary=job_benefits, lazy='select')
+    work_environment = relationship("WorkEnvironment", secondary=job_work_environment, lazy='select')
+    professional_development = relationship("ProfessionalDevelopment", secondary=job_professional_development, lazy='select')
+    work_life_balance = relationship("WorkLifeBalance", secondary=job_work_life_balance, lazy='select')
+    physical_requirements = relationship("PhysicalRequirements", secondary=job_physical_requirements, lazy='select')
+    work_conditions = relationship("WorkConditions", secondary=job_work_conditions, lazy='select')
+    special_requirements = relationship("SpecialRequirements", secondary=job_special_requirements, lazy='select')
 
 
 # ============ Child Tables (One-to-Many) ============
@@ -179,6 +220,8 @@ class Responsibility(DataBase):
     job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
     description = Column(String(500), nullable=False)
     order = Column(Integer, default=0)
+    
+    job_detail = relationship("JobDetail", back_populates="responsibilities")
 
 
 class JobLanguage(DataBase):
@@ -189,6 +232,8 @@ class JobLanguage(DataBase):
     job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
     language = Column(String(100), nullable=False)
     proficiency = Column(String(50))
+    
+    job_detail = relationship("JobDetail", back_populates="languages")
 
 
 class ContactEmail(DataBase):

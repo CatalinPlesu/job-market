@@ -3,7 +3,6 @@ from src.scrape_job_details import scrape_job_details
 from src.scrape_job_recheck import recheck_alive_jobs, recheck_all_jobs
 from src.structure_data_with_llm import structure_data_with_llm
 from src.process_data import process_data
-from src.generate_html_page import generate_html_page
 from src.menu import Menu
 from src.scheduled_scraper import run_all_stages_scheduled
 from src.scheduler import Scheduler
@@ -11,6 +10,14 @@ from src.database_backup import DatabaseBackup
 from config.settings import Config
 from datetime import datetime
 from pathlib import Path
+
+# Analysis engine imports
+try:
+    from analysis_engine.generator import AnalysisGenerator
+    from analysis_engine.config import AnalysisConfig
+    ANALYSIS_ENGINE_AVAILABLE = True
+except ImportError:
+    ANALYSIS_ENGINE_AVAILABLE = False
 
 
 # Menu Item Classes
@@ -70,19 +77,187 @@ class StructureDataItem:
 
 class ProcessDataItem:
     def get_item_description(self):
-        return "Process Data"
+        return "Process Data (Generate Analysis)"
+    
+    def _get_positive_int_input(self, prompt, default_value_int):
+        """Helper method to get and validate positive integer input.
+        
+        Args:
+            prompt: The input prompt to display
+            default_value_int: The default value as an integer
+            
+        Returns:
+            A positive integer (user input or default)
+        """
+        user_input = input(prompt).strip()
+        if not user_input:
+            return default_value_int
+        
+        try:
+            value = int(user_input)
+            if value <= 0:
+                print(f"Invalid input (must be positive), using default: {default_value_int}")
+                return default_value_int
+            return value
+        except ValueError:
+            print(f"Invalid input, using default: {default_value_int}")
+            return default_value_int
     
     def execute(self):
-        process_data()
+        if not ANALYSIS_ENGINE_AVAILABLE:
+            print("\n✗ Analysis engine not available. Please ensure it's properly installed.")
+            return True
+        
+        print("\n" + "="*80)
+        print("ANALYSIS GENERATION")
+        print("="*80)
+        print("\nGenerate statistical analyses from job market data.")
+        print()
+        
+        # Configuration options
+        print("Configuration:")
+        print()
+        
+        # Output directory
+        default_base = "frontend/api"
+        base_dir = input(f"Output directory (default: {default_base}): ").strip()
+        if not base_dir:
+            base_dir = default_base
+        output_dir = f"{base_dir}/analysis"
+        
+        # Time granularity
+        print("\nTime granularity for temporal analyses:")
+        print("  1. Daily")
+        print("  2. Weekly")
+        print("  3. Monthly (recommended)")
+        granularity_choice = input("Select granularity [3]: ").strip()
+        
+        granularity_map = {
+            "1": "daily",
+            "2": "weekly",
+            "3": "monthly",
+            "": "monthly"
+        }
+        granularity = granularity_map.get(granularity_choice, "monthly")
+        
+        # Use AnalysisConfig defaults
+        config_defaults = AnalysisConfig()
+        
+        # Min sample size
+        min_sample_size = self._get_positive_int_input(
+            f"\nMinimum sample size for analysis [{config_defaults.MIN_SAMPLE_SIZE}]: ",
+            config_defaults.MIN_SAMPLE_SIZE
+        )
+        
+        # Top N skills
+        top_n_skills = self._get_positive_int_input(
+            f"Top N skills to include [{config_defaults.TOP_N_SKILLS}]: ",
+            config_defaults.TOP_N_SKILLS
+        )
+        
+        # Top N companies
+        top_n_companies = self._get_positive_int_input(
+            f"Top N companies to include [{config_defaults.TOP_N_COMPANIES}]: ",
+            config_defaults.TOP_N_COMPANIES
+        )
+        
+        # Confirm
+        print("\n" + "-"*80)
+        print("Summary:")
+        print(f"  Output directory: {output_dir}")
+        print(f"  Time granularity: {granularity}")
+        print(f"  Min sample size: {min_sample_size}")
+        print(f"  Top N skills: {top_n_skills}")
+        print(f"  Top N companies: {top_n_companies}")
+        print("-"*80)
+        
+        confirm = input("\nProceed with analysis generation? (Y/n): ").strip().lower()
+        if confirm in ("n", "no"):
+            print("\nCancelled.")
+            return True
+        
+        # Configure and generate
+        print("\nConfiguring analysis engine...")
+        config = AnalysisConfig()
+        config.GRANULARITY = granularity
+        config.MIN_SAMPLE_SIZE = min_sample_size
+        config.TOP_N_SKILLS = top_n_skills
+        config.TOP_N_COMPANIES = top_n_companies
+        
+        generator = AnalysisGenerator(output_dir, config)
+        total_analyses = len(generator.analyses)
+        
+        print(f"\nGenerating {total_analyses} analyses to {output_dir}...")
+        print("="*80)
+        
+        exit_code = generator.generate_all()
+        
+        if exit_code == 0:
+            print("\n" + "="*80)
+            print("✓ Analysis generation completed successfully!")
+            print("="*80)
+            print(f"\nJSON files are available in: {output_dir}")
+        else:
+            print("\n" + "="*80)
+            print("✗ Analysis generation failed!")
+            print("="*80)
+        
         return True
 
 
-class GenerateHtmlItem:
+class GenerateJsonApiItem:
     def get_item_description(self):
-        return "Generate HTML Page"
+        return "Generate JSON API for GitHub Pages"
     
     def execute(self):
-        generate_html_page()
+        print("\n" + "="*80)
+        print("JSON API GENERATION")
+        print("="*80)
+        print("\nThis will generate paginated JSON files for GitHub Pages:")
+        print("  • index.json with metadata for all 50+ filterable fields")
+        print("  • page-N.json files with job listings (100 jobs per page)")
+        print("  • Sanitizes contact information (emails, phones, person names)")
+        print()
+        
+        output_dir = input("Enter output directory (default: frontend/api): ").strip()
+        if not output_dir:
+            output_dir = "frontend/api"
+        
+        print(f"\nGenerating JSON API to {output_dir}...")
+        print()
+        
+        try:
+            from json_generator.db_connector import DatabaseConnector
+            from json_generator.jobs_generator import JobsGenerator
+            
+            # Load jobs from database
+            with DatabaseConnector() as db:
+                jobs_count = db.get_jobs_count()
+                print(f"Found {jobs_count} jobs in database")
+                
+                if jobs_count == 0:
+                    print("\n⚠ No jobs found in database. Nothing to generate.")
+                    return True
+                
+                print("Loading jobs with relationships...")
+                jobs = db.get_all_jobs()
+                print(f"✓ Loaded {len(jobs)} jobs")
+            
+            # Generate JSON files
+            print()
+            generator = JobsGenerator(output_dir=output_dir)
+            generator.generate(jobs)
+            
+            print()
+            print(f"✓ JSON API generated successfully to {output_dir}/")
+            print(f"  - {output_dir}/jobs/index.json")
+            print(f"  - {output_dir}/jobs/page-*.json")
+        
+        except Exception as e:
+            print(f"\n✗ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        
         return True
 
 
@@ -230,7 +405,7 @@ def run():
     menu.register_item(RecheckAllJobsItem())
     menu.register_item(StructureDataItem())
     menu.register_item(ProcessDataItem())
-    menu.register_item(GenerateHtmlItem())
+    menu.register_item(GenerateJsonApiItem())
     menu.register_item(DatabaseRollbackItem())
     
     # Run the menu

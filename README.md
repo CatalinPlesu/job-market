@@ -1,6 +1,21 @@
 # Job Market Scraper - Moldova
 
-A comprehensive job scraping and analysis tool for the Moldovan job market across all industries and sectors. Collects job postings from multiple job sites, processes them with LLM for structured data extraction, and generates reports.
+A comprehensive job scraping and analysis tool for the Moldovan job market across all industries and sectors. Collects job postings from multiple job sites, processes them with LLM for structured data extraction, generates reports, and provides an interactive web interface.
+
+## Features
+
+- 🔍 **Job Scraping**: Automated collection from multiple job sites
+- 🤖 **LLM Processing**: Structured data extraction from raw job postings
+- 📊 **Analytics**: Market insights and salary analysis
+- 🌐 **Web Interface**: Interactive SPA for browsing jobs and analytics
+- 💾 **Data Export**: JSON API generation for static hosting
+- 🔄 **Automation**: Scheduled scraping with intelligent optimization
+
+## Quick Links
+
+- [Frontend Documentation](frontend/README.md) - Interactive web interface
+- [Deployment Guide](DEPLOYMENT.md) - Deploy to GitHub Pages, Netlify, etc.
+- [Analytics Specification](ANALYTICS_SPEC.md) - Planned analytics features
 
 ## Configuration Files
 
@@ -105,13 +120,20 @@ Restore databases from previous backups:
 
 ## Tech Stack
 
+### Backend
 - **HTTP:** `requests`, `aiohttp`
 - **HTML parsing:** `BeautifulSoup4`
 - **Database:** SQLite with `SQLAlchemy` ORM
 - **LLM Integration:** `openai` (OpenRouter API)
 - **Data Analysis:** `pandas`, `matplotlib`
-- **HTML Generation:** `jinja2`
 - **UI:** `rich` (terminal UI components)
+
+### Frontend (SPA)
+- **Framework:** Mithril.js (via CDN)
+- **UI:** DaisyUI + Tailwind CSS (via CDN)
+- **Charts:** Chart.js (via CDN)
+- **Routing:** Client-side hash routing
+- **Architecture:** Static SPA with JSON API
 
 ## Current Features
 
@@ -127,6 +149,21 @@ Restore databases from previous backups:
 - **Database backups**: Automatic backups with retention policy
 - **Comprehensive data model**: 50+ normalized tables with proper relationships
 - **Scraping reports**: Daily JSON/text reports with per-site and aggregated statistics
+- **JSON API Generation**: Export paginated job data as JSON for static hosting (GitHub Pages)
+  - Generates paginated job listings (page-1.json, page-2.json, etc.)
+  - Creates comprehensive index.json with metadata for ALL 50+ filterable fields
+  - Includes per-page item counts for efficient filtering
+  - Sanitizes sensitive data (removes contact information)
+  - Command: `python -m json_generator --output pages/api`
+- **Interactive Web Interface**: Modern SPA for job browsing and analytics
+  - Extra slim job listings (Hacker News style)
+  - Client-side filtering on multiple fields with hierarchical filtering
+  - Job detail view with parsed/raw tabs
+  - Analysis dashboard with charts
+  - Dark/light theme toggle
+  - Mobile responsive design
+  - See [frontend/README.md](frontend/README.md) for details
+  - See [json_generator/README.md](json_generator/README.md) for details
 
 ## Planned Features
 
