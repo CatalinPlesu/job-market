@@ -95,3 +95,28 @@ class Aggregator:
     def sort_checks_by_date(checks):
         """Sort job checks by check_date."""
         return sorted(checks, key=lambda c: c.check_date)
+    
+    @staticmethod
+    def get_period_key(dt, granularity):
+        """
+        Convert datetime to period key for bucketing.
+        
+        Args:
+            dt: datetime or date object
+            granularity: 'daily', 'weekly', or 'monthly'
+        
+        Returns:
+            String period key (e.g., '2026-01', '2026-W01', '2026-01-01')
+        """
+        from datetime import datetime, date
+        
+        # Convert date to datetime if needed for week calculation
+        if granularity == 'monthly':
+            return dt.strftime('%Y-%m')
+        elif granularity == 'weekly':
+            # Ensure we have a datetime for week calculation
+            if isinstance(dt, date) and not isinstance(dt, datetime):
+                dt = datetime.combine(dt, datetime.min.time())
+            return dt.strftime('%Y-W%U')
+        else:  # daily
+            return dt.strftime('%Y-%m-%d')

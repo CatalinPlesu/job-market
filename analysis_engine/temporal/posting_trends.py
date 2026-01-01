@@ -63,19 +63,10 @@ class PostingTrendsAnalysis(BaseAnalysis):
             if not job.created_at:
                 continue
             
-            period_key = self._get_period_key(job.created_at, granularity)
+            period_key = Aggregator.get_period_key(job.created_at, granularity)
             periods[period_key].append(job)
         
         return periods
-    
-    def _get_period_key(self, dt, granularity):
-        """Convert datetime to period key."""
-        if granularity == 'monthly':
-            return dt.strftime('%Y-%m')
-        elif granularity == 'weekly':
-            return dt.strftime('%Y-W%U')
-        else:  # daily
-            return dt.strftime('%Y-%m-%d')
     
     def _count_closed_in_period(self, jobs, period):
         """Count how many jobs closed in this period."""
@@ -88,7 +79,7 @@ class PostingTrendsAnalysis(BaseAnalysis):
             # Get the first failed check (http_status != 200)
             for check in Aggregator.sort_checks_by_date(job.checks):
                 if check.http_status and check.http_status != 200:
-                    check_period = self._get_period_key(check.check_date, self.config.GRANULARITY)
+                    check_period = Aggregator.get_period_key(check.check_date, self.config.GRANULARITY)
                     if check_period == period:
                         count += 1
                     break

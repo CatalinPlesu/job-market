@@ -46,7 +46,7 @@ class SkillsTrendsAnalysis(BaseAnalysis):
                 continue
             
             job_detail = job_detail_map[job.job_url]
-            period_key = self._get_period_key(job.created_at, granularity)
+            period_key = Aggregator.get_period_key(job.created_at, granularity)
             
             # Get skills for this job
             skills = self.data_db.query(HardSkills).join(
@@ -86,15 +86,6 @@ class SkillsTrendsAnalysis(BaseAnalysis):
             'granularity': granularity,
             'skill_trends': trends
         }
-    
-    def _get_period_key(self, dt, granularity):
-        """Convert datetime to period key."""
-        if granularity == 'monthly':
-            return dt.strftime('%Y-%m')
-        elif granularity == 'weekly':
-            return dt.strftime('%Y-W%U')
-        else:  # daily
-            return dt.strftime('%Y-%m-%d')
     
     def get_visualization_hints(self):
         return {

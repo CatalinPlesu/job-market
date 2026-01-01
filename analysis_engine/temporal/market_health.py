@@ -124,7 +124,7 @@ class MarketHealthAnalysis(BaseAnalysis):
                 continue
             
             # Count as new in creation period
-            created_period = self._get_period_key(job.created_at, granularity)
+            created_period = Aggregator.get_period_key(job.created_at, granularity)
             periods[created_period]['new'] += 1
             
             # Check if/when job closed
@@ -139,7 +139,7 @@ class MarketHealthAnalysis(BaseAnalysis):
                         break
             
             if closed and closed_date:
-                closed_period = self._get_period_key(closed_date, granularity)
+                closed_period = Aggregator.get_period_key(closed_date, granularity)
                 periods[closed_period]['closed'] += 1
         
         # Calculate cumulative active jobs
@@ -171,20 +171,6 @@ class MarketHealthAnalysis(BaseAnalysis):
             'granularity': granularity,
             'market_trends': trend_data
         }
-    
-    def _get_period_key(self, dt, granularity):
-        """Convert datetime to period key."""
-        if isinstance(dt, datetime):
-            dt = dt.date()
-        
-        if granularity == 'monthly':
-            return dt.strftime('%Y-%m')
-        elif granularity == 'weekly':
-            # Convert to datetime for week calculation
-            dt_obj = datetime.combine(dt, datetime.min.time())
-            return dt_obj.strftime('%Y-W%U')
-        else:  # daily
-            return dt.strftime('%Y-%m-%d')
     
     def get_visualization_hints(self):
         return {
