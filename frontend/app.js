@@ -527,9 +527,22 @@ const FilterPanel = {
                     m('div', { class: 'space-y-2' }, [
                         m('div', { class: 'text-xs font-semibold opacity-60 uppercase tracking-wide' }, section),
                         ...fields.map(field => {
-                            // Get jobs filtered by all OTHER filters (excluding this field)
+                            // Define hierarchical field relationships
+                            const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
+                            const currentFieldIndex = hierarchyLevels.indexOf(field.key);
+                            
+                            // Get jobs filtered by all OTHER filters (excluding this field and its children in hierarchy)
                             const filtersWithoutThisField = { ...state.filters };
                             delete filtersWithoutThisField[field.key];
+                            
+                            // If this field is part of the hierarchy, also exclude child fields from filtering
+                            if (currentFieldIndex !== -1) {
+                                // Remove all fields that come after this one in the hierarchy
+                                for (let i = currentFieldIndex + 1; i < hierarchyLevels.length; i++) {
+                                    delete filtersWithoutThisField[hierarchyLevels[i]];
+                                }
+                            }
+                            
                             const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filtersWithoutThisField));
                             
                             // Extract unique values from filtered jobs for this field
