@@ -31,7 +31,64 @@ const state = {
     availablePageSizes: [10, 20, 50, 100]
 };
 
+// Configuration constants
+const DEFAULT_JOBS_PER_API_PAGE = 100;
+
 // Utility Functions
+// Helper to check if filters are active
+const hasActiveFilters = (filters) => {
+    return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
+};
+
+// Map filter keys to metadata keys
+const filterKeyToMetadataKey = {
+    'city': 'location',
+    'company': 'company_name'
+};
+
+const getMetadataKey = (filterKey) => {
+    return filterKeyToMetadataKey[filterKey] || filterKey;
+};
+
+// Helper to find filter metadata for active filters
+// Note: Currently only supports single filter metadata lookups.
+// When multiple filters are active, returns metadata for the first one found.
+// This is a limitation of the current metadata structure which doesn't include
+// intersection counts for multiple filter combinations.
+const getActiveFilterMetadata = (filters, jobsIndex) => {
+    if (!jobsIndex || !jobsIndex.metadata) return null;
+    
+    let activeFilterCount = 0;
+    let firstFilterMetadata = null;
+    
+    for (const [filterKey, filterValue] of Object.entries(filters)) {
+        if (filterValue === null || filterValue === undefined || filterValue === '') continue;
+        
+        // Skip numeric range filters (salaryMin, salaryMax, experienceMin, experienceMax)
+        if (['salaryMin', 'salaryMax', 'experienceMin', 'experienceMax'].includes(filterKey)) continue;
+        
+        activeFilterCount++;
+        
+        const metadataKey = getMetadataKey(filterKey);
+        
+        if (jobsIndex.metadata[metadataKey] && !firstFilterMetadata) {
+            const metadataItems = jobsIndex.metadata[metadataKey];
+            
+            // Find the matching metadata entry
+            for (const item of metadataItems) {
+                if (item.name === filterValue) {
+                    firstFilterMetadata = item;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Only return metadata if there's exactly one active filter
+    // When multiple filters are active, we can't use single-filter metadata counts
+    return activeFilterCount === 1 ? firstFilterMetadata : null;
+};
+
 const formatSalary = (salary) => {
     if (!salary) return 'Not specified';
     
@@ -467,8 +524,42 @@ const FilterPanel = {
             { key: 'special_requirements', label: 'Special Requirements', section: 'Conditions' }
         ];
         
-        const handleFilterChange = () => {
+        const handleFilterChange = async () => {
             JobsPage.displayPage = 1;
+            
+            // Determine which pages we need to load for the current display page
+            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+            
+            // Calculate which pages are needed for the current display page
+            if (filterMetadata && filterMetadata.pages) {
+                const pagesToLoad = new Set();
+                // We need to load enough pages to satisfy the current display page
+                const itemsNeeded = state.itemsPerPage;
+                let itemsAccumulated = 0;
+                
+                for (const pageInfo of filterMetadata.pages) {
+                    if (itemsAccumulated < itemsNeeded) {
+                        pagesToLoad.add(pageInfo.page);
+                        itemsAccumulated += pageInfo.count;
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Load the identified pages
+                if (pagesToLoad.size > 0) {
+                    const promises = [];
+                    for (const page of pagesToLoad) {
+                        if (!state.loadedPages.has(page)) {
+                            promises.push(JobsPage.loadPage(page));
+                        }
+                    }
+                    if (promises.length > 0) {
+                        await Promise.all(promises);
+                    }
+                }
+            }
+            
             // Trigger auto-load after filter change
             setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
             m.redraw();
@@ -609,13 +700,33 @@ const FilterPanel = {
                             
                             // Calculate counts for each option
                             const optionCounts = {};
-                            availableOptions.forEach(option => {
-                                // Create temporary filter state with this option
-                                const tempFilters = { ...state.filters, [field.key]: option };
-                                // Count how many jobs match with this option
-                                const count = state.allLoadedJobs.filter(job => matchesFilters(job, tempFilters)).length;
-                                optionCounts[option] = count;
-                            });
+                            
+                            // Try to use metadata counts when available and no other filters are active
+                            const useMetadataCounts = !hasActiveFilters(filterForOptions) && 
+                                                     state.jobsIndex && 
+                                                     state.jobsIndex.metadata;
+                            
+                            if (useMetadataCounts) {
+                                // Use metadata counts for better UX (shows correct totals immediately)
+                                const metadataKey = getMetadataKey(field.key);
+                                if (state.jobsIndex.metadata[metadataKey]) {
+                                    const metadataItems = state.jobsIndex.metadata[metadataKey];
+                                    for (const item of metadataItems) {
+                                        if (availableOptions.includes(item.name)) {
+                                            optionCounts[item.name] = item.count;
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Fall back to counting from loaded jobs when filters are active
+                                availableOptions.forEach(option => {
+                                    // Create temporary filter state with this option
+                                    const tempFilters = { ...state.filters, [field.key]: option };
+                                    // Count how many jobs match with this option
+                                    const count = state.allLoadedJobs.filter(job => matchesFilters(job, tempFilters)).length;
+                                    optionCounts[option] = count;
+                                });
+                            }
                             
                             return m('div', { class: 'form-control' }, [
                                 m('label', { class: 'label py-1' }, [
@@ -759,19 +870,110 @@ const JobsPage = {
     },
     
     getDisplayedJobs: () => {
-        const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
-        const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
-        const end = start + state.itemsPerPage;
-        return {
-            jobs: filtered.slice(start, end),
-            total: filtered.length,
-            totalPages: Math.ceil(filtered.length / state.itemsPerPage)
-        };
+        const isFiltered = hasActiveFilters(state.filters);
+        
+        if (isFiltered) {
+            // When filtering, use metadata to get the total count immediately
+            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+            const totalFromMetadata = filterMetadata ? filterMetadata.count : 0;
+            
+            // Filter loaded jobs for display
+            const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
+            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
+            const end = start + state.itemsPerPage;
+            const effectiveTotal = totalFromMetadata > 0 ? totalFromMetadata : filtered.length;
+            
+            return {
+                jobs: filtered.slice(start, end),
+                total: effectiveTotal,
+                totalPages: Math.ceil(effectiveTotal / state.itemsPerPage),
+                isFiltered: true
+            };
+        } else {
+            // When not filtering, use metadata to show total available
+            const totalJobsFromMetadata = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
+            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
+            const end = start + state.itemsPerPage;
+            const displayJobs = state.allLoadedJobs.slice(start, end);
+            
+            return {
+                jobs: displayJobs,
+                total: totalJobsFromMetadata,
+                totalPages: Math.ceil(totalJobsFromMetadata / state.itemsPerPage),
+                isFiltered: false
+            };
+        }
     },
     
     navigateToPage: async (pageNumber) => {
         JobsPage.displayPage = pageNumber;
         window.scrollTo(0, 0);
+        
+        const isFiltered = hasActiveFilters(state.filters);
+        
+        if (isFiltered) {
+            // When filtering, load pages based on filter metadata
+            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+            
+            // Calculate which pages are needed for the requested display page
+            if (filterMetadata && filterMetadata.pages) {
+                const pagesToLoad = new Set();
+                const startItem = (pageNumber - 1) * state.itemsPerPage;
+                const endItem = startItem + state.itemsPerPage;
+                
+                let itemsAccumulated = 0;
+                
+                for (const pageInfo of filterMetadata.pages) {
+                    const pageStart = itemsAccumulated;
+                    const pageEnd = itemsAccumulated + pageInfo.count;
+                    
+                    // Check if this page overlaps with our display range
+                    if (pageEnd > startItem && pageStart < endItem) {
+                        pagesToLoad.add(pageInfo.page);
+                    }
+                    
+                    itemsAccumulated += pageInfo.count;
+                    
+                    // Stop if we've gone past what we need
+                    if (itemsAccumulated >= endItem) break;
+                }
+                
+                // Load the identified pages
+                if (pagesToLoad.size > 0) {
+                    const promises = [];
+                    for (const page of pagesToLoad) {
+                        if (!state.loadedPages.has(page)) {
+                            promises.push(JobsPage.loadPage(page));
+                        }
+                    }
+                    if (promises.length > 0) {
+                        await Promise.all(promises);
+                    }
+                }
+            }
+        } else if (state.jobsIndex) {
+            // If not filtering, we need to ensure the actual page from metadata is loaded
+            // Calculate which metadata page contains the jobs we need
+            const jobsPerApiPage = state.jobsIndex.jobs_per_page || DEFAULT_JOBS_PER_API_PAGE;
+            const startJobIndex = (pageNumber - 1) * state.itemsPerPage;
+            const endJobIndex = startJobIndex + state.itemsPerPage;
+            
+            // Determine which API pages we need
+            const startApiPage = Math.floor(startJobIndex / jobsPerApiPage) + 1;
+            const endApiPage = Math.floor((endJobIndex - 1) / jobsPerApiPage) + 1;
+            
+            // Load any missing pages
+            const pagesToLoad = [];
+            for (let apiPage = startApiPage; apiPage <= Math.min(endApiPage, state.jobsIndex.total_pages); apiPage++) {
+                if (!state.loadedPages.has(apiPage)) {
+                    pagesToLoad.push(JobsPage.loadPage(apiPage));
+                }
+            }
+            
+            if (pagesToLoad.length > 0) {
+                await Promise.all(pagesToLoad);
+            }
+        }
         
         // Trigger auto-load check after navigation
         setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
@@ -846,14 +1048,11 @@ const JobsPage = {
     },
     
     view: () => {
-        const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
-        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
+        const displayData = JobsPage.getDisplayedJobs();
+        const { jobs, total, totalPages, isFiltered } = displayData;
         
         // Auto-load more data if needed (non-blocking)
         setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 0);
-        
-        // Calculate accurate job counts
-        const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
         
         return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
@@ -882,9 +1081,9 @@ const JobsPage = {
                             )
                         ]),
                         m('div', { class: 'text-sm opacity-70' }, [
-                            hasActiveFilters ? 
+                            isFiltered ? 
                                 `Showing ${jobs.length} of ${total} filtered jobs` :
-                                `Showing ${jobs.length} of ${totalJobsInAPI} total jobs`
+                                `Showing ${jobs.length} of ${total.toLocaleString()} total jobs`
                         ])
                     ]),
                     
@@ -899,7 +1098,7 @@ const JobsPage = {
                                     index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
                                 })) :
                                 m('div', { class: 'text-center py-8 opacity-70' }, 
-                                    hasActiveFilters ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
+                                    isFiltered ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
                                 )
                         ]),
                         
