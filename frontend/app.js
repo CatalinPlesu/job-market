@@ -1451,30 +1451,33 @@ const AnalysisPage = {
         // Skill trends (complex - show first skill's trend)
         else if (data.skill_trends && Object.keys(data.skill_trends).length > 0) {
             const firstSkill = Object.keys(data.skill_trends)[0];
-            const items = data.skill_trends[firstSkill].slice(0, 10);
-            chartConfig = {
-                type: 'line',
-                data: {
-                    labels: items.map(item => item.period),
-                    datasets: [{
-                        data: items.map(item => item.count),
-                        borderColor: 'rgba(168, 85, 247, 1)',
-                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { display: false },
-                        x: { display: false }
+            const skillData = data.skill_trends[firstSkill];
+            if (Array.isArray(skillData) && skillData.length > 0) {
+                const items = skillData.slice(0, 10);
+                chartConfig = {
+                    type: 'line',
+                    data: {
+                        labels: items.map(item => item.period),
+                        datasets: [{
+                            data: items.map(item => item.count),
+                            borderColor: 'rgba(168, 85, 247, 1)',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { display: false },
+                            x: { display: false }
+                        }
                     }
-                }
-            };
+                };
+            }
         }
         // Duration stats as fallback
         else if (data.duration_stats) {
