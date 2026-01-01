@@ -1,3 +1,4 @@
+/frontend/api/*
 # Python-generated files
 __pycache__/
 *.py[oc]
