@@ -2,7 +2,7 @@
   "version": "1.0",
   "analysis_id": "salary-by-seniority",
   "title": "Salary by Seniority Level",
-  "generated_at": "2026-01-01T13:27:45.118131Z",
+  "generated_at": "2026-01-01T17:59:20.776737Z",
   "type": "static",
   "data": {
     "by_seniority": [
@@ -15,6 +15,7 @@
         "max": 20000.0,
         "percentile_25": 3600.0,
         "percentile_75": 13500.0,
+        "seniority": "entry",
         "seniority_level": "entry",
         "order": 0
       },
@@ -27,6 +28,7 @@
         "max": 22000.0,
         "percentile_25": 8000.0,
         "percentile_75": 16000.0,
+        "seniority": "junior",
         "seniority_level": "junior",
         "order": 1
       },
@@ -39,6 +41,7 @@
         "max": 51577.5,
         "percentile_25": 11500.0,
         "percentile_75": 20500.0,
+        "seniority": "mid",
         "seniority_level": "mid",
         "order": 2
       },
@@ -51,6 +54,7 @@
         "max": 30000.0,
         "percentile_25": 1250.0,
         "percentile_75": 20000.0,
+        "seniority": "manager",
         "seniority_level": "manager",
         "order": 5
       }
