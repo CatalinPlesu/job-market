@@ -109,19 +109,19 @@ const HomePage = {
                 m('div', { class: 'max-w-md' }, [
                     m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
                     m('p', { class: 'py-6' }, 'Browse thousands of job opportunities across Moldova. Filter by location, salary, skills, and more.'),
-                    state.jobsIndex ? [
-                        m('div', { class: 'stats shadow mb-8 justify-center' }, [
-                            m('div', { class: 'stat place-items-center' }, [
-                                m('div', { class: 'stat-title' }, 'Total Jobs'),
-                                m('div', { class: 'stat-value' }, state.jobsIndex.total_jobs.toLocaleString())
-                            ])
-                        ]),
+                    state.jobsIndex ? 
                         m('a', { 
-                            class: 'btn btn-primary btn-wide btn-lg', 
+                            class: 'stats shadow cursor-pointer hover:shadow-xl transition-shadow justify-center',
                             href: '#!/jobs',
                             oncreate: m.route.link 
-                        }, 'Browse Jobs')
-                    ] : m(Loading)
+                        }, [
+                            m('div', { class: 'stat place-items-center' }, [
+                                m('div', { class: 'stat-title' }, 'Total Jobs'),
+                                m('div', { class: 'stat-value text-primary' }, state.jobsIndex.total_jobs.toLocaleString()),
+                                m('div', { class: 'stat-desc' }, 'Click to browse →')
+                            ])
+                        ])
+                    : m(Loading)
                 ])
             ])
         ])
