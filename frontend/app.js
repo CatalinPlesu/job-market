@@ -114,7 +114,6 @@ const HomePage = {
                             class: 'stats shadow cursor-pointer hover:shadow-xl transition-shadow justify-center',
                             href: '#!/jobs',
                             oncreate: m.route.link,
-                            role: 'button',
                             'aria-label': 'Browse all jobs'
                         }, [
                             m('div', { class: 'stat place-items-center' }, [
