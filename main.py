@@ -119,10 +119,11 @@ class ProcessDataItem:
         print()
         
         # Output directory
-        default_output = "frontend/api/analysis"
-        output_dir = input(f"Output directory [{default_output}]: ").strip()
-        if not output_dir:
-            output_dir = default_output
+        default_base = "frontend/api"
+        base_dir = input(f"Output directory (default: {default_base}): ").strip()
+        if not base_dir:
+            base_dir = default_base
+        output_dir = f"{base_dir}/analysis"
         
         # Time granularity
         print("\nTime granularity for temporal analyses:")
