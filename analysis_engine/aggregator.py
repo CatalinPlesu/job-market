@@ -166,12 +166,12 @@ class Aggregator:
         avg_salary = None
         if job.max_salary and job.min_salary:
             avg_salary = float((job.min_salary + job.max_salary) / 2)
-        elif job.min_salary:
+        elif job.min_salary is not None:
             avg_salary = float(job.min_salary)
-        elif job.max_salary:
+        elif job.max_salary is not None:
             avg_salary = float(job.max_salary)
         
-        if not avg_salary:
+        if avg_salary is None:
             return None
         
         # Get currency code - default to MDL if not specified

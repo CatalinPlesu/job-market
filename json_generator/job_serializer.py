@@ -36,8 +36,9 @@ def serialize_job(job: JobDetail, currency_converter: Optional['CurrencyConverte
     # If no currency specified, assume MDL (reasonable default for Moldova market)
     # If currency is MDL, use original values
     # Otherwise, convert using currency converter if available
-    if min_salary or max_salary:
-        effective_currency = currency.upper() if currency else 'MDL'
+    if min_salary is not None or max_salary is not None:
+        # Ensure currency is a string and normalize to uppercase
+        effective_currency = str(currency).upper() if currency else 'MDL'
         
         if effective_currency == 'MDL':
             # Already in MDL, no conversion needed

@@ -34,24 +34,24 @@ const state = {
 const formatSalary = (salary) => {
     if (!salary) return 'Not specified';
     
-    // Check if we have MDL values
-    const hasMdlValues = salary.min_mdl !== null && salary.min_mdl !== undefined;
+    // Check if we have MDL values (handles 0 as valid salary)
+    const hasMdlValues = salary.min_mdl != null;
     
     if (hasMdlValues) {
         // Use MDL values
         const minMdl = salary.min_mdl;
         const maxMdl = salary.max_mdl;
         
-        if (!minMdl) return 'Not specified';
+        if (minMdl == null) return 'Not specified';
         
         const minStr = minMdl.toLocaleString();
-        const maxStr = maxMdl ? maxMdl.toLocaleString() : '';
+        const maxStr = maxMdl != null ? maxMdl.toLocaleString() : '';
         const mdlRange = maxStr ? `${minStr} - ${maxStr} MDL` : `${minStr} MDL`;
         
         // Show original currency if different from MDL
-        if (salary.currency && salary.currency.toUpperCase() !== 'MDL' && salary.min) {
+        if (salary.currency && salary.currency.toUpperCase() !== 'MDL' && salary.min != null) {
             const origMin = salary.min.toLocaleString();
-            const origMax = salary.max ? salary.max.toLocaleString() : '';
+            const origMax = salary.max != null ? salary.max.toLocaleString() : '';
             const origRange = origMax ? `${origMin} - ${origMax} ${salary.currency.toUpperCase()}` : `${origMin} ${salary.currency.toUpperCase()}`;
             return `${mdlRange} (${origRange})`;
         }
@@ -62,10 +62,10 @@ const formatSalary = (salary) => {
         // Only use if currency is MDL or not specified (assume MDL for Moldova market)
         const currency = salary.currency ? salary.currency.toUpperCase() : 'MDL';
         
-        if (!salary.min) return 'Not specified';
+        if (salary.min == null) return 'Not specified';
         
         const minStr = salary.min.toLocaleString();
-        const maxStr = salary.max ? salary.max.toLocaleString() : '';
+        const maxStr = salary.max != null ? salary.max.toLocaleString() : '';
         return maxStr ? `${minStr} - ${maxStr} ${currency}` : `${minStr} ${currency}`;
     }
 };
