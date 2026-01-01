@@ -1021,6 +1021,7 @@ const JobDetailPage = {
 // Helper object for field name mapping (backward compatibility)
 const FieldMapping = {
     map: {
+        'function': ['function'],
         'seniority': ['seniority', 'seniority_level'],
         'location': ['location', 'city'],
         'size': ['size', 'company_size'],
@@ -1029,7 +1030,9 @@ const FieldMapping = {
     getValue: (item, fieldName) => {
         if (FieldMapping.map[fieldName]) {
             for (const field of FieldMapping.map[fieldName]) {
-                if (item[field]) return item[field];
+                if (field in item && item[field] !== null && item[field] !== undefined) {
+                    return item[field];
+                }
             }
         }
         return item[fieldName];
@@ -1037,8 +1040,8 @@ const FieldMapping = {
     extractLabel: (item) => {
         // Try known field mappings first
         for (const fieldName of ['function', 'seniority', 'location', 'size', 'education']) {
-            const value = fieldName === 'function' ? item.function : FieldMapping.getValue(item, fieldName);
-            if (value) return value;
+            const value = FieldMapping.getValue(item, fieldName);
+            if (value !== null && value !== undefined) return value;
         }
         // Fallback to other common fields
         return item.employment_type || item.remote_option || 
