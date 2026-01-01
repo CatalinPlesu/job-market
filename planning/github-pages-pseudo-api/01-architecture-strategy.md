@@ -159,22 +159,43 @@ job-market/
 └── .github/workflows/      # New: Deployment automation
 ```
 
-### Phase 2: Separate Repository (Future)
+### Phase 2: Separate Repository (Manually Configured)
 ```
 job-market/              # Private: Scrapers + databases
 job-market-frontend/     # Public: SPA + JSON generation for Pages
-
-# Deployment flow:
-# 1. job-market generates fresh databases
-# 2. Trigger webhook to job-market-frontend
-# 3. job-market-frontend pulls databases, generates JSON, deploys
 ```
+
+**Configuration approach:**
+- Frontend repository will be created and linked **manually by maintainer**
+- Configuration file should specify remote repository URL
+- SSH key for push access will be configured by maintainer
+- Agents should only implement the git remote configuration structure
+
+**Example configuration (for implementation):**
+```python
+# config/deployment.py or similar
+class DeploymentConfig:
+    # Remote repository for frontend deployment
+    # This will be configured manually by the maintainer
+    FRONTEND_REPO_REMOTE = "git@github.com:CatalinPlesu/job-market-frontend.git"
+    FRONTEND_REPO_BRANCH = "main"
+    
+    # Note: SSH key authentication must be configured separately
+    # by the repository maintainer
+```
+
+**Deployment flow:**
+1. job-market generates fresh databases
+2. Deployment script uses configured remote URL
+3. Script pushes to frontend repository (using maintainer's SSH key)
+4. Frontend repository auto-deploys to GitHub Pages
 
 **Migration path:**
 - Start with monorepo for simplicity
 - Use clear directory boundaries
 - Minimize cross-dependencies
-- When ready, split using git subtree or submodule
+- Maintainer will handle repository creation and SSH key setup
+- Implementation only needs to support configurable remote URL
 
 ## Integration Points
 

@@ -96,15 +96,16 @@ These documents enable **parallel development** by multiple AI agents or develop
 ---
 
 ### 6. GitHub Issue Templates
-**File:** `06-github-issue-templates.md`
+**Folder:** `issues/`
 
-**Purpose:** Ready-to-use issue specifications for parallel development
+**Purpose:** Individual issue specifications for starting parallel development work
 
 **Contents:**
-- **Issue #1:** JSON Generation System
-- **Issue #2:** Analysis Engine Implementation
-- **Issue #3:** Frontend SPA Implementation
-- **Issue #4:** Deployment Pipeline Automation
+- **Issue #1:** `01-json-generation-system.md` - JSON Generation System
+- **Issue #2:** `02-analysis-engine.md` - Analysis Engine Implementation  
+- **Issue #3:** `03-frontend-spa.md` - Frontend SPA Implementation
+- **Issue #4:** `04-deployment-pipeline.md` - Deployment Pipeline Automation
+- **README.md** - Overview of all issues with dependency graph
 
 Each issue includes:
 - Clear scope and boundaries
@@ -116,6 +117,11 @@ Each issue includes:
 - Implementation hints
 
 **Audience:** Project managers, AI agent coordinators
+
+**Quick Start:**
+- Go to `issues/` folder to see individual issue specifications
+- Each issue is a standalone file ready to be assigned to an agent
+- Start with `issues/README.md` for overview and dependency graph
 
 ---
 
@@ -152,25 +158,27 @@ Job Function (e.g., Engineering)
 ## How to Use These Documents
 
 ### For AI Agents
-1. **Start with** `01-architecture-strategy.md` for context
-2. **Read your specific issue** from `06-github-issue-templates.md`
-3. **Deep-dive** into your component's specification document
+1. **Start with** `01-architecture-strategy.md` for overall context
+2. **Read your specific issue** from the `issues/` folder (e.g., `issues/01-json-generation-system.md`)
+3. **Deep-dive** into your component's specification document (referenced in your issue)
 4. **Explore** referenced code files in the repository
 5. **Implement** following the specification
 6. **Test** according to success criteria
 7. **Document** any deviations or changes
 
 ### For Project Coordinators
-1. Create GitHub issues using templates from `06-github-issue-templates.md`
-2. Assign issues to different agents for parallel work
-3. Monitor progress using success criteria checklists
-4. Coordinate integration testing when components are ready
+1. Review `issues/README.md` for overview of all implementation tasks
+2. Create GitHub issues using specifications from `issues/` folder
+3. Assign issues to different agents for parallel work
+4. Monitor progress using success criteria checklists in each issue
+5. Coordinate integration testing when components are ready
 
 ### For Future Maintainers
 1. Read `01-architecture-strategy.md` for system overview
 2. Refer to component specs for detailed documentation
-3. Update specs when making architectural changes
-4. Keep JSON schemas in sync between components
+3. Check `issues/` folder to understand implementation tasks
+4. Update specs when making architectural changes
+5. Keep JSON schemas in sync between components
 
 ## Development Timeline
 

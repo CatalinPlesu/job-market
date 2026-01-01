@@ -23,8 +23,23 @@ This specification defines the automated deployment pipeline for regenerating JS
 ## Deployment Architecture
 
 ### GitHub Pages Setup
+
+**Note on Repository Configuration:**
+The deployment target repository URL should be configurable to support future migration to a separate frontend repository. The repository maintainer will handle:
+- Creating separate repository (if/when needed)
+- Configuring SSH keys for deployment
+- Setting up repository access
+
+The deployment pipeline should read repository configuration from a config file:
+```python
+# config/deployment.py
+DEPLOYMENT_REPO_URL = "git@github.com:CatalinPlesu/job-market.git"  # Configurable
+DEPLOYMENT_BRANCH = "gh-pages"
 ```
-Repository: CatalinPlesu/job-market
+
+**Current Setup:**
+```
+Repository: CatalinPlesu/job-market (configurable via settings)
 Branch: gh-pages (or main with /docs folder)
 URL: https://catalinplesu.github.io/job-market/
 
