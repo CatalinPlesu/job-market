@@ -1,6 +1,7 @@
 """Skills demand trends analysis."""
 
 from ..base import BaseAnalysis
+from ..aggregator import Aggregator
 from src.data_database import JobDetail, HardSkills, job_hard_skills
 from src.scrape_database import Job
 from collections import defaultdict, Counter

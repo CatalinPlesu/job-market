@@ -1,6 +1,7 @@
 """Remote work adoption trends analysis."""
 
 from ..base import BaseAnalysis
+from ..aggregator import Aggregator
 from src.data_database import JobDetail, RemoteWorkOptions
 from src.scrape_database import Job
 from collections import defaultdict, Counter
