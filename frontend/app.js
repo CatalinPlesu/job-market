@@ -5,9 +5,8 @@ const API_BASE = '/api';
 const api = {
     getJobsIndex: () => m.request({ url: `${API_BASE}/jobs/index.json` }),
     getJobsPage: (page) => m.request({ url: `${API_BASE}/jobs/page-${page}.json` }),
-    getJobDetail: (jobId) => m.request({ url: `${API_BASE}/jobs/${jobId}/detail.json` }),
     getAnalysisIndex: () => m.request({ url: `${API_BASE}/analysis/index.json` }),
-    getAnalysis: (endpoint) => m.request({ url: `${API_BASE}${endpoint}` })
+    getAnalysis: (filename) => m.request({ url: `${API_BASE}/analysis/${filename}` })
 };
 
 // State Management
@@ -418,15 +417,60 @@ const JobDetailPage = {
     job: null,
     activeTab: 'parsed',
     oninit: (vnode) => {
-        const jobId = vnode.attrs.id;
-        api.getJobDetail(jobId).then(data => {
-            JobDetailPage.job = data.job;
-        }).catch(err => {
-            console.error('Error loading job:', err);
-        });
+        const jobId = parseInt(vnode.attrs.id);
+        
+        // Find job in already loaded pages or load the page containing this job
+        // First check if job is in current state.jobs
+        let foundJob = state.jobs.find(j => j.id === jobId);
+        
+        if (foundJob) {
+            JobDetailPage.job = foundJob;
+        } else {
+            // Need to load pages to find the job
+            // For now, try to find it across all pages
+            // In production, index.json would tell us which page
+            JobDetailPage.job = null;
+            
+            // Try loading pages until we find the job
+            const loadPages = async () => {
+                if (state.jobsIndex) {
+                    for (let page = 1; page <= state.jobsIndex.total_pages; page++) {
+                        try {
+                            const pageData = await api.getJobsPage(page);
+                            const job = pageData.jobs.find(j => j.id === jobId);
+                            if (job) {
+                                JobDetailPage.job = job;
+                                m.redraw();
+                                return;
+                            }
+                        } catch (err) {
+                            console.error(`Error loading page ${page}:`, err);
+                        }
+                    }
+                }
+            };
+            
+            if (state.jobsIndex) {
+                loadPages();
+            } else {
+                api.getJobsIndex().then(index => {
+                    state.jobsIndex = index;
+                    loadPages();
+                });
+            }
+        }
     },
     view: () => {
-        if (!JobDetailPage.job) return m(Loading);
+        if (!JobDetailPage.job) return m('div', { class: 'container mx-auto px-4 py-8' }, [
+            m('div', { class: 'mb-4' }, [
+                m('a', { 
+                    href: '#!/jobs',
+                    class: 'btn btn-sm btn-ghost',
+                    oncreate: m.route.link
+                }, '← Back to Jobs')
+            ]),
+            m(Loading)
+        ]);
         
         const job = JobDetailPage.job;
         
@@ -441,11 +485,11 @@ const JobDetailPage = {
             
             m('div', { class: 'card bg-base-100 shadow-xl' }, [
                 m('div', { class: 'card-body' }, [
-                    m('h1', { class: 'card-title text-2xl' }, job.title || job.parsed?.title),
+                    m('h1', { class: 'card-title text-2xl' }, job.title),
                     m('div', { class: 'flex flex-wrap gap-2 mb-4' }, [
                         job.company && m('span', { class: 'badge badge-primary' }, job.company),
-                        job.parsed?.location?.city && m('span', { class: 'badge badge-secondary' }, job.parsed.location.city),
-                        job.parsed?.seniority_level && m('span', { class: 'badge badge-accent' }, job.parsed.seniority_level)
+                        job.location?.city && m('span', { class: 'badge badge-secondary' }, job.location.city),
+                        job.seniority_level && m('span', { class: 'badge badge-accent' }, job.seniority_level)
                     ]),
                     
                     // Tabs
@@ -453,57 +497,87 @@ const JobDetailPage = {
                         m('a', { 
                             class: `tab ${JobDetailPage.activeTab === 'parsed' ? 'tab-active' : ''}`,
                             onclick: () => JobDetailPage.activeTab = 'parsed'
-                        }, 'Parsed View'),
+                        }, 'Job Details'),
                         m('a', { 
                             class: `tab ${JobDetailPage.activeTab === 'raw' ? 'tab-active' : ''}`,
                             onclick: () => JobDetailPage.activeTab = 'raw'
-                        }, 'Raw View')
+                        }, 'Source Info')
                     ]),
                     
                     // Tab Content
                     JobDetailPage.activeTab === 'parsed' ? [
-                        // Parsed View
-                        job.parsed && m('div', { class: 'space-y-4' }, [
+                        // Job Details View
+                        m('div', { class: 'space-y-4' }, [
                             // Salary
-                            job.parsed.salary && m('div', [
+                            job.salary && m('div', [
                                 m('h3', { class: 'font-bold mb-2' }, 'Salary'),
-                                m('p', formatSalary(job.parsed.salary))
+                                m('p', formatSalary(job.salary))
+                            ]),
+                            
+                            // Location
+                            job.location && m('div', [
+                                m('h3', { class: 'font-bold mb-2' }, 'Location'),
+                                m('p', [
+                                    job.location.city && m('span', job.location.city),
+                                    job.location.region && m('span', `, ${job.location.region}`),
+                                    job.location.country && m('span', `, ${job.location.country}`)
+                                ]),
+                                job.location.remote_work && m('p', [
+                                    m('strong', 'Remote: '),
+                                    job.location.remote_work
+                                ])
+                            ]),
+                            
+                            // Employment
+                            job.employment && m('div', [
+                                m('h3', { class: 'font-bold mb-2' }, 'Employment'),
+                                job.employment.type && m('p', [m('strong', 'Type: '), job.employment.type]),
+                                job.employment.contract && m('p', [m('strong', 'Contract: '), job.employment.contract]),
+                                job.employment.schedule && m('p', [m('strong', 'Schedule: '), job.employment.schedule])
                             ]),
                             
                             // Requirements
-                            job.parsed.requirements && m('div', [
+                            job.requirements && m('div', [
                                 m('h3', { class: 'font-bold mb-2' }, 'Requirements'),
-                                job.parsed.requirements.education && m('p', [
+                                job.requirements.education && m('p', [
                                     m('strong', 'Education: '),
-                                    job.parsed.requirements.education
+                                    job.requirements.education
                                 ]),
-                                job.parsed.requirements.experience_years && m('p', [
+                                job.requirements.experience_years && m('p', [
                                     m('strong', 'Experience: '),
-                                    `${job.parsed.requirements.experience_years} years`
+                                    `${job.requirements.experience_years} years`
                                 ]),
-                                job.parsed.requirements.languages && job.parsed.requirements.languages.length > 0 && m('div', [
+                                job.requirements.languages && job.requirements.languages.length > 0 && m('div', [
                                     m('strong', 'Languages: '),
                                     m('div', { class: 'flex flex-wrap gap-2 mt-2' },
-                                        job.parsed.requirements.languages.map(lang => 
+                                        job.requirements.languages.map(lang => 
                                             m('span', { class: 'badge badge-outline' }, lang)
                                         )
                                     )
                                 ]),
-                                job.parsed.requirements.hard_skills && job.parsed.requirements.hard_skills.length > 0 && m('div', [
+                                job.requirements.hard_skills && job.requirements.hard_skills.length > 0 && m('div', [
                                     m('strong', 'Skills: '),
                                     m('div', { class: 'flex flex-wrap gap-2 mt-2' },
-                                        job.parsed.requirements.hard_skills.map(skill => 
+                                        job.requirements.hard_skills.map(skill => 
                                             m('span', { class: 'badge badge-primary' }, skill)
+                                        )
+                                    )
+                                ]),
+                                job.requirements.soft_skills && job.requirements.soft_skills.length > 0 && m('div', [
+                                    m('strong', 'Soft Skills: '),
+                                    m('div', { class: 'flex flex-wrap gap-2 mt-2' },
+                                        job.requirements.soft_skills.map(skill => 
+                                            m('span', { class: 'badge badge-secondary' }, skill)
                                         )
                                     )
                                 ])
                             ]),
                             
                             // Responsibilities
-                            job.parsed.responsibilities && job.parsed.responsibilities.length > 0 && m('div', [
+                            job.parsed_view?.responsibilities && job.parsed_view.responsibilities.length > 0 && m('div', [
                                 m('h3', { class: 'font-bold mb-2' }, 'Responsibilities'),
                                 m('ul', { class: 'list-disc list-inside space-y-1' },
-                                    job.parsed.responsibilities.map(r => m('li', r))
+                                    job.parsed_view.responsibilities.map(r => m('li', r))
                                 )
                             ]),
                             
@@ -516,28 +590,22 @@ const JobDetailPage = {
                             ])
                         ])
                     ] : [
-                        // Raw View
-                        job.raw && m('div', { class: 'space-y-4' }, [
+                        // Source Info View
+                        m('div', { class: 'space-y-4' }, [
                             m('div', [
-                                m('h3', { class: 'font-bold mb-2' }, 'Original Information'),
-                                m('p', [m('strong', 'Title: '), job.raw.original_title]),
-                                m('p', [m('strong', 'Company: '), job.raw.original_company]),
-                                m('p', [m('strong', 'Language: '), job.raw.original_language]),
-                                m('p', [m('strong', 'Source: '), job.raw.source_site]),
-                                m('p', [m('strong', 'Scraped At: '), formatDate(job.raw.scraped_at)])
-                            ]),
-                            m('div', [
-                                m('h3', { class: 'font-bold mb-2' }, 'Original Description'),
-                                m('pre', { class: 'whitespace-pre-wrap bg-base-200 p-4 rounded' }, 
-                                    job.raw.original_description
-                                )
-                            ]),
-                            job.raw.source_url && m('div', [
-                                m('a', { 
-                                    href: job.raw.source_url, 
-                                    target: '_blank',
-                                    class: 'btn btn-primary'
-                                }, 'View Original Posting →')
+                                m('h3', { class: 'font-bold mb-2' }, 'Source Information'),
+                                job.source?.site && m('p', [m('strong', 'Source: '), job.source.site]),
+                                job.source?.url && m('div', { class: 'mt-2' }, [
+                                    m('a', { 
+                                        href: job.source.url, 
+                                        target: '_blank',
+                                        class: 'btn btn-primary btn-sm'
+                                    }, 'View Original Posting →')
+                                ]),
+                                job.posting_date && m('p', { class: 'mt-2' }, [
+                                    m('strong', 'Posted: '), 
+                                    formatDate(job.posting_date)
+                                ])
                             ])
                         ])
                     ]
@@ -552,52 +620,74 @@ const AnalysisPage = {
     oninit: () => {
         api.getAnalysisIndex().then(data => {
             state.analysisIndex = data;
+        }).catch(err => {
+            console.error('Error loading analysis index:', err);
+            state.analysisIndex = { error: true };
         });
     },
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
         m('h1', { class: 'text-3xl font-bold mb-6' }, 'Job Market Analysis'),
         
         state.analysisIndex ? [
-            m('div', { class: 'stats shadow mb-6 w-full' }, [
+            !state.analysisIndex.error && state.analysisIndex.data_summary && m('div', { class: 'stats shadow mb-6 w-full' }, [
                 m('div', { class: 'stat' }, [
                     m('div', { class: 'stat-title' }, 'Total Jobs Analyzed'),
-                    m('div', { class: 'stat-value' }, state.analysisIndex.data_summary.total_jobs.toLocaleString())
+                    m('div', { class: 'stat-value' }, state.analysisIndex.data_summary.total_jobs?.toLocaleString() || 'N/A')
+                ]),
+                m('div', { class: 'stat' }, [
+                    m('div', { class: 'stat-title' }, 'Date Range'),
+                    m('div', { class: 'stat-value text-2xl' }, 
+                        state.analysisIndex.data_summary.date_range ? 
+                            `${formatDate(state.analysisIndex.data_summary.date_range.start)} - ${formatDate(state.analysisIndex.data_summary.date_range.end)}` :
+                            'N/A'
+                    )
                 ]),
                 m('div', { class: 'stat' }, [
                     m('div', { class: 'stat-title' }, 'Jobs with Salary'),
                     m('div', { class: 'stat-value' }, state.analysisIndex.data_summary.jobs_with_salary?.toLocaleString() || 'N/A')
-                ]),
-                m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Unique Companies'),
-                    m('div', { class: 'stat-value' }, state.analysisIndex.data_summary.unique_companies?.toLocaleString() || 'N/A')
                 ])
             ]),
             
-            m('div', { class: 'alert alert-info mb-6' }, [
-                m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
-                    m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+            state.analysisIndex.error ? 
+                m('div', { class: 'alert alert-warning mb-6' }, [
+                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' })
+                    ]),
+                    m('span', 'Analysis data not yet generated. Run: python -m json_generator --output frontend/api')
+                ]) :
+                m('div', { class: 'alert alert-info mb-6' }, [
+                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+                    ]),
+                    m('span', `${state.analysisIndex.available_analyses?.length || 0} analyses available. Click "View" to see details.`)
                 ]),
-                m('span', 'Analysis features are available when JSON data is generated. See README for instructions.')
-            ]),
             
-            m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+            state.analysisIndex.available_analyses && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
                 state.analysisIndex.available_analyses.map(analysis => 
-                    m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                    m('div', { class: 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow' }, [
                         m('div', { class: 'card-body' }, [
-                            m('h2', { class: 'card-title' }, analysis.title),
-                            m('p', { class: 'text-sm text-gray-600' }, analysis.id),
-                            analysis.temporal && m('span', { class: 'badge badge-secondary' }, 'Temporal'),
-                            m('div', { class: 'card-actions justify-end' }, [
+                            m('h2', { class: 'card-title text-lg' }, analysis.title),
+                            m('p', { class: 'text-xs text-gray-500' }, `File: ${analysis.id}.json`),
+                            analysis.temporal && m('span', { class: 'badge badge-secondary mt-2' }, 'Time Series'),
+                            analysis.last_updated && m('p', { class: 'text-xs text-gray-500 mt-1' }, 
+                                `Updated: ${formatDate(analysis.last_updated)}`
+                            ),
+                            m('div', { class: 'card-actions justify-end mt-4' }, [
                                 m('button', { 
                                     class: 'btn btn-primary btn-sm',
                                     onclick: () => {
                                         state.selectedAnalysis = analysis;
-                                        api.getAnalysis(analysis.endpoint).then(data => {
-                                            console.log('Analysis data:', data);
-                                            // Would render charts here
+                                        // Extract filename from id (e.g., "salary-overview" -> "salary-overview.json")
+                                        const filename = `${analysis.id}.json`;
+                                        api.getAnalysis(filename).then(data => {
+                                            console.log(`${analysis.title} data:`, data);
+                                            alert(`${analysis.title} data loaded. Check console for details.\n\nIn production, charts would be rendered here.`);
+                                        }).catch(err => {
+                                            console.error(`Error loading ${filename}:`, err);
+                                            alert(`Error loading analysis data. Check console for details.`);
                                         });
                                     }
-                                }, 'View')
+                                }, 'View Details')
                             ])
                         ])
                     ])

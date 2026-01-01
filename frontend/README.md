@@ -72,18 +72,27 @@ Just copy the `frontend/` directory contents to your web server.
 The SPA expects JSON API files at `/api/`:
 
 ```
-/api/jobs/index.json          - Job metadata and filters
-/api/jobs/page-1.json          - Paginated jobs (page 1)
-/api/jobs/page-2.json          - Paginated jobs (page 2)
-...
-/api/jobs/{id}/detail.json     - Individual job details
-/api/analysis/index.json       - Available analyses
-/api/analysis/*.json           - Analysis data
+/api/
+├── jobs/
+│   ├── index.json          - Job metadata and filters
+│   ├── page-1.json          - Paginated jobs (page 1)
+│   ├── page-2.json          - Paginated jobs (page 2)
+│   └── page-N.json          - More paginated pages
+└── analysis/
+    ├── index.json           - Available analyses list
+    ├── benefits.json        - Benefits analysis
+    ├── employment-types.json - Employment types
+    ├── salary-overview.json - Salary overview
+    ├── skills-demand.json   - Skills demand
+    ├── market-health.json   - Market health
+    └── ... (22 analysis files total)
 ```
+
+**Note**: There are no individual job detail files (`/api/jobs/{id}/detail.json`). Job details are retrieved from the paginated page files.
 
 Generate these files using the `json_generator` module:
 ```bash
-python -m json_generator --output pages/api
+python -m json_generator --output frontend/api
 ```
 
 ## Customization

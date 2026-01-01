@@ -2,23 +2,27 @@
   "version": "1.0",
   "generated_at": "2026-01-01T00:00:00Z",
   "available_analyses": [
-    {
-      "id": "salary-overview",
-      "title": "Salary Analysis Overview",
-      "endpoint": "/api/analysis/salary-overview.json",
-      "last_updated": "2026-01-01T00:00:00Z"
-    },
-    {
-      "id": "skills-demand",
-      "title": "Most In-Demand Skills",
-      "endpoint": "/api/analysis/skills-demand.json"
-    },
-    {
-      "id": "market-trends",
-      "title": "Job Market Trends Over Time",
-      "endpoint": "/api/analysis/market-trends.json",
-      "temporal": true
-    }
+    {"id": "benefits", "title": "Benefits Analysis"},
+    {"id": "employment-types", "title": "Employment Types Distribution"},
+    {"id": "job-duration", "title": "Job Posting Duration"},
+    {"id": "market-health", "title": "Market Health Indicators"},
+    {"id": "posting-trends", "title": "Posting Trends Over Time", "temporal": true},
+    {"id": "remote-work-trends", "title": "Remote Work Adoption Trends", "temporal": true},
+    {"id": "remote-work", "title": "Remote Work Distribution"},
+    {"id": "requirements", "title": "Job Requirements Analysis"},
+    {"id": "salary-by-company-size", "title": "Salary by Company Size"},
+    {"id": "salary-by-education", "title": "Salary by Education Level"},
+    {"id": "salary-by-function", "title": "Salary by Job Function"},
+    {"id": "salary-by-hierarchy", "title": "Salary by Hierarchy"},
+    {"id": "salary-by-location", "title": "Salary by Location"},
+    {"id": "salary-by-seniority", "title": "Salary by Seniority Level"},
+    {"id": "salary-overview", "title": "Salary Overview"},
+    {"id": "salary-trends", "title": "Salary Trends Over Time", "temporal": true},
+    {"id": "skill-combinations", "title": "Common Skill Combinations"},
+    {"id": "skills-demand", "title": "Most In-Demand Skills"},
+    {"id": "skills-salary", "title": "Skills to Salary Correlation"},
+    {"id": "skills-trends", "title": "Skills Demand Trends", "temporal": true},
+    {"id": "top-companies", "title": "Top Hiring Companies"}
   ],
   "data_summary": {
     "total_jobs": 250,
@@ -26,8 +30,6 @@
       "start": "2025-12-01",
       "end": "2026-01-01"
     },
-    "jobs_with_salary": 200,
-    "unique_companies": 25,
-    "unique_skills": 150
+    "jobs_with_salary": 200
   }
 }
