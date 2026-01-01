@@ -169,8 +169,10 @@ def _get_m2m_ids(session, association_table, job_detail_id: int, column_name: st
         )
     ).fetchall()
     
-    # The column name pattern is {table_name}_id
-    return [row[1] for row in result]  # Second column is the related entity ID
+    # Association tables have two columns: job_details_id and {related_table}_id
+    # We want the second column which is the related entity ID
+    RELATED_ENTITY_ID_COLUMN_INDEX = 1
+    return [row[RELATED_ENTITY_ID_COLUMN_INDEX] for row in result]
 
 
 def _deduplicate_jobs(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
