@@ -695,13 +695,33 @@ const FilterPanel = {
                             
                             // Calculate counts for each option
                             const optionCounts = {};
-                            availableOptions.forEach(option => {
-                                // Create temporary filter state with this option
-                                const tempFilters = { ...state.filters, [field.key]: option };
-                                // Count how many jobs match with this option
-                                const count = state.allLoadedJobs.filter(job => matchesFilters(job, tempFilters)).length;
-                                optionCounts[option] = count;
-                            });
+                            
+                            // Try to use metadata counts when available and no other filters are active
+                            const useMetadataCounts = !hasActiveFilters(filterForOptions) && 
+                                                     state.jobsIndex && 
+                                                     state.jobsIndex.metadata;
+                            
+                            if (useMetadataCounts) {
+                                // Use metadata counts for better UX (shows correct totals immediately)
+                                const metadataKey = getMetadataKey(field.key);
+                                if (state.jobsIndex.metadata[metadataKey]) {
+                                    const metadataItems = state.jobsIndex.metadata[metadataKey];
+                                    for (const item of metadataItems) {
+                                        if (availableOptions.includes(item.name)) {
+                                            optionCounts[item.name] = item.count;
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Fall back to counting from loaded jobs when filters are active
+                                availableOptions.forEach(option => {
+                                    // Create temporary filter state with this option
+                                    const tempFilters = { ...state.filters, [field.key]: option };
+                                    // Count how many jobs match with this option
+                                    const count = state.allLoadedJobs.filter(job => matchesFilters(job, tempFilters)).length;
+                                    optionCounts[option] = count;
+                                });
+                            }
                             
                             return m('div', { class: 'form-control' }, [
                                 m('label', { class: 'label py-1' }, [
