@@ -54,7 +54,7 @@ export function HomePage() {
             <Card className="border-2 hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <CardTitle className="text-3xl font-bold text-secondary">
-                  {index?.metadata.companies.length || '0'}
+                  {index?.metadata?.companies?.length || '0'}
                 </CardTitle>
                 <CardDescription>Active Companies</CardDescription>
               </CardHeader>
@@ -63,7 +63,7 @@ export function HomePage() {
             <Card className="border-2 hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
                 <CardTitle className="text-3xl font-bold text-accent">
-                  {index?.metadata.job_functions.length || '0'}
+                  {index?.metadata?.job_functions?.length || '0'}
                 </CardTitle>
                 <CardDescription>Job Categories</CardDescription>
               </CardHeader>
