@@ -269,24 +269,53 @@ const FilterPanel = {
             if (maxSalary) salaryRange.max = Math.max(salaryRange.max, maxSalary);
         });
         
-        // All available filter fields
+        // All available filter fields - organized following schema order
+        // Excludes non-filterable fields like contact info
         const filterFields = [
-            { key: 'job_function', label: 'Job Function', basic: true },
-            { key: 'seniority_level', label: 'Seniority', basic: true },
-            { key: 'city', label: 'City', basic: true },
-            { key: 'remote_work', label: 'Remote Work', basic: true },
-            { key: 'industry', label: 'Industry', basic: true },
-            { key: 'company', label: 'Company', basic: true },
-            { key: 'employment_type', label: 'Employment Type', basic: false },
-            { key: 'contract_type', label: 'Contract Type', basic: false },
-            { key: 'department', label: 'Department', basic: false },
-            { key: 'specialization', label: 'Specialization', basic: false },
-            { key: 'education_level', label: 'Education', basic: false },
-            { key: 'company_size', label: 'Company Size', basic: false }
+            // Job Details
+            { key: 'seniority_level', label: 'Seniority Level', section: 'Job Details' },
+            { key: 'industry', label: 'Industry', section: 'Job Details' },
+            { key: 'department', label: 'Department', section: 'Job Details' },
+            { key: 'job_family', label: 'Job Family', section: 'Job Details' },
+            { key: 'specialization', label: 'Specialization', section: 'Job Details' },
+            { key: 'job_function', label: 'Job Function', section: 'Job Details' },
+            
+            // Requirements
+            { key: 'education_level', label: 'Required Education', section: 'Requirements' },
+            { key: 'languages', label: 'Languages', section: 'Requirements' },
+            { key: 'hard_skills', label: 'Hard Skills', section: 'Requirements' },
+            { key: 'soft_skills', label: 'Soft Skills', section: 'Requirements' },
+            { key: 'certifications', label: 'Certifications', section: 'Requirements' },
+            { key: 'licenses_required', label: 'Licenses', section: 'Requirements' },
+            
+            // Work Arrangement
+            { key: 'employment_type', label: 'Employment Type', section: 'Work Arrangement' },
+            { key: 'contract_type', label: 'Contract Type', section: 'Work Arrangement' },
+            { key: 'work_schedule', label: 'Work Schedule', section: 'Work Arrangement' },
+            { key: 'shift_details', label: 'Shift Details', section: 'Work Arrangement' },
+            { key: 'remote_work', label: 'Remote Work', section: 'Work Arrangement' },
+            { key: 'travel_required', label: 'Travel Required', section: 'Work Arrangement' },
+            
+            // Location
+            { key: 'city', label: 'City', section: 'Location' },
+            { key: 'region', label: 'Region', section: 'Location' },
+            { key: 'country', label: 'Country', section: 'Location' },
+            
+            // Company
+            { key: 'company', label: 'Company Name', section: 'Company' },
+            { key: 'company_size', label: 'Company Size', section: 'Company' },
+            
+            // Benefits & Culture
+            { key: 'benefits', label: 'Benefits', section: 'Benefits & Culture' },
+            { key: 'work_environment', label: 'Work Environment', section: 'Benefits & Culture' },
+            { key: 'professional_development', label: 'Professional Development', section: 'Benefits & Culture' },
+            { key: 'work_life_balance', label: 'Work Life Balance', section: 'Benefits & Culture' },
+            
+            // Conditions
+            { key: 'physical_requirements', label: 'Physical Requirements', section: 'Conditions' },
+            { key: 'work_conditions', label: 'Work Conditions', section: 'Conditions' },
+            { key: 'special_requirements', label: 'Special Requirements', section: 'Conditions' }
         ];
-        
-        const basicFilters = filterFields.filter(f => f.basic);
-        const advancedFilters = filterFields.filter(f => !f.basic);
         
         const handleFilterChange = () => {
             JobsPage.displayPage = 1;
@@ -375,30 +404,42 @@ const FilterPanel = {
             
             m('div', { class: 'divider' }),
             
-            // All filters (no more basic/advanced split)
-            m('div', { class: 'space-y-4' },
-                [...basicFilters, ...advancedFilters].map(field => 
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, [
-                            m('span', { class: 'label-text' }, field.label)
-                        ]),
-                        m('select', { 
-                            class: 'select select-bordered select-sm w-full',
-                            value: state.filters[field.key] || '',
-                            onchange: (e) => {
-                                if (e.target.value) {
-                                    state.filters[field.key] = e.target.value;
-                                } else {
-                                    delete state.filters[field.key];
-                                }
-                                handleFilterChange();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All'),
-                            ...(state.jobsIndex.filters[field.key] || []).map(f => 
-                                m('option', { value: f }, f)
-                            )
-                        ])
+            // All filters grouped by section
+            m('div', { class: 'space-y-6' },
+                // Group filters by section
+                Object.entries(
+                    filterFields.reduce((acc, field) => {
+                        if (!acc[field.section]) acc[field.section] = [];
+                        acc[field.section].push(field);
+                        return acc;
+                    }, {})
+                ).map(([section, fields]) => 
+                    m('div', { class: 'space-y-2' }, [
+                        m('div', { class: 'text-xs font-semibold opacity-60 uppercase tracking-wide' }, section),
+                        ...fields.map(field => 
+                            m('div', { class: 'form-control' }, [
+                                m('label', { class: 'label py-1' }, [
+                                    m('span', { class: 'label-text text-sm' }, field.label)
+                                ]),
+                                m('select', { 
+                                    class: 'select select-bordered select-sm w-full',
+                                    value: state.filters[field.key] || '',
+                                    onchange: (e) => {
+                                        if (e.target.value) {
+                                            state.filters[field.key] = e.target.value;
+                                        } else {
+                                            delete state.filters[field.key];
+                                        }
+                                        handleFilterChange();
+                                    }
+                                }, [
+                                    m('option', { value: '' }, 'All'),
+                                    ...(state.jobsIndex.filters[field.key] || []).map(f => 
+                                        m('option', { value: f }, f)
+                                    )
+                                ])
+                            ])
+                        )
                     ])
                 )
             )
