@@ -15,6 +15,7 @@ const state = {
     currentPage: 1,
     jobs: [],
     allLoadedJobs: [], // Cache of all jobs loaded so far
+    loadedJobIds: new Set(), // Track job IDs for fast duplicate checking
     loadedPages: new Set(), // Track which pages have been loaded
     filters: {
         salaryMin: null,
@@ -654,9 +655,12 @@ const JobsPage = {
         
         try {
             const pageData = await api.getJobsPage(pageNum);
-            state.allLoadedJobs.push(...pageData.jobs);
+            // Add jobs, avoiding duplicates
+            const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
+            state.allLoadedJobs.push(...newJobs);
+            newJobs.forEach(j => state.loadedJobIds.add(j.id));
             state.loadedPages.add(pageNum);
-            return pageData.jobs;
+            return newJobs;
         } catch (err) {
             console.error(`Error loading page ${pageNum}:`, err);
             return [];
@@ -667,17 +671,23 @@ const JobsPage = {
     loadMorePages: async (numPages = 3) => {
         if (JobsPage.loadingMore || !state.jobsIndex) return;
         
-        const nextPage = state.loadedPages.size + 1;
+        // Find the first unloaded page
+        let nextPage = 1;
+        while (nextPage <= state.jobsIndex.total_pages && state.loadedPages.has(nextPage)) {
+            nextPage++;
+        }
+        
         if (nextPage > state.jobsIndex.total_pages) return;
         
         JobsPage.loadingMore = true;
-        const pagesToLoad = Math.min(numPages, state.jobsIndex.total_pages - state.loadedPages.size);
         const promises = [];
+        let pagesLoaded = 0;
         
-        for (let i = 0; i < pagesToLoad; i++) {
-            const page = nextPage + i;
-            if (page <= state.jobsIndex.total_pages) {
+        // Load up to numPages starting from nextPage
+        for (let page = nextPage; page <= state.jobsIndex.total_pages && pagesLoaded < numPages; page++) {
+            if (!state.loadedPages.has(page)) {
                 promises.push(JobsPage.loadPage(page));
+                pagesLoaded++;
             }
         }
         
@@ -697,6 +707,7 @@ const JobsPage = {
             // Initialize if needed
             if (!state.allLoadedJobs) {
                 state.allLoadedJobs = [];
+                state.loadedJobIds = new Set();
                 state.loadedPages = new Set();
             }
             
@@ -911,11 +922,12 @@ const JobDetailPage = {
                 
                 if (job) {
                     JobDetailPage.job = job;
-                    // Also add to loaded jobs for caching, avoiding duplicates
+                    // Also add to loaded jobs for caching, avoiding duplicates using the Set
                     if (!state.allLoadedJobs) state.allLoadedJobs = [];
-                    const existingIds = new Set(state.allLoadedJobs.map(j => j.id));
-                    const newJobs = pageData.jobs.filter(j => !existingIds.has(j.id));
+                    if (!state.loadedJobIds) state.loadedJobIds = new Set();
+                    const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
                     state.allLoadedJobs.push(...newJobs);
+                    newJobs.forEach(j => state.loadedJobIds.add(j.id));
                     if (!state.loadedPages) state.loadedPages = new Set();
                     state.loadedPages.add(page);
                     m.redraw();
