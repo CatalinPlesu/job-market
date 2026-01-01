@@ -677,6 +677,11 @@ const JobsPage = {
         // Check if all pages are already loaded
         if (state.loadedPages.size >= state.jobsIndex.total_pages) return;
         
+        // Limit automatic loading to prevent excessive memory use
+        // Max 15 pages (1500 jobs) loaded automatically
+        const maxAutoLoadPages = 15;
+        if (state.loadedPages.size >= maxAutoLoadPages) return;
+        
         const { total, totalPages } = JobsPage.getDisplayedJobs();
         const currentPage = JobsPage.displayPage;
         
