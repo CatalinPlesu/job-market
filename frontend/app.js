@@ -1034,6 +1034,27 @@ const ChartHelpers = {
             canvas.chart.destroy();
             canvas.chart = null;
         }
+    },
+    formatTitle: (key) => {
+        // Remove 'by_' prefix and format title
+        return key.includes('by_') ? 
+            key.replace('by_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) :
+            key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+    },
+    extractLabel: (item) => {
+        // Extract label from item based on various possible field names
+        return item.function || item.seniority || item.location || 
+               item.size || item.education || item.education_level ||
+               item.employment_type || item.remote_option || 
+               item.benefit || item.name || item.skill || 
+               item.company || 'Unknown';
+    },
+    generateColors: (count) => {
+        // Generate an array of colors for charts
+        return Array.from({ length: count }, (_, i) => {
+            const hue = (i * 360 / count);
+            return `hsla(${hue}, 70%, 60%, 0.7)`;
+        });
     }
 };
 
@@ -1228,10 +1249,7 @@ const AnalysisPage = {
                 m('div', { class: 'chart-container' }, [
                     m('canvas', {
                         oncreate: (vnode) => {
-                            const labels = topItems.map(item => 
-                                item.name || item.skill || item.company || item.function || 
-                                item.seniority || item.location || item.benefit || 'Unknown'
-                            );
+                            const labels = topItems.map(item => ChartHelpers.extractLabel(item));
                             const values = topItems.map(item => item.count);
                             
                             ChartHelpers.createChart(vnode.dom, {
@@ -1295,9 +1313,7 @@ const AnalysisPage = {
         if (!breakdownKey || !data[breakdownKey] || data[breakdownKey].length === 0) return null;
         
         const items = data[breakdownKey].slice(0, 10); // Top 10
-        const title = breakdownKey.includes('by_') ? 
-            breakdownKey.replace('by_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) :
-            breakdownKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const title = ChartHelpers.formatTitle(breakdownKey);
         
         return m('div', { class: 'card bg-base-100 shadow-xl' }, [
             m('div', { class: 'card-body' }, [
@@ -1305,20 +1321,9 @@ const AnalysisPage = {
                 m('div', { class: 'chart-container' }, [
                     m('canvas', {
                         oncreate: (vnode) => {
-                            // Extract labels based on data structure
-                            const labels = items.map(item => 
-                                item.function || item.seniority || item.location || 
-                                item.size || item.education || item.education_level ||
-                                item.employment_type || item.remote_option || 
-                                item.benefit || item.name || 'Unknown'
-                            );
+                            const labels = items.map(item => ChartHelpers.extractLabel(item));
                             const values = items.map(item => item.count);
-                            
-                            // Generate colors
-                            const backgroundColors = items.map((_, i) => {
-                                const hue = (i * 360 / items.length);
-                                return `hsla(${hue}, 70%, 60%, 0.7)`;
-                            });
+                            const backgroundColors = ChartHelpers.generateColors(items.length);
                             
                             ChartHelpers.createChart(vnode.dom, {
                                 type: 'doughnut',
