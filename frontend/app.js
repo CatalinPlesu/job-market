@@ -14,12 +14,16 @@ const state = {
     jobsIndex: null,
     currentPage: 1,
     jobs: [],
+    allLoadedJobs: [], // Cache of all jobs loaded so far
+    loadedPages: new Set(), // Track which pages have been loaded
     filters: {},
     loading: false,
     analysisIndex: null,
     selectedAnalysis: null,
     selectedAnalysisData: null,
-    showAnalysisModal: false
+    showAnalysisModal: false,
+    itemsPerPage: 20, // User-configurable items per page for display
+    availablePageSizes: [10, 20, 50, 100]
 };
 
 // Utility Functions
@@ -223,7 +227,7 @@ const FilterPanel = {
         if (!state.jobsIndex) return null;
         
         // Get filtered jobs based on current filters for hierarchical filtering
-        const filteredJobs = state.jobs.filter(job => matchesFilters(job, state.filters));
+        const filteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
         
         // All available filter fields
         const filterFields = [
@@ -244,6 +248,15 @@ const FilterPanel = {
         const basicFilters = filterFields.filter(f => f.basic);
         const advancedFilters = filterFields.filter(f => !f.basic);
         
+        const handleFilterChange = async () => {
+            JobsPage.displayPage = 1;
+            // Trigger loading more pages if needed
+            if (JobsPage.ensureSufficientJobs) {
+                await JobsPage.ensureSufficientJobs();
+            }
+            m.redraw();
+        };
+        
         return m('div', { class: 'bg-base-200 p-4 rounded-lg mb-4' }, [
             m('div', { class: 'flex justify-between items-center mb-4' }, [
                 m('h3', { class: 'font-bold' }, 'Filters'),
@@ -256,8 +269,7 @@ const FilterPanel = {
                         class: 'btn btn-xs btn-ghost',
                         onclick: () => {
                             state.filters = {};
-                            state.currentPage = 1;
-                            m.redraw();
+                            handleFilterChange();
                         }
                     }, 'Clear All')
                 ])
@@ -272,7 +284,7 @@ const FilterPanel = {
                             class: 'btn btn-xs btn-circle btn-ghost',
                             onclick: () => {
                                 delete state.filters[key];
-                                m.redraw();
+                                handleFilterChange();
                             }
                         }, '×')
                     ])
@@ -299,8 +311,7 @@ const FilterPanel = {
                                 } else {
                                     delete state.filters[field.key];
                                 }
-                                state.currentPage = 1;
-                                m.redraw();
+                                handleFilterChange();
                             }
                         }, [
                             m('option', { value: '' }, 'All'),
@@ -326,8 +337,7 @@ const FilterPanel = {
                                 } else {
                                     delete state.filters[field.key];
                                 }
-                                state.currentPage = 1;
-                                m.redraw();
+                                handleFilterChange();
                             }
                         }, [
                             m('option', { value: '' }, 'All'),
@@ -344,20 +354,63 @@ const FilterPanel = {
 
 // Jobs Page
 const JobsPage = {
+    displayPage: 1, // Current display page for filtered results
+    
     oninit: () => {
         state.loading = true;
         Promise.all([
             api.getJobsIndex(),
-            api.getJobsPage(state.currentPage)
+            api.getJobsPage(1) // Always start with page 1
         ]).then(([index, page]) => {
             state.jobsIndex = index;
-            state.jobs = page.jobs;
+            state.allLoadedJobs = page.jobs;
+            state.loadedPages = new Set([1]);
             state.loading = false;
+            // Load additional pages if needed for initial display
+            JobsPage.ensureSufficientJobs();
         });
     },
+    
+    // Load more pages from API until we have enough jobs to fill the display
+    ensureSufficientJobs: async () => {
+        const filteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
+        const needed = JobsPage.displayPage * state.itemsPerPage;
+        
+        // If we have enough filtered jobs or loaded all pages, we're done
+        if (filteredJobs.length >= needed || state.loadedPages.size >= state.jobsIndex.total_pages) {
+            m.redraw();
+            return;
+        }
+        
+        // Load next unloaded page
+        const nextPage = state.loadedPages.size + 1;
+        if (nextPage <= state.jobsIndex.total_pages && !state.loadedPages.has(nextPage)) {
+            try {
+                const pageData = await api.getJobsPage(nextPage);
+                state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
+                state.loadedPages.add(nextPage);
+                // Recursively check if we need more
+                await JobsPage.ensureSufficientJobs();
+            } catch (err) {
+                console.error(`Error loading page ${nextPage}:`, err);
+                m.redraw();
+            }
+        }
+    },
+    
+    getDisplayedJobs: () => {
+        const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
+        const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
+        const end = start + state.itemsPerPage;
+        return {
+            jobs: filtered.slice(start, end),
+            total: filtered.length,
+            totalPages: Math.ceil(filtered.length / state.itemsPerPage)
+        };
+    },
+    
     view: () => {
-        // Apply client-side filtering
-        const filteredJobs = state.jobs.filter(job => matchesFilters(job, state.filters));
+        const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
         const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k]);
         
         return m('div', { class: 'container mx-auto px-4 py-8' }, [
@@ -365,49 +418,78 @@ const JobsPage = {
             
             state.jobsIndex && m(FilterPanel),
             
+            // Page size selector
+            state.jobsIndex && m('div', { class: 'flex justify-between items-center mb-4' }, [
+                m('div', { class: 'text-sm' }, [
+                    m('span', { class: 'mr-2' }, 'Items per page:'),
+                    state.availablePageSizes.map(size =>
+                        m('button', {
+                            class: `btn btn-xs ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'} mr-1`,
+                            onclick: () => {
+                                state.itemsPerPage = size;
+                                JobsPage.displayPage = 1;
+                                JobsPage.ensureSufficientJobs();
+                            }
+                        }, size)
+                    )
+                ]),
+                m('div', { class: 'text-sm text-gray-600' }, [
+                    hasActiveFilters ? 
+                        `Showing ${jobs.length} of ${total} filtered jobs` :
+                        `Showing ${jobs.length} of ${state.allLoadedJobs.length} jobs (${state.loadedPages.size} of ${state.jobsIndex.total_pages} pages loaded)`
+                ])
+            ]),
+            
             state.loading ? m(Loading) : [
                 m('div', { class: 'bg-base-100 rounded-lg shadow mb-4 p-4' }, [
-                    m('div', { class: 'text-sm text-gray-600 mb-2' }, [
-                        hasActiveFilters ? 
-                            `Showing ${filteredJobs.length} filtered jobs (${state.jobs.length} total on page ${state.currentPage})` :
-                            `Showing ${state.jobs.length} jobs (Page ${state.currentPage} of ${state.jobsIndex ? state.jobsIndex.total_pages : '?'})`
-                    ]),
-                    filteredJobs.length > 0 ? 
-                        filteredJobs.map((job, idx) => m(JobListItem, { job, index: idx + 1 })) :
+                    jobs.length > 0 ? 
+                        jobs.map((job, idx) => m(JobListItem, { 
+                            job, 
+                            index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
+                        })) :
                         m('div', { class: 'text-center py-8 text-gray-500' }, 
-                            hasActiveFilters ? 'No jobs match your filters' : 'No jobs found'
+                            hasActiveFilters ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
                         )
                 ]),
                 
-                // Pagination
-                state.jobsIndex && m('div', { class: 'flex justify-center gap-2' }, [
+                // Pagination for display
+                totalPages > 1 && m('div', { class: 'flex justify-center gap-2 items-center' }, [
                     m('button', { 
                         class: 'btn btn-sm',
-                        disabled: state.currentPage === 1,
+                        disabled: JobsPage.displayPage === 1,
                         onclick: () => {
-                            state.currentPage--;
-                            state.loading = true;
-                            api.getJobsPage(state.currentPage).then(page => {
-                                state.jobs = page.jobs;
-                                state.loading = false;
-                                window.scrollTo(0, 0);
-                            });
+                            JobsPage.displayPage--;
+                            window.scrollTo(0, 0);
+                            m.redraw();
                         }
                     }, 'Previous'),
-                    m('span', { class: 'btn btn-sm btn-ghost' }, `Page ${state.currentPage} of ${state.jobsIndex.total_pages}`),
+                    m('span', { class: 'btn btn-sm btn-ghost' }, `Page ${JobsPage.displayPage} of ${totalPages}`),
                     m('button', { 
                         class: 'btn btn-sm',
-                        disabled: state.currentPage === state.jobsIndex.total_pages,
-                        onclick: () => {
-                            state.currentPage++;
-                            state.loading = true;
-                            api.getJobsPage(state.currentPage).then(page => {
-                                state.jobs = page.jobs;
-                                state.loading = false;
-                                window.scrollTo(0, 0);
-                            });
+                        disabled: JobsPage.displayPage === totalPages,
+                        onclick: async () => {
+                            JobsPage.displayPage++;
+                            await JobsPage.ensureSufficientJobs();
+                            window.scrollTo(0, 0);
                         }
-                    }, 'Next')
+                    }, 'Next'),
+                    // Load more from API button
+                    state.loadedPages.size < state.jobsIndex.total_pages && m('button', {
+                        class: 'btn btn-sm btn-outline ml-4',
+                        onclick: async () => {
+                            state.loading = true;
+                            const nextPage = state.loadedPages.size + 1;
+                            try {
+                                const pageData = await api.getJobsPage(nextPage);
+                                state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
+                                state.loadedPages.add(nextPage);
+                            } catch (err) {
+                                console.error(`Error loading page ${nextPage}:`, err);
+                            }
+                            state.loading = false;
+                            m.redraw();
+                        }
+                    }, `Load More (${state.loadedPages.size}/${state.jobsIndex.total_pages} pages)`)
                 ])
             ]
         ]);
