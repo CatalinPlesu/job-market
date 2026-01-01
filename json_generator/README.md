@@ -6,6 +6,7 @@ Generates paginated JSON files from SQLite databases for GitHub Pages API.
 
 - **Paginated Job Listings**: Generates page-1.json, page-2.json, etc. with configurable jobs per page (default: 100)
 - **Comprehensive Metadata**: index.json contains metadata for ALL 50+ filterable fields with per-page item counts
+- **Currency Conversion**: Automatically converts all salary values to MDL using current exchange rates
 - **Data Sanitization**: Removes contact emails, phones, and person names from output
 - **Company Blacklist**: Support for anonymizing companies on blacklist
 - **Field Coverage**: Supports all one-to-one and many-to-many database relationships
@@ -63,6 +64,34 @@ Each metadata entry includes:
 - `name`: The value
 - `count`: Total occurrences
 - `pages`: Array of `{page: N, count: X}` indicating which pages contain this value and how many items per page
+
+## Currency Conversion
+
+The generator automatically converts all salary values to MDL (Moldovan Leu) for easy comparison:
+
+**How it works:**
+1. Fetches current exchange rates from [open.er-api.com](https://open.er-api.com) at generation time
+2. Converts all salary amounts to MDL
+3. Includes both original and converted values in the output
+
+**Output format:**
+```json
+{
+  "salary": {
+    "min": 1000,
+    "max": 2000,
+    "currency": "USD",
+    "period": "month",
+    "min_mdl": 17500,
+    "max_mdl": 35000
+  }
+}
+```
+
+**Fallback behavior:**
+- If exchange rates cannot be fetched (network issues, API limits), conversion is skipped
+- Original salary values are always preserved
+- Generator continues without error
 
 ## Configuration
 

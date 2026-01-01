@@ -1,19 +1,39 @@
 """Job serialization to JSON format."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from src.data_database import JobDetail
 
 
-def serialize_job(job: JobDetail) -> Dict[str, Any]:
+def serialize_job(job: JobDetail, currency_converter=None) -> Dict[str, Any]:
     """
     Convert JobDetail object to JSON-serializable dictionary.
     
     Args:
         job: JobDetail database object.
+        currency_converter: Optional CurrencyConverter for salary conversion.
         
     Returns:
         Dictionary representation of job.
     """
+    # Get salary info
+    min_salary = float(job.min_salary) if job.min_salary else None
+    max_salary = float(job.max_salary) if job.max_salary else None
+    currency = job.salary_currency.code if job.salary_currency else None
+    
+    # Build salary dict with original values
+    salary_dict = {
+        'min': min_salary,
+        'max': max_salary,
+        'currency': currency,
+        'period': job.salary_period.name if job.salary_period else None,
+    }
+    
+    # Add MDL conversion if converter available
+    if currency_converter and currency:
+        converted = currency_converter.convert_salary_range(min_salary, max_salary, currency)
+        salary_dict['min_mdl'] = converted['min_mdl']
+        salary_dict['max_mdl'] = converted['max_mdl']
+    
     result = {
         'id': job.id,
         'title': job.title.name if job.title else None,
@@ -28,12 +48,7 @@ def serialize_job(job: JobDetail) -> Dict[str, Any]:
             'country': job.country.name if job.country else None,
             'remote_work': job.remote_work.name if job.remote_work else None,
         },
-        'salary': {
-            'min': float(job.min_salary) if job.min_salary else None,
-            'max': float(job.max_salary) if job.max_salary else None,
-            'currency': job.salary_currency.code if job.salary_currency else None,
-            'period': job.salary_period.name if job.salary_period else None,
-        },
+        'salary': salary_dict,
         'employment': {
             'type': job.employment_type.name if job.employment_type else None,
             'contract': job.contract_type.name if job.contract_type else None,
@@ -75,14 +90,15 @@ def serialize_job(job: JobDetail) -> Dict[str, Any]:
     return result
 
 
-def serialize_jobs(jobs: List[JobDetail]) -> List[Dict[str, Any]]:
+def serialize_jobs(jobs: List[JobDetail], currency_converter=None) -> List[Dict[str, Any]]:
     """
     Convert list of JobDetail objects to JSON-serializable list.
     
     Args:
         jobs: List of JobDetail database objects.
+        currency_converter: Optional CurrencyConverter for salary conversion.
         
     Returns:
         List of dictionary representations.
     """
-    return [serialize_job(job) for job in jobs]
+    return [serialize_job(job, currency_converter) for job in jobs]

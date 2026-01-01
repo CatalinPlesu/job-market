@@ -10,6 +10,7 @@ from .config import GeneratorConfig
 from .job_serializer import serialize_jobs
 from .data_sanitizer import DataSanitizer
 from .index_builder import IndexBuilder
+from .currency_converter import CurrencyConverter
 
 
 class JobsGenerator:
@@ -26,6 +27,7 @@ class JobsGenerator:
         self.output_dir = Path(output_dir or GeneratorConfig.OUTPUT_DIR)
         self.jobs_per_page = jobs_per_page or GeneratorConfig.JOBS_PER_PAGE
         self.sanitizer = DataSanitizer(GeneratorConfig.COMPANY_BLACKLIST_FILE)
+        self.currency_converter = CurrencyConverter()
     
     def generate(self, jobs: List[JobDetail]) -> None:
         """
@@ -74,8 +76,8 @@ class JobsGenerator:
         Returns:
             Page data dictionary.
         """
-        # Serialize jobs
-        serialized_jobs = serialize_jobs(jobs)
+        # Serialize jobs with currency conversion
+        serialized_jobs = serialize_jobs(jobs, self.currency_converter)
         
         # Sanitize jobs
         sanitized_jobs = [self.sanitizer.sanitize_job(job) for job in serialized_jobs]
