@@ -21,7 +21,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        <div className="min-h-screen flex flex-col bg-gray-50">
+        <div className="min-h-screen flex flex-col">
           <Header />
           <main className="flex-1">
             <Routes>
@@ -30,9 +30,9 @@ function App() {
               <Route path="/jobs/:jobId" element={<JobDetailPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="*" element={
-                <div className="container mx-auto px-4 py-8 text-center">
-                  <h1 className="text-4xl font-bold text-gray-900 mb-4">404 - Page Not Found</h1>
-                  <p className="text-gray-600">The page you're looking for doesn't exist.</p>
+                <div className="container mx-auto px-4 py-16 text-center">
+                  <h1 className="text-4xl font-bold mb-4">404 - Page Not Found</h1>
+                  <p className="text-muted-foreground">The page you're looking for doesn't exist.</p>
                 </div>
               } />
             </Routes>

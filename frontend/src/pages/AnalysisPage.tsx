@@ -3,6 +3,8 @@
 import { useAnalysisIndex } from '../api/hooks';
 import { Loading } from '../components/common/Loading';
 import { ErrorMessage } from '../components/common/ErrorMessage';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import { TrendingUp, Users, Briefcase, Clock } from 'lucide-react';
 
 export function AnalysisPage() {
   const { data: analysisIndex, isLoading, error } = useAnalysisIndex();
@@ -12,52 +14,89 @@ export function AnalysisPage() {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Job Market Analysis</h1>
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Market Analysis</h1>
+        <p className="text-muted-foreground">
+          Comprehensive insights into Moldova's job market
+        </p>
+      </div>
       
       {analysisIndex && (
         <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-3xl font-bold text-primary mb-2">
-              {analysisIndex.data_summary.total_jobs.toLocaleString()}
-            </div>
-            <div className="text-gray-600">Total Jobs</div>
-          </div>
+          <Card className="border-2">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardDescription>Total Jobs</CardDescription>
+                <Briefcase className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <CardTitle className="text-3xl">
+                {analysisIndex.data_summary.total_jobs.toLocaleString()}
+              </CardTitle>
+            </CardHeader>
+          </Card>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-3xl font-bold text-secondary mb-2">
-              {analysisIndex.data_summary.unique_companies.toLocaleString()}
-            </div>
-            <div className="text-gray-600">Companies</div>
-          </div>
+          <Card className="border-2">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardDescription>Companies</CardDescription>
+                <Users className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <CardTitle className="text-3xl">
+                {analysisIndex.data_summary.unique_companies.toLocaleString()}
+              </CardTitle>
+            </CardHeader>
+          </Card>
           
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-3xl font-bold text-accent mb-2">
-              {analysisIndex.data_summary.unique_skills.toLocaleString()}
-            </div>
-            <div className="text-gray-600">Unique Skills</div>
-          </div>
+          <Card className="border-2">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardDescription>Unique Skills</CardDescription>
+                <TrendingUp className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <CardTitle className="text-3xl">
+                {analysisIndex.data_summary.unique_skills.toLocaleString()}
+              </CardTitle>
+            </CardHeader>
+          </Card>
         </div>
       )}
       
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-4">Available Analyses</h2>
-        <p className="text-gray-600">Analysis visualizations will be implemented here.</p>
-        
-        {analysisIndex && (
-          <ul className="mt-4 space-y-2">
-            {analysisIndex.available_analyses.map((analysis) => (
-              <li key={analysis.id} className="p-3 border rounded hover:bg-gray-50">
-                <div className="font-semibold">{analysis.title}</div>
-                {analysis.last_updated && (
-                  <div className="text-sm text-gray-500">
-                    Updated: {new Date(analysis.last_updated).toLocaleDateString()}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">Available Analyses</CardTitle>
+          <CardDescription>
+            Interactive visualizations and insights (coming soon)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {analysisIndex && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {analysisIndex.available_analyses.map((analysis) => (
+                <Card key={analysis.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{analysis.title}</CardTitle>
+                        {analysis.last_updated && (
+                          <CardDescription className="flex items-center gap-1 mt-2">
+                            <Clock className="w-3 h-3" />
+                            Updated: {new Date(analysis.last_updated).toLocaleDateString()}
+                          </CardDescription>
+                        )}
+                      </div>
+                      {analysis.temporal && (
+                        <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
+                          Time Series
+                        </span>
+                      )}
+                    </div>
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

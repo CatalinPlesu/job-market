@@ -1,9 +1,14 @@
 // Jobs page with browsing and filtering
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useJobsIndex, useJobsPage } from '../api/hooks';
 import { Loading } from '../components/common/Loading';
 import { ErrorMessage } from '../components/common/ErrorMessage';
+import { Button } from '../components/ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { MapPin, Briefcase, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function JobsPage() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -15,12 +20,26 @@ export function JobsPage() {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Browse Jobs</h1>
-      
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-        <p className="text-gray-700">
-          Showing page {currentPage} of {index?.total_pages || 0} ({index?.total_jobs.toLocaleString() || 0} total jobs)
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2">Browse Jobs</h1>
+        <p className="text-muted-foreground">
+          Discover opportunities across Moldova
         </p>
+      </div>
+      
+      <div className="mb-6">
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Page {currentPage} of {index?.total_pages || 0}
+              </span>
+              <span className="font-medium">
+                {index?.total_jobs.toLocaleString() || 0} total jobs
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
       
       {/* TODO: Add filters here */}
@@ -31,43 +50,90 @@ export function JobsPage() {
         <ErrorMessage message="Failed to load jobs" />
       ) : (
         <div>
-          <div className="grid grid-cols-1 gap-4 mb-6">
+          <div className="grid grid-cols-1 gap-4 mb-8">
             {page?.jobs.map((job) => (
-              <div key={job.id} className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{job.title}</h3>
-                <p className="text-gray-600 mb-2">{job.company}</p>
-                <div className="flex flex-wrap gap-2 text-sm text-gray-500">
-                  {job.location.city && <span>📍 {job.location.city}</span>}
-                  {job.seniority_level && <span>👔 {job.seniority_level}</span>}
-                  {job.salary && (
-                    <span>
-                      💰 {job.salary.min?.toLocaleString()}-{job.salary.max?.toLocaleString()} {job.salary.currency}
-                    </span>
+              <Card key={job.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-2xl mb-2 hover:text-primary transition-colors">
+                        <Link to={`/jobs/${job.id}`}>{job.title}</Link>
+                      </CardTitle>
+                      <CardDescription className="text-base">
+                        {job.company}
+                      </CardDescription>
+                    </div>
+                    {job.seniority_level && (
+                      <Badge variant="secondary" className="ml-4">
+                        {job.seniority_level}
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                    {job.location.city && (
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        <span>{job.location.city}</span>
+                      </div>
+                    )}
+                    {job.job_function && (
+                      <div className="flex items-center gap-1">
+                        <Briefcase className="w-4 h-4" />
+                        <span>{job.job_function}</span>
+                      </div>
+                    )}
+                    {job.salary && (
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="w-4 h-4" />
+                        <span>
+                          {job.salary.min?.toLocaleString()}-{job.salary.max?.toLocaleString()} {job.salary.currency}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {job.requirements.hard_skills.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {job.requirements.hard_skills.slice(0, 5).map((skill, idx) => (
+                        <Badge key={idx} variant="outline">
+                          {skill}
+                        </Badge>
+                      ))}
+                      {job.requirements.hard_skills.length > 5 && (
+                        <Badge variant="outline">
+                          +{job.requirements.hard_skills.length - 5} more
+                        </Badge>
+                      )}
+                    </div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
           
           {/* Pagination */}
-          <div className="flex justify-center gap-2">
-            <button
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 bg-white border rounded-md disabled:opacity-50 hover:bg-gray-50"
             >
+              <ChevronLeft className="w-4 h-4 mr-2" />
               Previous
-            </button>
-            <span className="px-4 py-2">
+            </Button>
+            <div className="px-4 py-2 text-sm text-muted-foreground">
               Page {currentPage} of {index?.total_pages || 0}
-            </span>
-            <button
+            </div>
+            <Button
+              variant="outline"
               onClick={() => setCurrentPage(p => Math.min(index?.total_pages || p, p + 1))}
               disabled={currentPage === (index?.total_pages || 0)}
-              className="px-4 py-2 bg-white border rounded-md disabled:opacity-50 hover:bg-gray-50"
             >
               Next
-            </button>
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
         </div>
       )}
