@@ -51,27 +51,42 @@ const getMetadataKey = (filterKey) => {
 };
 
 // Helper to find filter metadata for active filters
+// Note: Currently only supports single filter metadata lookups.
+// When multiple filters are active, returns metadata for the first one found.
+// This is a limitation of the current metadata structure which doesn't include
+// intersection counts for multiple filter combinations.
 const getActiveFilterMetadata = (filters, jobsIndex) => {
     if (!jobsIndex || !jobsIndex.metadata) return null;
+    
+    let activeFilterCount = 0;
+    let firstFilterMetadata = null;
     
     for (const [filterKey, filterValue] of Object.entries(filters)) {
         if (filterValue === null || filterValue === undefined || filterValue === '') continue;
         
+        // Skip numeric range filters (salaryMin, salaryMax, experienceMin, experienceMax)
+        if (['salaryMin', 'salaryMax', 'experienceMin', 'experienceMax'].includes(filterKey)) continue;
+        
+        activeFilterCount++;
+        
         const metadataKey = getMetadataKey(filterKey);
         
-        if (jobsIndex.metadata[metadataKey]) {
+        if (jobsIndex.metadata[metadataKey] && !firstFilterMetadata) {
             const metadataItems = jobsIndex.metadata[metadataKey];
             
             // Find the matching metadata entry
             for (const item of metadataItems) {
                 if (item.name === filterValue) {
-                    return item;
+                    firstFilterMetadata = item;
+                    break;
                 }
             }
         }
     }
     
-    return null;
+    // Only return metadata if there's exactly one active filter
+    // When multiple filters are active, we can't use single-filter metadata counts
+    return activeFilterCount === 1 ? firstFilterMetadata : null;
 };
 
 const formatSalary = (salary) => {
