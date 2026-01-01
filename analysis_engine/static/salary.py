@@ -160,7 +160,8 @@ class SalaryBySeniorityAnalysis(BaseAnalysis):
             
             if salaries_clean:
                 stats = Aggregator.compute_stats(salaries_clean)
-                stats['seniority_level'] = level_name
+                stats['seniority'] = level_name
+                stats['seniority_level'] = level_name  # Keep for backward compatibility
                 # Add order for frontend sorting
                 try:
                     stats['order'] = seniority_order.index(level_name.lower())
@@ -226,7 +227,8 @@ class SalaryByLocationAnalysis(BaseAnalysis):
             
             if salaries_clean:
                 stats = Aggregator.compute_stats(salaries_clean)
-                stats['city'] = city_name
+                stats['location'] = city_name
+                stats['city'] = city_name  # Keep for backward compatibility
                 results.append(stats)
         
         # Sort by count descending
@@ -290,7 +292,8 @@ class SalaryByCompanySizeAnalysis(BaseAnalysis):
             
             if salaries_clean:
                 stats = Aggregator.compute_stats(salaries_clean)
-                stats['company_size'] = size_name
+                stats['size'] = size_name
+                stats['company_size'] = size_name  # Keep for backward compatibility
                 # Add order for frontend sorting
                 try:
                     stats['order'] = size_order.index(size_name.lower())
@@ -359,7 +362,8 @@ class SalaryByEducationAnalysis(BaseAnalysis):
             
             if salaries_clean:
                 stats = Aggregator.compute_stats(salaries_clean)
-                stats['education_level'] = edu_name
+                stats['education'] = edu_name
+                stats['education_level'] = edu_name  # Keep for backward compatibility
                 # Add order for frontend sorting
                 try:
                     stats['order'] = education_order.index(edu_name.lower())

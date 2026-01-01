@@ -2,33 +2,17 @@
   "version": "1.0",
   "analysis_id": "market-health",
   "title": "Market Health Indicators",
-  "generated_at": "2026-01-01T13:27:58.740803Z",
+  "generated_at": "2026-01-01T17:59:36.688419Z",
   "type": "temporal",
   "data": {
-    "granularity": "daily",
+    "granularity": "monthly",
     "market_trends": [
       {
-        "period": "2025-12-25",
-        "new_jobs": 16350,
-        "closed_jobs": 12,
-        "net_change": 16338,
-        "cumulative_active": 16338
-      },
-      {
-        "period": "2025-12-26",
-        "new_jobs": 136,
-        "closed_jobs": 0,
-        "net_change": 136,
-        "cumulative_active": 16474,
-        "growth_rate": 0.83
-      },
-      {
-        "period": "2025-12-27",
-        "new_jobs": 25,
-        "closed_jobs": 100,
-        "net_change": -75,
-        "cumulative_active": 16399,
-        "growth_rate": -0.46
+        "period": "2025-12",
+        "new_jobs": 16511,
+        "closed_jobs": 112,
+        "net_change": 16399,
+        "cumulative_active": 16399
       }
     ]
   },

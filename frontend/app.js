@@ -1018,6 +1018,38 @@ const JobDetailPage = {
     }
 };
 
+// Helper object for field name mapping (backward compatibility)
+const FieldMapping = {
+    map: {
+        'function': ['function'],
+        'seniority': ['seniority', 'seniority_level'],
+        'location': ['location', 'city'],
+        'size': ['size', 'company_size'],
+        'education': ['education', 'education_level']
+    },
+    getValue: (item, fieldName) => {
+        if (FieldMapping.map[fieldName]) {
+            for (const field of FieldMapping.map[fieldName]) {
+                if (field in item && item[field] !== null && item[field] !== undefined) {
+                    return item[field];
+                }
+            }
+        }
+        return item[fieldName];
+    },
+    extractLabel: (item) => {
+        // Try known field mappings first
+        for (const fieldName of ['function', 'seniority', 'location', 'size', 'education']) {
+            const value = FieldMapping.getValue(item, fieldName);
+            if (value !== null && value !== undefined) return value;
+        }
+        // Fallback to other common fields
+        return item.employment_type || item.remote_option || 
+               item.benefit || item.name || item.skill || 
+               item.company || 'Unknown';
+    }
+};
+
 // Chart Helper Functions
 const ChartHelpers = {
     createChart: (canvas, config) => {
@@ -1042,12 +1074,8 @@ const ChartHelpers = {
             key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
     },
     extractLabel: (item) => {
-        // Extract label from item based on various possible field names
-        return item.function || item.seniority || item.location || 
-               item.size || item.education || item.education_level ||
-               item.employment_type || item.remote_option || 
-               item.benefit || item.name || item.skill || 
-               item.company || 'Unknown';
+        // Use centralized field mapping for consistency
+        return FieldMapping.extractLabel(item);
     },
     generateColors: (count) => {
         // Generate an array of colors for charts
@@ -1060,9 +1088,449 @@ const ChartHelpers = {
 
 // Analysis Page
 const AnalysisPage = {
+    // Helper function to get field value with fallback for backward compatibility
+    getFieldValue: (item, fieldName) => {
+        return FieldMapping.getValue(item, fieldName);
+    },
+    // Get preview text for analysis based on its type
+    getPreviewText: (analysis) => {
+        const previewMap = {
+            'salary-overview': 'Overall salary statistics across all jobs with distribution ranges',
+            'salary-by-function': 'Salary breakdown by different job functions and roles',
+            'salary-by-seniority': 'Salary progression across seniority levels from entry to executive',
+            'salary-by-location': 'Salary comparison across different cities and regions',
+            'salary-by-company-size': 'How company size impacts salary ranges',
+            'salary-by-education': 'Salary correlation with education level requirements',
+            'skills-demand': 'Most in-demand skills in the job market',
+            'skills-salary': 'Skills that command the highest salaries',
+            'skill-combinations': 'Common skill pairings in job postings',
+            'employment-types': 'Distribution of full-time, part-time, and contract positions',
+            'remote-work': 'Remote work availability and trends',
+            'benefits': 'Most frequently offered employee benefits',
+            'requirements': 'Common job requirements and qualifications',
+            'top-companies': 'Companies posting the most jobs',
+            'posting-trends': 'Job posting volume over time',
+            'salary-trends': 'Salary changes and trends over time',
+            'skills-trends': 'Evolving skill demand over time',
+            'remote-work-trends': 'Remote work adoption trends',
+            'job-duration': 'How long job postings remain active',
+            'market-health': 'Overall job market health indicators',
+            'salary-by-hierarchy': 'Salary structure across organizational hierarchy'
+        };
+        return previewMap[analysis.id] || 'Detailed analysis with visualizations and statistics';
+    },
+    // Render mini chart preview for analysis card
+    renderMiniChart: (analysis) => {
+        if (!analysis.previewData || analysis.previewData.error) {
+            return m('div', { class: 'flex items-center justify-center h-32 text-xs opacity-60' }, 
+                'Loading preview...'
+            );
+        }
+        
+        const data = analysis.previewData;
+        
+        // Create mini chart based on data type
+        return m('div', { class: 'h-32' }, [
+            m('canvas', {
+                oncreate: (vnode) => {
+                    AnalysisPage.createMiniChart(vnode.dom, data, analysis.id);
+                },
+                onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+            })
+        ]);
+    },
+    // Create mini chart for preview
+    createMiniChart: (canvas, data, analysisId) => {
+        let chartConfig = null;
+        
+        // Distribution-based analyses (bar chart)
+        if (data.distribution && data.distribution.length > 0) {
+            const items = data.distribution.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.range || `${item.min}-${item.max}`),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Breakdown analyses (top items - horizontal bar)
+        else if (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education) {
+            const breakdownKey = data.by_function ? 'by_function' : 
+                                data.by_seniority ? 'by_seniority' : 
+                                data.by_location ? 'by_location' : 
+                                data.by_company_size ? 'by_company_size' : 'by_education';
+            const items = data[breakdownKey].slice(0, 5);
+            
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => FieldMapping.extractLabel(item)),
+                    datasets: [{
+                        data: items.map(item => item.average || item.count),
+                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                        borderColor: 'rgba(168, 85, 247, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Top items (skills, companies, benefits)
+        else if (data.top_skills || data.top_companies || data.top_benefits) {
+            const itemsKey = data.top_skills ? 'top_skills' : data.top_companies ? 'top_companies' : 'top_benefits';
+            const items = data[itemsKey].slice(0, 5);
+            
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.name || item.skill || item.benefit || item.company),
+                    datasets: [{
+                        data: items.map(item => item.count || item.job_count),
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Time series data (line chart) - check for various time series field names
+        else if (data.time_series || data.trends || data.salary_trends || data.market_trends) {
+            const series = data.time_series || data.trends || data.salary_trends || data.market_trends;
+            const items = series.slice(0, 10);
+            
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: items.map(item => item.date || item.period),
+                    datasets: [{
+                        data: items.map(item => item.count || item.new_jobs || item.average),
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Skills-salary (bubble style with bars)
+        else if (data.skills_salary || data.top_10_highest_paying) {
+            const items = (data.top_10_highest_paying || data.skills_salary).slice(0, 5);
+            
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.skill),
+                    datasets: [{
+                        data: items.map(item => item.average),
+                        backgroundColor: 'rgba(234, 179, 8, 0.7)',
+                        borderColor: 'rgba(234, 179, 8, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Employment types, remote work (doughnut for categorical data)
+        else if (data.employment_types || data.remote_options) {
+            const itemsKey = data.employment_types ? 'employment_types' : 'remote_options';
+            const items = data[itemsKey].slice(0, 4);
+            
+            chartConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: items.map(item => item.type || item.option),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: [
+                            'rgba(99, 102, 241, 0.7)',
+                            'rgba(168, 85, 247, 0.7)',
+                            'rgba(34, 197, 94, 0.7)',
+                            'rgba(234, 179, 8, 0.7)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '60%'
+                }
+            };
+        }
+        // Overall stats (simple stat display)
+        else if (data.overall) {
+            const stats = data.overall;
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: ['Min', '25%', 'Avg', 'Median', '75%', 'Max'],
+                    datasets: [{
+                        data: [
+                            stats.min || 0,
+                            stats.percentile_25 || 0,
+                            stats.average || 0,
+                            stats.median || 0,
+                            stats.percentile_75 || 0,
+                            stats.max || 0
+                        ],
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Education requirements (bar chart)
+        else if (data.education_requirements && data.education_requirements.length > 0) {
+            const items = data.education_requirements.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.education_level || item.education),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                        borderColor: 'rgba(168, 85, 247, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Duration distribution
+        else if (data.duration_distribution && data.duration_distribution.length > 0) {
+            const items = data.duration_distribution.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.range),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Hierarchy tree (horizontal bar for top levels)
+        else if (data.tree && data.tree.length > 0) {
+            const items = data.tree.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.name),
+                    datasets: [{
+                        data: items.map(item => item.average_salary || item.count),
+                        backgroundColor: 'rgba(234, 179, 8, 0.7)',
+                        borderColor: 'rgba(234, 179, 8, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Remote work trends (stacked area approximation with line chart)
+        else if (data.remote_trends && data.remote_trends.length > 0) {
+            const items = data.remote_trends.slice(0, 10);
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: items.map(item => item.period),
+                    datasets: [{
+                        label: 'Remote',
+                        data: items.map(item => item.remote?.count || 0),
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.3)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Skill trends (complex - show first skill's trend)
+        else if (data.skill_trends && Object.keys(data.skill_trends).length > 0) {
+            const firstSkill = Object.keys(data.skill_trends)[0];
+            const skillData = data.skill_trends[firstSkill];
+            if (Array.isArray(skillData) && skillData.length > 0) {
+                const items = skillData.slice(0, 10);
+                chartConfig = {
+                    type: 'line',
+                    data: {
+                        labels: items.map(item => item.period),
+                        datasets: [{
+                            data: items.map(item => item.count),
+                            borderColor: 'rgba(168, 85, 247, 1)',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { display: false },
+                            x: { display: false }
+                        }
+                    }
+                };
+            }
+        }
+        // Duration stats as fallback
+        else if (data.duration_stats) {
+            const stats = data.duration_stats;
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: ['Min', '25%', 'Avg', 'Median', '75%', 'Max'],
+                    datasets: [{
+                        data: [
+                            stats.min || 0,
+                            stats.percentile_25 || 0,
+                            stats.average || 0,
+                            stats.median || 0,
+                            stats.percentile_75 || 0,
+                            stats.max || 0
+                        ],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        
+        if (chartConfig) {
+            ChartHelpers.createChart(canvas, chartConfig);
+        }
+    },
     oninit: () => {
         api.getAnalysisIndex().then(data => {
             state.analysisIndex = data;
+            // Load preview data for each analysis
+            if (data.analyses) {
+                data.analyses.forEach(analysis => {
+                    analysis.previewData = null; // Initialize
+                    api.getAnalysis(`${analysis.id}.json`).then(response => {
+                        analysis.previewData = response.data || response;
+                        m.redraw();
+                    }).catch(err => {
+                        console.error(`Error loading preview for ${analysis.id}:`, err);
+                    });
+                });
+            }
         }).catch(err => {
             console.error('Error loading analysis index:', err);
             state.analysisIndex = { error: true };
@@ -1298,6 +1766,173 @@ const AnalysisPage = {
             ])
         ]);
     },
+    renderEducationChart: (data) => {
+        if (!data || !data.by_education || data.by_education.length === 0) return null;
+        
+        const items = data.by_education;
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, 'Salary by Education Level'),
+                
+                // Statistics cards
+                m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2 mb-4' }, 
+                    items.map(item => 
+                        m('div', { class: 'stat bg-base-200 rounded-lg p-2' }, [
+                            m('div', { class: 'stat-title text-xs' }, AnalysisPage.getFieldValue(item, 'education')),
+                            m('div', { class: 'stat-value text-sm' }, `${Math.round(item.average || 0).toLocaleString()}`),
+                            m('div', { class: 'stat-desc text-xs' }, `${item.count} jobs`)
+                        ])
+                    )
+                ),
+                
+                // Bar chart with grouped data
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = items.map(item => AnalysisPage.getFieldValue(item, 'education'));
+                            const avgSalaries = items.map(item => Math.round(item.average || 0));
+                            const medianSalaries = items.map(item => Math.round(item.median || 0));
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Average Salary',
+                                        data: avgSalaries,
+                                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                                        borderColor: 'rgba(99, 102, 241, 1)',
+                                        borderWidth: 1
+                                    }, {
+                                        label: 'Median Salary',
+                                        data: medianSalaries,
+                                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                                        borderColor: 'rgba(168, 85, 247, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: (value) => `${value.toLocaleString()} MDL`
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const item = items[context.dataIndex];
+                                                    const label = context.dataset.label || '';
+                                                    const value = context.parsed.y;
+                                                    return [
+                                                        `${label}: ${value.toLocaleString()} MDL`,
+                                                        `Jobs: ${item.count}`,
+                                                        `Min: ${Math.round(item.min || 0).toLocaleString()} MDL`,
+                                                        `Max: ${Math.round(item.max || 0).toLocaleString()} MDL`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
+    renderSkillsSalaryChart: (data) => {
+        if (!data || !data.top_10_highest_paying || data.top_10_highest_paying.length === 0) return null;
+        
+        const skills = data.top_10_highest_paying;
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, 'Top 10 Highest Paying Skills'),
+                m('p', { class: 'text-sm text-gray-600 mb-4' }, 'Skills with the highest average salaries'),
+                
+                // Horizontal bar chart with statistics
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = skills.map(item => item.skill);
+                            const averages = skills.map(item => Math.round(item.average || 0));
+                            const medians = skills.map(item => Math.round(item.median || 0));
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Average Salary',
+                                        data: averages,
+                                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                        borderColor: 'rgba(34, 197, 94, 1)',
+                                        borderWidth: 1
+                                    }, {
+                                        label: 'Median Salary',
+                                        data: medians,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                        borderColor: 'rgba(59, 130, 246, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: (value) => `${value.toLocaleString()} MDL`
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const item = skills[context.dataIndex];
+                                                    const label = context.dataset.label || '';
+                                                    const value = context.parsed.x;
+                                                    return [
+                                                        `${label}: ${value.toLocaleString()} MDL`,
+                                                        `Jobs: ${item.count}`,
+                                                        `Min: ${Math.round(item.min || 0).toLocaleString()} MDL`,
+                                                        `Max: ${Math.round(item.max || 0).toLocaleString()} MDL`,
+                                                        `25th percentile: ${Math.round(item.percentile_25 || 0).toLocaleString()} MDL`,
+                                                        `75th percentile: ${Math.round(item.percentile_75 || 0).toLocaleString()} MDL`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
     renderBreakdownChart: (data) => {
         // Check for various breakdown formats
         const breakdownKey = data.by_function ? 'by_function' : 
@@ -1311,6 +1946,9 @@ const AnalysisPage = {
                             data.top_benefits ? 'top_benefits' : null;
         
         if (!breakdownKey || !data[breakdownKey] || data[breakdownKey].length === 0) return null;
+        
+        // Skip education - it has specialized rendering
+        if (breakdownKey === 'by_education') return null;
         
         const items = data[breakdownKey].slice(0, 10); // Top 10
         const title = ChartHelpers.formatTitle(breakdownKey);
@@ -1411,9 +2049,15 @@ const AnalysisPage = {
             data.top_companies && AnalysisPage.renderTopItemsChart(data, 'top_companies', 'Top Companies'),
             data.top_benefits && AnalysisPage.renderTopItemsChart(data, 'top_benefits', 'Most Common Benefits'),
             
+            // Specialized skills-salary visualization
+            data.skills_salary && AnalysisPage.renderSkillsSalaryChart(data),
+            
             // Requirements charts
             data.education_requirements && AnalysisPage.renderBreakdownChart({ education_requirements: data.education_requirements }),
             data.experience_requirements && AnalysisPage.renderDistributionChart({ distribution: data.experience_requirements }),
+            
+            // Education level - specialized bar chart with statistics
+            data.by_education && AnalysisPage.renderEducationChart(data),
             
             // Breakdown pie chart (general)
             AnalysisPage.renderBreakdownChart(data),
@@ -1634,19 +2278,39 @@ const AnalysisPage = {
                     m('span', `${state.analysisIndex.analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
                 ]),
             
-            state.analysisIndex.analyses && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
-                state.analysisIndex.analyses.map(analysis => 
-                    m('div', { class: 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow' }, [
-                        m('div', { class: 'card-body' }, [
-                            m('h2', { class: 'card-title text-lg' }, analysis.title),
-                            m('p', { class: 'text-xs text-gray-500' }, `${analysis.id}.json`),
-                            analysis.temporal && m('span', { class: 'badge badge-secondary mt-2' }, 'Time Series'),
-                            m('div', { class: 'card-actions justify-end mt-4' }, [
-                                m('a', { 
-                                    class: 'btn btn-primary btn-sm',
-                                    href: `#!/analysis/${analysis.id}`,
-                                    oncreate: m.route.link
-                                }, 'View Analysis')
+            state.analysisIndex.analyses && m('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4' },
+                state.analysisIndex.analyses.map((analysis, idx) => 
+                    m('a', { 
+                        href: `#!/analysis/${analysis.id}`,
+                        oncreate: m.route.link,
+                        class: 'card bg-base-100 shadow-lg hover:shadow-xl transition-shadow cursor-pointer border border-base-300'
+                    }, [
+                        m('div', { class: 'card-body p-4' }, [
+                            // Header with number and title
+                            m('div', { class: 'flex items-start gap-2 mb-2' }, [
+                                m('span', { class: 'text-sm opacity-60 mt-1' }, `${idx + 1}.`),
+                                m('h3', { class: 'card-title text-base flex-1' }, analysis.title)
+                            ]),
+                            
+                            // Badges
+                            m('div', { class: 'flex flex-wrap gap-2 mb-3' }, [
+                                m('span', { class: 'badge badge-ghost badge-sm' }, analysis.id),
+                                analysis.temporal && m('span', { class: 'badge badge-secondary badge-sm' }, 'Time Series'),
+                                analysis.type && m('span', { class: 'badge badge-outline badge-sm' }, analysis.type)
+                            ]),
+                            
+                            // Preview section with mini chart
+                            m('div', { class: 'bg-base-200 rounded-lg p-3 mt-2' }, [
+                                m('div', { class: 'flex items-center justify-between mb-2' }, [
+                                    m('span', { class: 'text-xs opacity-70' }, 'Quick Preview'),
+                                    m('div', { class: 'flex items-center gap-1 text-primary' }, [
+                                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+                                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
+                                        ]),
+                                        m('span', { class: 'text-xs font-medium' }, 'Click for details')
+                                    ])
+                                ]),
+                                AnalysisPage.renderMiniChart(analysis)
                             ])
                         ])
                     ])

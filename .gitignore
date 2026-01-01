@@ -34,3 +34,5 @@ test_*.py
 
 # Generated analysis JSON files
 pages/
+# Exclude generated analysis files from frontend/api
+/frontend/api/*.json
