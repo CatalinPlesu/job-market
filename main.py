@@ -12,6 +12,14 @@ from config.settings import Config
 from datetime import datetime
 from pathlib import Path
 
+# Analysis engine imports
+try:
+    from analysis_engine.generator import AnalysisGenerator
+    from analysis_engine.config import AnalysisConfig
+    ANALYSIS_ENGINE_AVAILABLE = True
+except ImportError:
+    ANALYSIS_ENGINE_AVAILABLE = False
+
 
 # Menu Item Classes
 class ScrapeJobsListItem:
@@ -73,8 +81,9 @@ class ProcessDataItem:
         return "Process Data (Generate Analysis)"
     
     def execute(self):
-        from analysis_engine.generator import AnalysisGenerator
-        from analysis_engine.config import AnalysisConfig
+        if not ANALYSIS_ENGINE_AVAILABLE:
+            print("\n✗ Analysis engine not available. Please ensure it's properly installed.")
+            return True
         
         print("\n" + "="*80)
         print("ANALYSIS GENERATION")
@@ -166,10 +175,12 @@ class ProcessDataItem:
         config.TOP_N_SKILLS = top_n_skills
         config.TOP_N_COMPANIES = top_n_companies
         
-        print(f"\nGenerating {21} analyses to {output_dir}...")
+        generator = AnalysisGenerator(output_dir, config)
+        total_analyses = len(generator.analyses)
+        
+        print(f"\nGenerating {total_analyses} analyses to {output_dir}...")
         print("="*80)
         
-        generator = AnalysisGenerator(output_dir, config)
         exit_code = generator.generate_all()
         
         if exit_code == 0:
