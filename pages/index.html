@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Market - Moldova</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+        
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+        
+        .error {
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #c33;
+        }
+        
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+            
+            header p {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="container">
+                <h1>Job Market - Moldova</h1>
+                <p>Explore job opportunities across Moldova</p>
+            </div>
+        </header>
+        
+        <div class="container">
+            <div v-if="loading" class="loading">
+                Loading job data...
+            </div>
+            
+            <div v-else-if="error" class="error">
+                {{ error }}
+            </div>
+            
+            <template v-else>
+                <filters-component 
+                    :lookups="lookups"
+                    :filters="filters"
+                    @update-filters="updateFilters"
+                ></filters-component>
+                
+                <job-list-component 
+                    v-if="!selectedJob"
+                    :jobs="currentPageJobs"
+                    :current-page="currentPage"
+                    :total-pages="totalPages"
+                    :lookups="lookups"
+                    @select-job="selectJob"
+                    @change-page="changePage"
+                ></job-list-component>
+                
+                <job-detail-component 
+                    v-else
+                    :job="selectedJob"
+                    :lookups="lookups"
+                    @back="selectedJob = null"
+                ></job-detail-component>
+            </template>
+        </div>
+    </div>
+    
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

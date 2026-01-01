@@ -94,7 +94,17 @@ Process raw job descriptions with LLM:
 Additional data processing and normalization tasks (placeholder - not yet implemented)
 
 ### 9. Generate HTML Page
-Create static HTML report with job listings and statistics (placeholder - not yet implemented)
+Create static GitHub Pages site with Vue.js SPA for browsing jobs:
+- **Vue.js Single Page Application**: Modern, interactive job browser
+- **Paginated API**: Jobs split into 50-job pages with metadata
+- **Normalized Data**: Lookup tables reduce redundancy and file size
+- **Duplicate Detection**: Merges jobs with same title + company, showing all source sites
+- **Job Details with Tabs**:
+  - Structured view: Clean display of all job information
+  - Raw data view: Debug tab with full JSON
+- **Filtering**: Search, city, seniority, employment type, work location
+- **Output Directory**: `/pages` (ready for GitHub Pages hosting)
+- See `/pages/README.md` for detailed documentation
 
 ### 10. Database Rollback
 Restore databases from previous backups:
