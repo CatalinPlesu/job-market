@@ -3,7 +3,6 @@ from src.scrape_job_details import scrape_job_details
 from src.scrape_job_recheck import recheck_alive_jobs, recheck_all_jobs
 from src.structure_data_with_llm import structure_data_with_llm
 from src.process_data import process_data
-from src.generate_html_page import generate_html_page
 from src.menu import Menu
 from src.scheduled_scraper import run_all_stages_scheduled
 from src.scheduler import Scheduler
@@ -77,12 +76,59 @@ class ProcessDataItem:
         return True
 
 
-class GenerateHtmlItem:
+class GenerateJsonApiItem:
     def get_item_description(self):
-        return "Generate HTML Page"
+        return "Generate JSON API for GitHub Pages"
     
     def execute(self):
-        generate_html_page()
+        print("\n" + "="*80)
+        print("JSON API GENERATION")
+        print("="*80)
+        print("\nThis will generate paginated JSON files for GitHub Pages:")
+        print("  • index.json with metadata for all 50+ filterable fields")
+        print("  • page-N.json files with job listings (100 jobs per page)")
+        print("  • Sanitizes contact information (emails, phones, person names)")
+        print()
+        
+        output_dir = input("Enter output directory (default: pages/api): ").strip()
+        if not output_dir:
+            output_dir = "pages/api"
+        
+        print(f"\nGenerating JSON API to {output_dir}...")
+        print()
+        
+        try:
+            from json_generator.db_connector import DatabaseConnector
+            from json_generator.jobs_generator import JobsGenerator
+            
+            # Load jobs from database
+            with DatabaseConnector() as db:
+                jobs_count = db.get_jobs_count()
+                print(f"Found {jobs_count} jobs in database")
+                
+                if jobs_count == 0:
+                    print("\n⚠ No jobs found in database. Nothing to generate.")
+                    return True
+                
+                print("Loading jobs with relationships...")
+                jobs = db.get_all_jobs()
+                print(f"✓ Loaded {len(jobs)} jobs")
+            
+            # Generate JSON files
+            print()
+            generator = JobsGenerator(output_dir=output_dir)
+            generator.generate(jobs)
+            
+            print()
+            print(f"✓ JSON API generated successfully to {output_dir}/")
+            print(f"  - {output_dir}/jobs/index.json")
+            print(f"  - {output_dir}/jobs/page-*.json")
+        
+        except Exception as e:
+            print(f"\n✗ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        
         return True
 
 
@@ -230,7 +276,7 @@ def run():
     menu.register_item(RecheckAllJobsItem())
     menu.register_item(StructureDataItem())
     menu.register_item(ProcessDataItem())
-    menu.register_item(GenerateHtmlItem())
+    menu.register_item(GenerateJsonApiItem())
     menu.register_item(DatabaseRollbackItem())
     
     # Run the menu
