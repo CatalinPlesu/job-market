@@ -80,6 +80,22 @@ class ProcessDataItem:
     def get_item_description(self):
         return "Process Data (Generate Analysis)"
     
+    def _get_positive_int_input(self, prompt, default_value):
+        """Helper method to get and validate positive integer input."""
+        user_input = input(prompt).strip()
+        if not user_input:
+            user_input = default_value
+        
+        try:
+            value = int(user_input)
+            if value <= 0:
+                print(f"Invalid input (must be positive), using default: {default_value}")
+                return int(default_value)
+            return value
+        except ValueError:
+            print(f"Invalid input, using default: {default_value}")
+            return int(default_value)
+    
     def execute(self):
         if not ANALYSIS_ENGINE_AVAILABLE:
             print("\n✗ Analysis engine not available. Please ensure it's properly installed.")
@@ -117,40 +133,22 @@ class ProcessDataItem:
         granularity = granularity_map.get(granularity_choice, "monthly")
         
         # Min sample size
-        default_min_size = "10"
-        min_size = input(f"\nMinimum sample size for analysis [{default_min_size}]: ").strip()
-        if not min_size:
-            min_size = default_min_size
-        
-        try:
-            min_sample_size = int(min_size)
-        except ValueError:
-            print(f"Invalid input, using default: {default_min_size}")
-            min_sample_size = int(default_min_size)
+        min_sample_size = self._get_positive_int_input(
+            "\nMinimum sample size for analysis [10]: ",
+            "10"
+        )
         
         # Top N skills
-        default_top_skills = "20"
-        top_skills = input(f"Top N skills to include [{default_top_skills}]: ").strip()
-        if not top_skills:
-            top_skills = default_top_skills
-        
-        try:
-            top_n_skills = int(top_skills)
-        except ValueError:
-            print(f"Invalid input, using default: {default_top_skills}")
-            top_n_skills = int(default_top_skills)
+        top_n_skills = self._get_positive_int_input(
+            "Top N skills to include [20]: ",
+            "20"
+        )
         
         # Top N companies
-        default_top_companies = "50"
-        top_companies = input(f"Top N companies to include [{default_top_companies}]: ").strip()
-        if not top_companies:
-            top_companies = default_top_companies
-        
-        try:
-            top_n_companies = int(top_companies)
-        except ValueError:
-            print(f"Invalid input, using default: {default_top_companies}")
-            top_n_companies = int(default_top_companies)
+        top_n_companies = self._get_positive_int_input(
+            "Top N companies to include [50]: ",
+            "50"
+        )
         
         # Confirm
         print("\n" + "-"*80)
