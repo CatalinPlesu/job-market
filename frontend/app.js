@@ -911,22 +911,16 @@ const JobDetailPage = {
                 
                 if (job) {
                     JobDetailPage.job = job;
-                    // Also add to loaded jobs for caching
+                    // Also add to loaded jobs for caching, avoiding duplicates
                     if (!state.allLoadedJobs) state.allLoadedJobs = [];
-                    state.allLoadedJobs.push(...pageData.jobs);
+                    const existingIds = new Set(state.allLoadedJobs.map(j => j.id));
+                    const newJobs = pageData.jobs.filter(j => !existingIds.has(j.id));
+                    state.allLoadedJobs.push(...newJobs);
                     if (!state.loadedPages) state.loadedPages = new Set();
                     state.loadedPages.add(page);
                     m.redraw();
                     return;
                 }
-            }
-            
-            // If still not found, check already loaded pages
-            // (in case it was added but we missed it)
-            foundJob = state.allLoadedJobs?.find(j => j.id === jobId);
-            if (foundJob) {
-                JobDetailPage.job = foundJob;
-                m.redraw();
             }
         } catch (err) {
             console.error('Error searching for job:', err);
