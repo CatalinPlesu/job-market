@@ -403,12 +403,10 @@ const FilterPanel = {
                 m('button', { 
                     class: 'btn btn-xs btn-ghost',
                     onclick: () => {
-                        state.filters = {
-                            salaryMin: null,
-                            salaryMax: null,
-                            experienceMin: null,
-                            experienceMax: null
-                        };
+                        // Clear all filters - both numeric and categorical
+                        Object.keys(state.filters).forEach(key => {
+                            state.filters[key] = null;
+                        });
                         handleFilterChange();
                     }
                 }, 'Clear All')
@@ -420,7 +418,7 @@ const FilterPanel = {
                 m('div', { class: 'space-y-2' }, [
                     m('input', { 
                         type: 'number',
-                        class: 'input input-bordered input-sm w-full',
+                        class: `input input-bordered input-sm w-full ${state.filters.salaryMin ? 'input-info' : ''}`,
                         placeholder: 'Minimum',
                         value: state.filters.salaryMin || '',
                         oninput: (e) => {
@@ -430,7 +428,7 @@ const FilterPanel = {
                     }),
                     m('input', { 
                         type: 'number',
-                        class: 'input input-bordered input-sm w-full',
+                        class: `input input-bordered input-sm w-full ${state.filters.salaryMax ? 'input-info' : ''}`,
                         placeholder: 'Maximum',
                         value: state.filters.salaryMax || '',
                         oninput: (e) => {
@@ -450,7 +448,7 @@ const FilterPanel = {
                 m('div', { class: 'space-y-2' }, [
                     m('input', { 
                         type: 'number',
-                        class: 'input input-bordered input-sm w-full',
+                        class: `input input-bordered input-sm w-full ${state.filters.experienceMin !== null ? 'input-info' : ''}`,
                         placeholder: 'Minimum',
                         min: 0,
                         value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
@@ -461,7 +459,7 @@ const FilterPanel = {
                     }),
                     m('input', { 
                         type: 'number',
-                        class: 'input input-bordered input-sm w-full',
+                        class: `input input-bordered input-sm w-full ${state.filters.experienceMax !== null ? 'input-info' : ''}`,
                         placeholder: 'Maximum',
                         min: 0,
                         value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
@@ -509,13 +507,13 @@ const FilterPanel = {
                                     m('span', { class: 'label-text text-sm' }, field.label)
                                 ]),
                                 m('select', { 
-                                    class: 'select select-bordered select-sm w-full',
+                                    class: `select select-bordered select-sm w-full ${state.filters[field.key] ? 'select-info' : ''}`,
                                     value: state.filters[field.key] || '',
                                     onchange: (e) => {
                                         if (e.target.value) {
                                             state.filters[field.key] = e.target.value;
                                         } else {
-                                            delete state.filters[field.key];
+                                            state.filters[field.key] = null;
                                         }
                                         handleFilterChange();
                                     }
