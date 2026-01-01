@@ -413,6 +413,12 @@ const JobsPage = {
         };
     },
     
+    navigateToPage: async (pageNumber) => {
+        JobsPage.displayPage = pageNumber;
+        await JobsPage.ensureSufficientJobs();
+        window.scrollTo(0, 0);
+    },
+    
     renderPagination: (totalPages) => {
         if (totalPages <= 1) return null;
         
@@ -424,11 +430,7 @@ const JobsPage = {
             m('button', {
                 class: `btn btn-sm ${currentPage === 1 ? 'btn-disabled' : ''}`,
                 disabled: currentPage === 1,
-                onclick: async () => {
-                    JobsPage.displayPage = 1;
-                    await JobsPage.ensureSufficientJobs();
-                    window.scrollTo(0, 0);
-                }
+                onclick: () => JobsPage.navigateToPage(1)
             }, '« First')
         );
         
@@ -437,11 +439,7 @@ const JobsPage = {
             m('button', {
                 class: `btn btn-sm ${currentPage === 1 ? 'btn-disabled' : ''}`,
                 disabled: currentPage === 1,
-                onclick: async () => {
-                    JobsPage.displayPage--;
-                    await JobsPage.ensureSufficientJobs();
-                    window.scrollTo(0, 0);
-                }
+                onclick: () => JobsPage.navigateToPage(currentPage - 1)
             }, '‹ Prev')
         );
         
@@ -450,24 +448,20 @@ const JobsPage = {
         const endPage = Math.min(totalPages, currentPage + 3);
         
         if (startPage > 1) {
-            pageButtons.push(m('span', { class: 'btn btn-sm btn-ghost btn-disabled' }, '...'));
+            pageButtons.push(m('div', { class: 'px-2 py-1 text-sm text-gray-500' }, '...'));
         }
         
         for (let i = startPage; i <= endPage; i++) {
             pageButtons.push(
                 m('button', {
                     class: `btn btn-sm ${i === currentPage ? 'btn-primary' : ''}`,
-                    onclick: async () => {
-                        JobsPage.displayPage = i;
-                        await JobsPage.ensureSufficientJobs();
-                        window.scrollTo(0, 0);
-                    }
+                    onclick: () => JobsPage.navigateToPage(i)
                 }, i)
             );
         }
         
         if (endPage < totalPages) {
-            pageButtons.push(m('span', { class: 'btn btn-sm btn-ghost btn-disabled' }, '...'));
+            pageButtons.push(m('div', { class: 'px-2 py-1 text-sm text-gray-500' }, '...'));
         }
         
         // Next button
@@ -475,11 +469,7 @@ const JobsPage = {
             m('button', {
                 class: `btn btn-sm ${currentPage === totalPages ? 'btn-disabled' : ''}`,
                 disabled: currentPage === totalPages,
-                onclick: async () => {
-                    JobsPage.displayPage++;
-                    await JobsPage.ensureSufficientJobs();
-                    window.scrollTo(0, 0);
-                }
+                onclick: () => JobsPage.navigateToPage(currentPage + 1)
             }, 'Next ›')
         );
         
@@ -488,11 +478,7 @@ const JobsPage = {
             m('button', {
                 class: `btn btn-sm ${currentPage === totalPages ? 'btn-disabled' : ''}`,
                 disabled: currentPage === totalPages,
-                onclick: async () => {
-                    JobsPage.displayPage = totalPages;
-                    await JobsPage.ensureSufficientJobs();
-                    window.scrollTo(0, 0);
-                }
+                onclick: () => JobsPage.navigateToPage(totalPages)
             }, 'Last »')
         );
         
