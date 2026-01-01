@@ -190,6 +190,7 @@ const JobListItem = {
 // Helper function to get field value from a job object
 const getJobFieldValue = (job, fieldKey) => {
     switch (fieldKey) {
+        case 'title': return job.title;
         case 'job_function': return job.job_function;
         case 'seniority_level': return job.seniority_level;
         case 'industry': return job.industry;
@@ -231,6 +232,9 @@ const matchesFilters = (job, filters) => {
         
         switch (key) {
             // Job Details
+            case 'title':
+                if (job.title !== value) return false;
+                break;
             case 'job_function':
                 if (job.job_function !== value) return false;
                 break;
@@ -418,6 +422,7 @@ const FilterPanel = {
         // Excludes non-filterable fields like contact info
         const filterFields = [
             // Job Details
+            { key: 'title', label: 'Job Title', section: 'Job Details' },
             { key: 'seniority_level', label: 'Seniority Level', section: 'Job Details' },
             { key: 'industry', label: 'Industry', section: 'Job Details' },
             { key: 'department', label: 'Department', section: 'Job Details' },
