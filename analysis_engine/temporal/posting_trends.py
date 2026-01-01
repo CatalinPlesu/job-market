@@ -1,6 +1,7 @@
 """Job posting volume trends analysis."""
 
 from ..base import BaseAnalysis
+from ..aggregator import Aggregator
 from src.scrape_database import Job, JobCheck
 from datetime import datetime
 from collections import defaultdict
@@ -85,7 +86,7 @@ class PostingTrendsAnalysis(BaseAnalysis):
                 continue
             
             # Get the first failed check (http_status != 200)
-            for check in sorted(job.checks, key=lambda c: c.check_date):
+            for check in Aggregator.sort_checks_by_date(job.checks):
                 if check.http_status and check.http_status != 200:
                     check_period = self._get_period_key(check.check_date, self.config.GRANULARITY)
                     if check_period == period:

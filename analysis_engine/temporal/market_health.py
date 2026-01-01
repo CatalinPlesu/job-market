@@ -36,14 +36,17 @@ class JobDurationAnalysis(BaseAnalysis):
             
             # Find when job closed (first non-200 status)
             closed_date = None
-            for check in sorted(job.checks, key=lambda c: c.check_date):
+            for check in Aggregator.sort_checks_by_date(job.checks):
                 if check.http_status and check.http_status != 200:
                     closed_date = check.check_date
                     break
             
             if closed_date:
                 # Job closed
-                duration_days = (closed_date - job.created_at.date()).days
+                # Ensure both are dates for subtraction
+                closed_as_date = closed_date if isinstance(closed_date, datetime) else datetime.combine(closed_date, datetime.min.time())
+                created_as_date = job.created_at if isinstance(job.created_at, datetime) else datetime.combine(job.created_at, datetime.min.time())
+                duration_days = (closed_as_date.date() - created_as_date.date()).days
                 durations.append(duration_days)
                 
                 if duration_days > 90:
@@ -53,8 +56,9 @@ class JobDurationAnalysis(BaseAnalysis):
                         'duration_days': duration_days
                     })
             else:
-                # Job still open - calculate current duration
-                current_duration = (datetime.now().date() - job.created_at.date()).days
+                # Job still open - calculate current duration using generation timestamp
+                created_as_date = job.created_at if isinstance(job.created_at, datetime) else datetime.combine(job.created_at, datetime.min.time())
+                current_duration = (self.generated_at.date() - created_as_date.date()).days
                 if current_duration > 90:
                     long_running.append({
                         'job_title': job.job_title,
@@ -128,7 +132,7 @@ class MarketHealthAnalysis(BaseAnalysis):
             closed_date = None
             
             if job.checks:
-                for check in sorted(job.checks, key=lambda c: c.check_date):
+                for check in Aggregator.sort_checks_by_date(job.checks):
                     if check.http_status and check.http_status != 200:
                         closed = True
                         closed_date = check.check_date

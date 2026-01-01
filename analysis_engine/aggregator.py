@@ -90,3 +90,8 @@ class Aggregator:
         elif job.max_salary:
             return float(job.max_salary)
         return None
+    
+    @staticmethod
+    def sort_checks_by_date(checks):
+        """Sort job checks by check_date."""
+        return sorted(checks, key=lambda c: c.check_date)
