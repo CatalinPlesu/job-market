@@ -31,9 +31,10 @@ A single-page application (SPA) built with Mithril.js and DaisyUI for browsing j
   - Skills and language requirements
   - Benefits and perks
 - **Raw Tab**: Original scraped data
-  - Original job posting text
-  - Source information
-  - Link to original posting
+  - Original job title and company name
+  - **Complete original job description text** (from `job_description` field in database)
+  - Source information and link to original posting
+  - **Note**: The raw description is pulled from the `job_description` column in the `job_details` table. If jobs show empty descriptions, ensure this field is populated during LLM processing.
 
 ### Analysis Dashboard
 - Overview statistics
