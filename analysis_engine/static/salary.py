@@ -3,7 +3,6 @@
 from ..base import BaseAnalysis
 from ..aggregator import Aggregator
 from src.data_database import JobDetail
-from sqlalchemy.orm import joinedload
 
 
 class SalaryOverviewAnalysis(BaseAnalysis):
@@ -19,10 +18,7 @@ class SalaryOverviewAnalysis(BaseAnalysis):
     
     def compute(self):
         # Query jobs with salary data
-        jobs = self.data_db.query(JobDetail).options(
-            joinedload(JobDetail.salary_currency_id),
-            joinedload(JobDetail.salary_period_id)
-        ).filter(
+        jobs = self.data_db.query(JobDetail).filter(
             JobDetail.min_salary.isnot(None)
         ).all()
         
@@ -77,9 +73,7 @@ class SalaryByFunctionAnalysis(BaseAnalysis):
     def compute(self):
         from src.data_database import JobFunctions
         
-        jobs = self.data_db.query(JobDetail).options(
-            joinedload(JobDetail.job_function_id)
-        ).filter(
+        jobs = self.data_db.query(JobDetail).filter(
             JobDetail.min_salary.isnot(None),
             JobDetail.job_function_id.isnot(None)
         ).all()
