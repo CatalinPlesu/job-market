@@ -187,20 +187,28 @@ const matchesFilters = (job, filters) => {
             case 'salaryMin':
                 // Check if job's min salary (in MDL if available, otherwise convert) is >= filter min
                 const jobMinSalary = job.salary?.min_mdl || job.salary?.min;
-                if (jobMinSalary && jobMinSalary < value) return false;
+                // Exclude jobs with no salary when salary filter is active
+                if (!jobMinSalary) return false;
+                if (jobMinSalary < value) return false;
                 break;
             case 'salaryMax':
                 // Check if job's max salary (in MDL if available, otherwise convert) is <= filter max
                 const jobMaxSalary = job.salary?.max_mdl || job.salary?.max;
-                if (jobMaxSalary && jobMaxSalary > value) return false;
+                // Exclude jobs with no salary when salary filter is active
+                if (!jobMaxSalary) return false;
+                if (jobMaxSalary > value) return false;
                 break;
             case 'experienceMin':
                 const jobExpYears = job.requirements?.experience_years;
-                if (jobExpYears !== null && jobExpYears !== undefined && jobExpYears < value) return false;
+                // Exclude jobs with no experience data when experience filter is active
+                if (jobExpYears === null || jobExpYears === undefined) return false;
+                if (jobExpYears < value) return false;
                 break;
             case 'experienceMax':
                 const jobExpYearsMax = job.requirements?.experience_years;
-                if (jobExpYearsMax !== null && jobExpYearsMax !== undefined && jobExpYearsMax > value) return false;
+                // Exclude jobs with no experience data when experience filter is active
+                if (jobExpYearsMax === null || jobExpYearsMax === undefined) return false;
+                if (jobExpYearsMax > value) return false;
                 break;
         }
     }
@@ -285,7 +293,7 @@ const FilterPanel = {
             m.redraw();
         };
         
-        return m('div', { class: 'bg-base-200 p-4 h-full' }, [
+        return m('div', { class: 'bg-base-200 p-4' }, [
             m('div', { class: 'flex justify-between items-center mb-4' }, [
                 m('h3', { class: 'font-bold text-lg' }, 'Filters'),
                 m('button', { 
@@ -530,14 +538,14 @@ const JobsPage = {
         const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
         const loadedJobsCount = state.allLoadedJobs.length;
         
-        return m('div', { class: 'flex h-screen' }, [
+        return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
-            state.jobsIndex && m('div', { class: 'w-80 border-r border-base-300' }, [
+            state.jobsIndex && m('div', { class: 'w-80 border-r border-base-300 overflow-y-auto' }, [
                 m(FilterPanel)
             ]),
             
             // Main Content Area
-            m('div', { class: 'flex-1 overflow-y-auto' }, [
+            m('div', { class: 'flex-1 overflow-y-auto min-h-0' }, [
                 m('div', { class: 'container mx-auto px-4 py-8' }, [
                     m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
                     
