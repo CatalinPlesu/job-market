@@ -464,6 +464,8 @@ const FilterPanel = {
         
         const handleFilterChange = () => {
             JobsPage.displayPage = 1;
+            // Trigger auto-load after filter change
+            setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
             m.redraw();
         };
         
@@ -646,6 +648,7 @@ const FilterPanel = {
 const JobsPage = {
     displayPage: 1, // Current display page for filtered results
     loadingMore: false,
+    autoLoadThreshold: 2, // Auto-load when within 2 pages of the end
     
     // Load a single page of jobs
     loadPage: async (pageNum) => {
@@ -664,6 +667,26 @@ const JobsPage = {
         } catch (err) {
             console.error(`Error loading page ${pageNum}:`, err);
             return [];
+        }
+    },
+    
+    // Automatically load more pages if needed
+    autoLoadMoreIfNeeded: async () => {
+        if (JobsPage.loadingMore || !state.jobsIndex) return;
+        
+        // Check if all pages are already loaded
+        if (state.loadedPages.size >= state.jobsIndex.total_pages) return;
+        
+        const { total, totalPages } = JobsPage.getDisplayedJobs();
+        const currentPage = JobsPage.displayPage;
+        
+        // Auto-load if we're near the end of available filtered results
+        // OR if we have very few results due to filtering
+        const nearEnd = currentPage >= totalPages - JobsPage.autoLoadThreshold;
+        const needsMoreData = total < state.itemsPerPage * 3; // Less than 3 pages worth of results
+        
+        if (nearEnd || needsMoreData) {
+            await JobsPage.loadMorePages(3);
         }
     },
     
@@ -739,6 +762,10 @@ const JobsPage = {
     navigateToPage: async (pageNumber) => {
         JobsPage.displayPage = pageNumber;
         window.scrollTo(0, 0);
+        
+        // Trigger auto-load check after navigation
+        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
+        
         m.redraw();
     },
     
@@ -812,9 +839,11 @@ const JobsPage = {
         const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
         const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
         
+        // Auto-load more data if needed (non-blocking)
+        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 0);
+        
         // Calculate accurate job counts
         const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
-        const loadedJobsCount = state.allLoadedJobs.length;
         
         return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
@@ -842,19 +871,10 @@ const JobsPage = {
                                 }, size)
                             )
                         ]),
-                        m('div', { class: 'flex items-center gap-4' }, [
-                            m('div', { class: 'text-sm opacity-70' }, [
-                                hasActiveFilters ? 
-                                    `Showing ${jobs.length} of ${total} filtered jobs (${loadedJobsCount} of ${totalJobsInAPI} loaded)` :
-                                    `Showing ${jobs.length} of ${loadedJobsCount} loaded jobs (${totalJobsInAPI} total)`
-                            ]),
-                            // Load More button - show if not all pages loaded
-                            state.loadedPages && state.jobsIndex && state.loadedPages.size < state.jobsIndex.total_pages && 
-                                m('button', {
-                                    class: `btn btn-sm btn-outline ${JobsPage.loadingMore ? 'loading' : ''}`,
-                                    disabled: JobsPage.loadingMore,
-                                    onclick: () => JobsPage.loadMorePages(3)
-                                }, JobsPage.loadingMore ? 'Loading...' : `Load More (${state.loadedPages.size}/${state.jobsIndex.total_pages} pages)`)
+                        m('div', { class: 'text-sm opacity-70' }, [
+                            hasActiveFilters ? 
+                                `Showing ${jobs.length} of ${total} filtered jobs` :
+                                `Showing ${jobs.length} of ${totalJobsInAPI} total jobs`
                         ])
                     ]),
                     
