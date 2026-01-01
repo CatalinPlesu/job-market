@@ -127,6 +127,13 @@ Restore databases from previous backups:
 - **Database backups**: Automatic backups with retention policy
 - **Comprehensive data model**: 50+ normalized tables with proper relationships
 - **Scraping reports**: Daily JSON/text reports with per-site and aggregated statistics
+- **JSON API Generation**: Export paginated job data as JSON for static hosting (GitHub Pages)
+  - Generates paginated job listings (page-1.json, page-2.json, etc.)
+  - Creates comprehensive index.json with metadata for ALL 50+ filterable fields
+  - Includes per-page item counts for efficient filtering
+  - Sanitizes sensitive data (removes contact information)
+  - Command: `python -m json_generator --output pages/api`
+  - See [json_generator/README.md](json_generator/README.md) for details
 
 ## Planned Features
 

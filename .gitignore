@@ -15,6 +15,9 @@ wheels/
 data.db*
 databases/
 
+# Generated JSON API files
+pages/
+
 # State files
 state.json
 
