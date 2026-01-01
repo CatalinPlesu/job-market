@@ -163,7 +163,9 @@ class Aggregator:
             Average salary in MDL, or None if no salary data
         """
         # Get currency code
-        currency_code = job.salary_currency.code if job.salary_currency else 'MDL'
+        currency_code = 'MDL'
+        if job.salary_currency and hasattr(job.salary_currency, 'code'):
+            currency_code = job.salary_currency.code
         
         # Calculate average in original currency
         avg_salary = None
