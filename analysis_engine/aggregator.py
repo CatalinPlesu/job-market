@@ -2,11 +2,82 @@
 
 from collections import defaultdict
 from statistics import mean, median
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Optional
 
 
 class Aggregator:
     """Common aggregation utilities for analyses."""
+    
+    # Cache for exchange rates to avoid repeated API calls
+    _exchange_rates_cache: Optional[Dict[str, float]] = None
+    
+    @staticmethod
+    def get_exchange_rates() -> Dict[str, float]:
+        """
+        Get current exchange rates with MDL as base currency.
+        Caches the result to avoid repeated API calls.
+        
+        Returns:
+            Dict mapping currency codes to their rate relative to MDL
+            e.g., {'USD': 17.5, 'EUR': 19.2, 'MDL': 1.0, ...}
+        """
+        if Aggregator._exchange_rates_cache is not None:
+            return Aggregator._exchange_rates_cache
+        
+        try:
+            from src.exhangerate import get_exchange_rates
+            # Fetch rates with MDL as base (so all rates are "X units = 1 MDL")
+            rates = get_exchange_rates("MDL")
+            Aggregator._exchange_rates_cache = rates
+            return rates
+        except Exception as e:
+            # If exchange rate fetch fails, use fallback rates
+            print(f"Warning: Could not fetch exchange rates: {e}")
+            print("Using fallback exchange rates")
+            # Fallback rates (approximate as of 2024)
+            fallback_rates = {
+                'MDL': 1.0,
+                'USD': 0.056,  # 1 MDL = 0.056 USD, so 1 USD = ~17.8 MDL
+                'EUR': 0.051,  # 1 MDL = 0.051 EUR, so 1 EUR = ~19.6 MDL
+                'GBP': 0.044,  # 1 MDL = 0.044 GBP, so 1 GBP = ~22.7 MDL
+            }
+            Aggregator._exchange_rates_cache = fallback_rates
+            return fallback_rates
+    
+    @staticmethod
+    def convert_to_mdl(amount: float, currency_code: str) -> float:
+        """
+        Convert an amount in any currency to MDL.
+        
+        Args:
+            amount: Amount in the source currency
+            currency_code: Currency code (e.g., 'USD', 'EUR', 'MDL')
+            
+        Returns:
+            Amount converted to MDL
+        """
+        if not amount or not currency_code:
+            return amount
+        
+        currency_code = currency_code.upper()
+        
+        # If already in MDL, no conversion needed
+        if currency_code == 'MDL':
+            return amount
+        
+        rates = Aggregator.get_exchange_rates()
+        
+        # rates[currency] gives us how many of that currency = 1 MDL
+        # So to convert FROM that currency TO MDL: amount / rates[currency]
+        if currency_code in rates:
+            rate = rates[currency_code]
+            if rate > 0:
+                return amount / rate
+        
+        # If currency not found, return original amount
+        # (better than crashing)
+        print(f"Warning: Currency {currency_code} not found in exchange rates, using original value")
+        return amount
     
     @staticmethod
     def group_by(items, key_func: Callable):
