@@ -125,36 +125,78 @@ export interface JobsIndexResponse {
   jobs_per_page: number;
   metadata: {
     date_range: DateRange;
+    // One-to-one lookups (50+ normalized tables)
+    titles: CategoryMetadata[];
     job_functions: CategoryMetadata[];
     seniority_levels: CategoryMetadata[];
-    specializations: CategoryMetadata[];
     industries: CategoryMetadata[];
     departments: CategoryMetadata[];
     job_families: CategoryMetadata[];
-    locations: CategoryMetadata[];
-    remote_work: CategoryMetadata[];
+    specializations: CategoryMetadata[];
+    education_levels: CategoryMetadata[];
     employment_types: CategoryMetadata[];
     contract_types: CategoryMetadata[];
     work_schedules: CategoryMetadata[];
-    education_levels: CategoryMetadata[];
-    company_sizes: CategoryMetadata[];
-    salary_ranges: SalaryRangeMetadata[];
+    shift_details: CategoryMetadata[];
+    remote_work: CategoryMetadata[];
+    travel_requirements: CategoryMetadata[];
+    cities: CategoryMetadata[];
+    regions: CategoryMetadata[];
+    countries: CategoryMetadata[];
     companies: CategoryMetadata[];
+    company_sizes: CategoryMetadata[];
+    currencies: CategoryMetadata[];
+    salary_periods: CategoryMetadata[];
+    salary_ranges: SalaryRangeMetadata[];
+    // Many-to-many fields
+    hard_skills: CategoryMetadata[];
+    soft_skills: CategoryMetadata[];
+    languages: CategoryMetadata[];
+    certifications: CategoryMetadata[];
+    licenses: CategoryMetadata[];
+    benefits: CategoryMetadata[];
+    work_environment: CategoryMetadata[];
+    professional_development: CategoryMetadata[];
+    work_life_balance: CategoryMetadata[];
+    physical_requirements: CategoryMetadata[];
+    work_conditions: CategoryMetadata[];
+    special_requirements: CategoryMetadata[];
   };
   filters: {
+    // All filterable fields from 50+ tables
+    title: string[];
     job_function: string[];
     seniority_level: string[];
-    specialization: string[];
     industry: string[];
     department: string[];
     job_family: string[];
-    location: string[];
-    remote_work: string[];
+    specialization: string[];
+    education_level: string[];
     employment_type: string[];
     contract_type: string[];
     work_schedule: string[];
-    education_level: string[];
+    shift_details: string[];
+    remote_work: string[];
+    travel_requirements: string[];
+    city: string[];
+    region: string[];
+    country: string[];
+    company: string[];
     company_size: string[];
+    currency: string[];
+    salary_period: string[];
+    hard_skills: string[];
+    soft_skills: string[];
+    languages: string[];
+    certifications: string[];
+    licenses: string[];
+    benefits: string[];
+    work_environment: string[];
+    professional_development: string[];
+    work_life_balance: string[];
+    physical_requirements: string[];
+    work_conditions: string[];
+    special_requirements: string[];
   };
 }
 
@@ -563,23 +605,213 @@ function FilteredJobList() {
 }
 
 function matchesFilters(job: Job, filters: Filters): boolean {
-  if (filters.job_function && job.job_function !== filters.job_function) {
-    return false;
-  }
-  if (filters.seniority_level && job.seniority_level !== filters.seniority_level) {
-    return false;
-  }
-  if (filters.location && job.location.city !== filters.location) {
-    return false;
-  }
-  if (filters.remote_work && job.location.remote_work !== filters.remote_work) {
-    return false;
-  }
+  // Check all filter fields
+  if (filters.job_function && job.job_function !== filters.job_function) return false;
+  if (filters.seniority_level && job.seniority_level !== filters.seniority_level) return false;
+  if (filters.city && job.location.city !== filters.city) return false;
+  if (filters.remote_work && job.location.remote_work !== filters.remote_work) return false;
+  if (filters.industry && job.industry !== filters.industry) return false;
+  if (filters.department && job.department !== filters.department) return false;
+  if (filters.job_family && job.job_family !== filters.job_family) return false;
+  if (filters.specialization && job.specialization !== filters.specialization) return false;
+  // Check many-to-many fields
+  if (filters.hard_skills && !job.hard_skills?.includes(filters.hard_skills)) return false;
+  if (filters.soft_skills && !job.soft_skills?.includes(filters.soft_skills)) return false;
+  if (filters.languages && !job.languages?.some(l => l.language === filters.languages)) return false;
+  // ... check other fields
   return true;
 }
 ```
 
-### 3. Job Detail with Tabs
+### 3. Dynamic Hierarchical Filtering
+
+**Purpose:** Enable cascading filters where selecting a value at one level automatically filters available options at the next level.
+
+**Example Hierarchy:**
+```
+Level 0: All jobs → Show all industries, departments, job_families, specializations
+  ↓ Select industry
+Level 1: Filtered by industry → Show only departments within selected industry
+  ↓ Select department
+Level 2: Filtered by industry + department → Show only job_families within selection
+  ↓ Select job_family
+Level 3: Filtered by all above → Show only specializations within selection
+```
+
+**Hook: useHierarchicalFilters.ts**
+```typescript
+function useHierarchicalFilters() {
+  const [filters, setFilters] = useState<Filters>({});
+  const { data: index } = useJobsIndex();
+  const pageQueries = useJobsPages(relevantPages);
+  
+  // Get all jobs matching current filters
+  const filteredJobs = useMemo(() => {
+    return pageQueries
+      .filter(q => q.isSuccess)
+      .flatMap(q => q.data.jobs)
+      .filter(job => matchesFilters(job, filters));
+  }, [pageQueries, filters]);
+  
+  // Calculate available options for each field based on current filters
+  const availableOptions = useMemo(() => {
+    const options: Record<string, Set<string>> = {};
+    
+    // For each filterable field, find unique values in filtered jobs
+    const fields = [
+      'industry', 'department', 'job_family', 'specialization',
+      'seniority_level', 'city', 'remote_work', 'employment_type',
+      // ... all other fields
+    ];
+    
+    fields.forEach(field => {
+      options[field] = new Set(
+        filteredJobs
+          .map(job => getJobFieldValue(job, field))
+          .filter(v => v != null)
+      );
+    });
+    
+    return options;
+  }, [filteredJobs]);
+  
+  const updateFilter = (key: string, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+  
+  const clearFilter = (key: string) => {
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      delete newFilters[key];
+      return newFilters;
+    });
+  };
+  
+  const clearAllFilters = () => {
+    setFilters({});
+  };
+  
+  return { 
+    filters, 
+    updateFilter, 
+    clearFilter, 
+    clearAllFilters, 
+    availableOptions,
+    filteredJobs 
+  };
+}
+```
+
+**Component: HierarchicalFilterPanel.tsx**
+```typescript
+function HierarchicalFilterPanel() {
+  const { filters, updateFilter, clearFilter, availableOptions } = useHierarchicalFilters();
+  const { data: index } = useJobsIndex();
+  
+  return (
+    <div className="filter-panel">
+      {/* Industry Level (Level 0) */}
+      <FilterSelect
+        label="Industry"
+        options={Array.from(availableOptions.industry || [])}
+        value={filters.industry}
+        onChange={(v) => updateFilter('industry', v)}
+        onClear={() => clearFilter('industry')}
+        disabled={false}
+      />
+      
+      {/* Department Level (Level 1 - shown only if industry selected) */}
+      {filters.industry && (
+        <FilterSelect
+          label="Department"
+          options={Array.from(availableOptions.department || [])}
+          value={filters.department}
+          onChange={(v) => updateFilter('department', v)}
+          onClear={() => clearFilter('department')}
+          disabled={false}
+          helperText={`${availableOptions.department?.size || 0} departments in ${filters.industry}`}
+        />
+      )}
+      
+      {/* Job Family Level (Level 2 - shown only if department selected) */}
+      {filters.department && (
+        <FilterSelect
+          label="Job Family"
+          options={Array.from(availableOptions.job_family || [])}
+          value={filters.job_family}
+          onChange={(v) => updateFilter('job_family', v)}
+          onClear={() => clearFilter('job_family')}
+          disabled={false}
+          helperText={`${availableOptions.job_family?.size || 0} families in ${filters.department}`}
+        />
+      )}
+      
+      {/* Specialization Level (Level 3 - shown only if job_family selected) */}
+      {filters.job_family && (
+        <FilterSelect
+          label="Specialization"
+          options={Array.from(availableOptions.specialization || [])}
+          value={filters.specialization}
+          onChange={(v) => updateFilter('specialization', v)}
+          onClear={() => clearFilter('specialization')}
+          disabled={false}
+          helperText={`${availableOptions.specialization?.size || 0} specializations in ${filters.job_family}`}
+        />
+      )}
+      
+      {/* Other filters - always available but options dynamically filtered */}
+      <FilterSelect
+        label="Seniority Level"
+        options={Array.from(availableOptions.seniority_level || [])}
+        value={filters.seniority_level}
+        onChange={(v) => updateFilter('seniority_level', v)}
+        onClear={() => clearFilter('seniority_level')}
+      />
+      
+      <FilterSelect
+        label="City"
+        options={Array.from(availableOptions.city || [])}
+        value={filters.city}
+        onChange={(v) => updateFilter('city', v)}
+        onClear={() => clearFilter('city')}
+      />
+      
+      {/* Many-to-many filters */}
+      <MultiSelectFilter
+        label="Hard Skills"
+        options={Array.from(availableOptions.hard_skills || [])}
+        values={filters.hard_skills || []}
+        onChange={(values) => updateFilter('hard_skills', values)}
+      />
+      
+      <MultiSelectFilter
+        label="Soft Skills"
+        options={Array.from(availableOptions.soft_skills || [])}
+        values={filters.soft_skills || []}
+        onChange={(values) => updateFilter('soft_skills', values)}
+      />
+      
+      <MultiSelectFilter
+        label="Languages"
+        options={Array.from(availableOptions.languages || [])}
+        values={filters.languages || []}
+        onChange={(values) => updateFilter('languages', values)}
+      />
+      
+      {/* Add all other 50+ fields here */}
+    </div>
+  );
+}
+```
+
+**Key Features:**
+- **Dynamic options**: Filter options update based on current selections
+- **Hierarchical levels**: Can toggle levels on/off, selecting industry enables department, etc.
+- **All 50+ fields**: Each filterable field from normalized tables available
+- **Many-to-many support**: Skills, languages, certifications support multi-select
+- **Clear indicators**: Show count of available options at each level
+
+### 4. Job Detail with Tabs
 
 **Component: JobDetailPage.tsx**
 ```typescript

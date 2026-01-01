@@ -13,7 +13,8 @@ Create a single-page application (SPA) that consumes JSON API files to provide a
 
 ### Scope
 - Job browsing with pagination
-- Client-side filtering (function, location, salary, etc.)
+- **Comprehensive client-side filtering on ALL 50+ database fields**
+- **Dynamic hierarchical filtering** (selecting at one level filters next level options)
 - Job detail view with parsed/raw tabs
 - Analysis dashboard with interactive charts
 - Mobile-responsive design
@@ -24,6 +25,9 @@ This SPA will be hosted on GitHub Pages and consume static JSON files as a pseud
 
 **Key Features:**
 - Smart pagination: Use index.json metadata to load only relevant pages when filtering
+- **Hierarchical filtering**: Selecting industry shows only relevant departments, selecting department shows only relevant job families, etc.
+- **50+ filter fields**: Support filtering by all normalized database tables (hard_skills, soft_skills, languages, certifications, etc.)
+- Per-page counts: Display "X items on page Y" using enhanced metadata
 - Two-tab job view: Parsed (structured LLM data) vs Raw (original posting)
 - Interactive charts: Line charts for trends, bar charts for comparisons, tables for details
 
@@ -94,9 +98,12 @@ frontend/dist/
 - [ ] Charts render without errors
 - [ ] No accessibility violations (WCAG AA)
 - [ ] Works in Chrome, Firefox, Safari, Edge
-- [ ] Filtering correctly loads only relevant pages
-- [ ] Job detail view shows both tabs
+- [ ] **Filtering supports ALL 50+ database fields** (hard_skills, soft_skills, languages, certifications, etc.)
+- [ ] **Dynamic hierarchical filtering** works correctly (selecting industry filters departments, etc.)
+- [ ] Filtering correctly loads only relevant pages with per-page count display
+- [ ] Job detail view shows both parsed/raw tabs
 - [ ] Analysis visualizations are interactive
+- [ ] Multi-select filters work for many-to-many fields (skills, languages, etc.)
 
 ### What This Does NOT Depend On
 - JSON generation implementation (use mock data)

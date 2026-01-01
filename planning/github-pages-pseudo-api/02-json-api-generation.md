@@ -184,6 +184,36 @@ This specification defines how to generate paginated JSON files from SQLite data
         ]
       }
     ],
+    "departments": [
+      {
+        "name": "Engineering",
+        "count": 1100,
+        "pages": [
+          {"page": 1, "count": 42},
+          {"page": 2, "count": 38}
+        ]
+      }
+    ],
+    "job_families": [
+      {
+        "name": "Technical",
+        "count": 1500,
+        "pages": [
+          {"page": 1, "count": 55},
+          {"page": 2, "count": 48}
+        ]
+      }
+    ],
+    "titles": [
+      {
+        "name": "Software Engineer",
+        "count": 450,
+        "pages": [
+          {"page": 1, "count": 25},
+          {"page": 2, "count": 18}
+        ]
+      }
+    ],
     "employment_types": [
       {
         "name": "full-time",
@@ -214,6 +244,26 @@ This specification defines how to generate paginated JSON files from SQLite data
         ]
       }
     ],
+    "shift_details": [
+      {
+        "name": "day",
+        "count": 3500,
+        "pages": [
+          {"page": 1, "count": 72},
+          {"page": 2, "count": 68}
+        ]
+      }
+    ],
+    "travel_requirements": [
+      {
+        "name": "occasional",
+        "count": 800,
+        "pages": [
+          {"page": 1, "count": 18},
+          {"page": 3, "count": 15}
+        ]
+      }
+    ],
     "education_levels": [
       {
         "name": "bachelor",
@@ -221,6 +271,36 @@ This specification defines how to generate paginated JSON files from SQLite data
         "pages": [
           {"page": 1, "count": 52},
           {"page": 2, "count": 48}
+        ]
+      }
+    ],
+    "cities": [
+      {
+        "name": "Chișinău",
+        "count": 3200,
+        "pages": [
+          {"page": 1, "count": 65},
+          {"page": 2, "count": 62}
+        ]
+      }
+    ],
+    "regions": [
+      {
+        "name": "Chișinău",
+        "count": 3300,
+        "pages": [
+          {"page": 1, "count": 68},
+          {"page": 2, "count": 64}
+        ]
+      }
+    ],
+    "countries": [
+      {
+        "name": "Moldova",
+        "count": 5400,
+        "pages": [
+          {"page": 1, "count": 100},
+          {"page": 2, "count": 100}
         ]
       }
     ],
@@ -233,29 +313,224 @@ This specification defines how to generate paginated JSON files from SQLite data
           {"page": 2, "count": 35}
         ]
       }
+    ],
+    "currencies": [
+      {
+        "code": "MDL",
+        "count": 4500,
+        "pages": [
+          {"page": 1, "count": 90},
+          {"page": 2, "count": 88}
+        ]
+      }
+    ],
+    "salary_periods": [
+      {
+        "name": "month",
+        "count": 4800,
+        "pages": [
+          {"page": 1, "count": 95},
+          {"page": 2, "count": 92}
+        ]
+      }
+    ],
+    "hard_skills": [
+      {
+        "name": "Python",
+        "count": 650,
+        "pages": [
+          {"page": 1, "count": 28},
+          {"page": 2, "count": 24}
+        ]
+      },
+      {
+        "name": "JavaScript",
+        "count": 720,
+        "pages": [
+          {"page": 1, "count": 32},
+          {"page": 2, "count": 28}
+        ]
+      }
+    ],
+    "soft_skills": [
+      {
+        "name": "Communication",
+        "count": 2100,
+        "pages": [
+          {"page": 1, "count": 58},
+          {"page": 2, "count": 52}
+        ]
+      },
+      {
+        "name": "Teamwork",
+        "count": 1800,
+        "pages": [
+          {"page": 1, "count": 48},
+          {"page": 2, "count": 45}
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "name": "Romanian",
+        "count": 4200,
+        "pages": [
+          {"page": 1, "count": 85},
+          {"page": 2, "count": 82}
+        ]
+      },
+      {
+        "name": "English",
+        "count": 3800,
+        "pages": [
+          {"page": 1, "count": 78},
+          {"page": 2, "count": 75}
+        ]
+      },
+      {
+        "name": "Russian",
+        "count": 2500,
+        "pages": [
+          {"page": 1, "count": 52},
+          {"page": 2, "count": 48}
+        ]
+      }
+    ],
+    "certifications": [
+      {
+        "name": "AWS Solutions Architect",
+        "count": 180,
+        "pages": [
+          {"page": 1, "count": 8},
+          {"page": 3, "count": 6}
+        ]
+      }
+    ],
+    "licenses": [
+      {
+        "name": "Driver's License Category B",
+        "count": 450,
+        "pages": [
+          {"page": 1, "count": 12},
+          {"page": 2, "count": 10}
+        ]
+      }
+    ],
+    "benefits": [
+      {
+        "name": "Health insurance",
+        "count": 2800,
+        "pages": [
+          {"page": 1, "count": 62},
+          {"page": 2, "count": 58}
+        ]
+      }
+    ],
+    "work_environment": [
+      {
+        "name": "Modern office",
+        "count": 1500,
+        "pages": [
+          {"page": 1, "count": 38},
+          {"page": 2, "count": 35}
+        ]
+      }
+    ],
+    "professional_development": [
+      {
+        "name": "Training budget",
+        "count": 1200,
+        "pages": [
+          {"page": 1, "count": 28},
+          {"page": 2, "count": 25}
+        ]
+      }
+    ],
+    "work_life_balance": [
+      {
+        "name": "Flexible hours",
+        "count": 1800,
+        "pages": [
+          {"page": 1, "count": 42},
+          {"page": 2, "count": 38}
+        ]
+      }
+    ],
+    "physical_requirements": [
+      {
+        "name": "Standing for long periods",
+        "count": 320,
+        "pages": [
+          {"page": 5, "count": 8},
+          {"page": 7, "count": 6}
+        ]
+      }
+    ],
+    "work_conditions": [
+      {
+        "name": "Air-conditioned office",
+        "count": 2200,
+        "pages": [
+          {"page": 1, "count": 52},
+          {"page": 2, "count": 48}
+        ]
+      }
+    ],
+    "special_requirements": [
+      {
+        "name": "Security clearance",
+        "count": 85,
+        "pages": [
+          {"page": 3, "count": 4},
+          {"page": 8, "count": 3}
+        ]
+      }
     ]
   },
   "filters": {
+    "title": ["Software Engineer", "Sales Manager", "..."],
     "job_function": ["Engineering", "Sales", "Healthcare", "Manufacturing", "..."],
     "seniority_level": ["entry", "junior", "mid", "senior", "lead", "manager", "director"],
-    "location": ["Chișinău", "Bălți", "Tiraspol", "..."],
-    "remote_work": ["remote", "hybrid", "on-site"],
+    "industry": ["Technology", "Healthcare", "Manufacturing", "..."],
+    "department": ["Engineering", "Sales", "HR", "..."],
+    "job_family": ["Technical", "Business", "..."],
+    "specialization": ["Software Development", "Quality Assurance", "..."],
     "employment_type": ["full-time", "part-time", "contract", "..."],
     "contract_type": ["permanent", "fixed-term", "internship", "..."],
     "work_schedule": ["standard", "flexible", "shift", "..."],
-    "industry": ["Technology", "Healthcare", "Manufacturing", "..."],
-    "specialization": ["Software Development", "Quality Assurance", "..."],
+    "shift_details": ["day", "night", "rotating", "..."],
+    "remote_work": ["remote", "hybrid", "on-site"],
+    "travel_requirements": ["none", "occasional", "frequent", "..."],
     "education_level": ["none", "highschool", "bachelor", "master", "phd"],
-    "company_size": ["startup", "small", "medium", "large", "enterprise"]
+    "city": ["Chișinău", "Bălți", "Tiraspol", "..."],
+    "region": ["Chișinău", "Bălți", "..."],
+    "country": ["Moldova", "Romania", "..."],
+    "company": ["Company A", "Company B", "..."],
+    "company_size": ["startup", "small", "medium", "large", "enterprise"],
+    "currency": ["MDL", "EUR", "USD", "..."],
+    "salary_period": ["hour", "month", "year"],
+    "hard_skills": ["Python", "JavaScript", "SQL", "Docker", "..."],
+    "soft_skills": ["Communication", "Teamwork", "Problem-solving", "..."],
+    "languages": ["Romanian", "English", "Russian", "..."],
+    "certifications": ["AWS Solutions Architect", "PMP", "..."],
+    "licenses": ["Driver's License Category B", "..."],
+    "benefits": ["Health insurance", "Training budget", "..."],
+    "work_environment": ["Modern office", "Remote-friendly", "..."],
+    "professional_development": ["Training budget", "Conference attendance", "..."],
+    "work_life_balance": ["Flexible hours", "Work from home", "..."],
+    "physical_requirements": ["Standing for long periods", "Lifting", "..."],
+    "work_conditions": ["Air-conditioned office", "Outdoor work", "..."],
+    "special_requirements": ["Security clearance", "Background check", "..."]
   }
 }
 ```
 
 **Purpose:** 
 - Enable smart pagination (jump to relevant pages without loading all)
-- Support client-side filtering on ALL database fields
+- Support client-side filtering on **ALL 50+ normalized database tables**
 - Provide overview statistics with per-page item counts
 - Show which pages contain filtered results and how many items per page
+- Support **dynamic hierarchical filtering** where selection at one level filters available options at next level
 
 **Enhanced Page Mapping Logic:**
 Each job appears on a page. Metadata includes which pages contain jobs matching specific filters, **along with the count of matching items on each page**. This allows:
@@ -263,15 +538,54 @@ Each job appears on a page. Metadata includes which pages contain jobs matching 
 2. Display "X items on page Y" information to users
 3. Smart page prioritization (load pages with more matching items first)
 
-**Comprehensive Field Coverage:**
-The metadata strategy covers **ALL filterable database fields**, including:
-- Job classification: job_function, specialization, industry, department, job_family
-- Experience: seniority_level, education_level, experience_years
-- Employment terms: employment_type, contract_type, work_schedule, shift_details
-- Location: city, region, country, remote_work
-- Company: company_name, company_size
-- Compensation: salary ranges (min/max/currency)
-- Any other field from JobDetail that users can filter by
+**Complete Field Coverage (50+ Normalized Tables):**
+The metadata strategy covers **ALL filterable database fields** from the 50+ normalized tables:
+
+**Lookup Tables (One-to-One):**
+- `titles` - Job titles
+- `job_functions` - Job function/domain level
+- `seniority_levels` - Entry, Junior, Mid, Senior, Lead, Manager, Director
+- `industries` - Industry classifications
+- `departments` - Department within organization
+- `job_families` - Job family groupings
+- `specializations` - Specialization within function (niche level)
+- `education_levels` - Education requirements
+- `employment_types` - Full-time, Part-time, Contract
+- `contract_types` - Permanent, Fixed-term, Internship
+- `work_schedules` - Standard, Flexible, Shift
+- `shift_details` - Day, Night, Rotating shifts
+- `remote_work_options` - Remote, Hybrid, On-site
+- `travel_requirements` - None, Occasional, Frequent
+- `salary_periods` - Hour, Month, Year
+- `cities` - City locations
+- `regions` - Regional locations
+- `countries` - Country locations
+- `companies` - Company names
+- `company_sizes` - Startup to Enterprise
+- `currencies` - MDL, EUR, USD, etc.
+
+**Many-to-Many Tables:**
+- `hard_skills` - Technical skills (Python, JavaScript, SQL, etc.)
+- `soft_skills` - Soft skills (Communication, Teamwork, etc.)
+- `languages` - Required languages (Romanian, English, Russian, etc.)
+- `certifications` - Professional certifications
+- `licenses` - Required licenses
+- `benefits` - Job benefits and perks
+- `work_environment` - Work environment characteristics
+- `professional_development` - Development opportunities
+- `work_life_balance` - Work-life balance features
+- `physical_requirements` - Physical job requirements
+- `work_conditions` - Working conditions
+- `special_requirements` - Special requirements
+
+**Dynamic Hierarchical Filtering:**
+The system supports hierarchical filtering where selecting a value at one level filters available options at the next level. For example:
+- Level 0 (all jobs): Show all industries, departments, job families, specializations
+- Select industry → Level 1: Show only departments that exist within selected industry
+- Select department → Level 2: Show only job families that exist within selected department
+- Select job family → Level 3: Show only specializations that exist within selected job family
+
+This is enabled by the page metadata which tracks which pages contain jobs matching specific filter combinations.
 
 #### `/api/jobs/page-{N}.json`
 ```json
@@ -646,13 +960,25 @@ def build_index(jobs, jobs_per_page):
         'metadata': {}
     }
     
-    # ALL filterable database fields
+    # ALL filterable database fields from 50+ normalized tables
     categories = [
-        'job_function', 'specialization', 'industry', 'department', 'job_family',
-        'seniority_level', 'education_level', 
+        # One-to-one lookups
+        'title', 'job_function', 'seniority_level', 'industry', 'department', 
+        'job_family', 'specialization', 'education_level', 
         'employment_type', 'contract_type', 'work_schedule', 'shift_details',
-        'city', 'region', 'country', 'remote_work',
-        'company_name', 'company_size'
+        'remote_work', 'travel_requirements',
+        'city', 'region', 'country',
+        'company_name', 'company_size',
+        'currency', 'salary_period'
+    ]
+    
+    # Many-to-many fields (will be handled separately)
+    m2m_categories = [
+        'hard_skills', 'soft_skills', 'languages',
+        'certifications', 'licenses', 'benefits',
+        'work_environment', 'professional_development',
+        'work_life_balance', 'physical_requirements',
+        'work_conditions', 'special_requirements'
     ]
     
     for category in categories:
@@ -692,6 +1018,36 @@ def build_index(jobs, jobs_per_page):
     # Special handling for salary ranges
     index['metadata']['salary_ranges'] = build_salary_range_metadata(jobs, jobs_per_page)
     
+    # Handle many-to-many fields separately
+    for m2m_category in m2m_categories:
+        m2m_map = {}
+        
+        for i, job in enumerate(jobs):
+            page = (i // jobs_per_page) + 1
+            values = get_m2m_field_values(job, m2m_category)
+            
+            for value in values:
+                if value not in m2m_map:
+                    m2m_map[value] = {'count': 0, 'pages': {}}
+                
+                m2m_map[value]['count'] += 1
+                if page not in m2m_map[value]['pages']:
+                    m2m_map[value]['pages'][page] = 0
+                m2m_map[value]['pages'][page] += 1
+        
+        # Convert to final format
+        index['metadata'][m2m_category] = [
+            {
+                'name': k,
+                'count': v['count'],
+                'pages': [
+                    {'page': page, 'count': count}
+                    for page, count in sorted(v['pages'].items())
+                ]
+            }
+            for k, v in m2m_map.items()
+        ]
+    
     return index
 
 
@@ -700,17 +1056,61 @@ def get_field_value(job, field):
     Get the value of a field from job, handling foreign keys and nested structures.
     Works with all database fields from JobDetail model.
     """
-    # Handle foreign key relationships
+    # Handle foreign key relationships (one-to-one)
     field_mappings = {
+        'title': lambda j: j.title.name if j.title else None,
         'job_function': lambda j: j.job_function.name if j.job_function else None,
-        'specialization': lambda j: j.specialization.name if j.specialization else None,
-        'industry': lambda j: j.industry.name if j.industry else None,
         'seniority_level': lambda j: j.seniority_level.name if j.seniority_level else None,
-        'city': lambda j: j.city.name if j.city else None,
+        'industry': lambda j: j.industry.name if j.industry else None,
+        'department': lambda j: j.department.name if j.department else None,
+        'job_family': lambda j: j.job_family.name if j.job_family else None,
+        'specialization': lambda j: j.specialization.name if j.specialization else None,
+        'education_level': lambda j: j.education_level.name if j.education_level else None,
+        'employment_type': lambda j: j.employment_type.name if j.employment_type else None,
+        'contract_type': lambda j: j.contract_type.name if j.contract_type else None,
+        'work_schedule': lambda j: j.work_schedule.name if j.work_schedule else None,
+        'shift_details': lambda j: j.shift_details.name if j.shift_details else None,
         'remote_work': lambda j: j.remote_work.name if j.remote_work else None,
-        'company_name': lambda j: j.company_name_ref.name if j.company_name_ref else None,
-        # ... add all other foreign key fields
+        'travel_requirements': lambda j: j.travel_requirements.name if j.travel_requirements else None,
+        'city': lambda j: j.city.name if j.city else None,
+        'region': lambda j: j.region.name if j.region else None,
+        'country': lambda j: j.country.name if j.country else None,
+        'company_name': lambda j: j.company.name if j.company else None,
+        'company_size': lambda j: j.company_size.name if j.company_size else None,
+        'currency': lambda j: j.salary_currency.code if j.salary_currency else None,
+        'salary_period': lambda j: j.salary_period.name if j.salary_period else None,
     }
+    
+    if field in field_mappings:
+        return field_mappings[field](job)
+    
+    return getattr(job, field, None)
+
+
+def get_m2m_field_values(job, field):
+    """
+    Get values for many-to-many relationships.
+    Returns a list of values for the given field.
+    """
+    field_mappings = {
+        'hard_skills': lambda j: [skill.name for skill in j.hard_skills],
+        'soft_skills': lambda j: [skill.name for skill in j.soft_skills],
+        'languages': lambda j: [lang.language for lang in j.languages],
+        'certifications': lambda j: [cert.name for cert in j.certifications],
+        'licenses': lambda j: [lic.name for lic in j.licenses],
+        'benefits': lambda j: [benefit.description for benefit in j.benefits],
+        'work_environment': lambda j: [env.description for env in j.work_environment],
+        'professional_development': lambda j: [pd.description for pd in j.professional_development],
+        'work_life_balance': lambda j: [wlb.description for wlb in j.work_life_balance],
+        'physical_requirements': lambda j: [pr.description for pr in j.physical_requirements],
+        'work_conditions': lambda j: [wc.description for wc in j.work_conditions],
+        'special_requirements': lambda j: [sr.description for sr in j.special_requirements],
+    }
+    
+    if field in field_mappings:
+        return field_mappings[field](job)
+    
+    return []
     
     if field in field_mappings:
         return field_mappings[field](job)
