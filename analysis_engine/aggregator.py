@@ -153,13 +153,31 @@ class Aggregator:
     
     @staticmethod
     def get_average_salary(job):
-        """Get average salary from a job record."""
+        """
+        Get average salary from a job record, converted to MDL.
+        
+        Args:
+            job: JobDetail record with salary and currency information
+            
+        Returns:
+            Average salary in MDL, or None if no salary data
+        """
+        # Get currency code
+        currency_code = job.salary_currency.code if job.salary_currency else 'MDL'
+        
+        # Calculate average in original currency
+        avg_salary = None
         if job.max_salary and job.min_salary:
-            return float((job.min_salary + job.max_salary) / 2)
+            avg_salary = float((job.min_salary + job.max_salary) / 2)
         elif job.min_salary:
-            return float(job.min_salary)
+            avg_salary = float(job.min_salary)
         elif job.max_salary:
-            return float(job.max_salary)
+            avg_salary = float(job.max_salary)
+        
+        # Convert to MDL
+        if avg_salary:
+            return Aggregator.convert_to_mdl(avg_salary, currency_code)
+        
         return None
     
     @staticmethod

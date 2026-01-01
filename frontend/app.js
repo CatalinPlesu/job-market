@@ -32,10 +32,27 @@ const state = {
 
 // Utility Functions
 const formatSalary = (salary) => {
-    if (!salary || !salary.min) return 'Not specified';
-    const min = salary.min.toLocaleString();
-    const max = salary.max ? salary.max.toLocaleString() : '';
-    return max ? `${min} - ${max} ${salary.currency}` : `${min} ${salary.currency}`;
+    if (!salary) return 'Not specified';
+    
+    // Prioritize MDL values for display
+    const minMdl = salary.min_mdl || salary.min;
+    const maxMdl = salary.max_mdl || salary.max;
+    
+    if (!minMdl) return 'Not specified';
+    
+    const minStr = minMdl.toLocaleString();
+    const maxStr = maxMdl ? maxMdl.toLocaleString() : '';
+    const mdlRange = maxStr ? `${minStr} - ${maxStr} MDL` : `${minStr} MDL`;
+    
+    // Show original currency if different from MDL
+    if (salary.currency && salary.currency !== 'MDL' && salary.min) {
+        const origMin = salary.min.toLocaleString();
+        const origMax = salary.max ? salary.max.toLocaleString() : '';
+        const origRange = origMax ? `${origMin} - ${origMax} ${salary.currency}` : `${origMin} ${salary.currency}`;
+        return `${mdlRange} (${origRange})`;
+    }
+    
+    return mdlRange;
 };
 
 const formatDate = (dateStr) => {
