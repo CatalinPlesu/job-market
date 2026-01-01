@@ -354,51 +354,36 @@ const FilterPanel = {
 const JobsPage = {
     displayPage: 1, // Current display page for filtered results
     
-    oninit: () => {
+    oninit: async () => {
         state.loading = true;
-        Promise.all([
-            api.getJobsIndex(),
-            api.getJobsPage(1) // Always start with page 1
-        ]).then(([index, page]) => {
+        try {
+            // Load index first to know how many pages we need
+            const index = await api.getJobsIndex();
             state.jobsIndex = index;
-            state.allLoadedJobs = page.jobs;
-            state.loadedPages = new Set([1]);
-            state.loading = false;
-            // Load additional pages if needed for initial display
-            JobsPage.ensureSufficientJobs().catch(err => {
-                console.error('Error loading sufficient jobs:', err);
-            });
-        });
-    },
-    
-    // Load more pages from API until we have enough jobs to fill the display
-    ensureSufficientJobs: async () => {
-        const filteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
-        const needed = JobsPage.displayPage * state.itemsPerPage;
-        
-        // If we have enough filtered jobs or loaded all pages, we're done
-        if (filteredJobs.length >= needed || state.loadedPages.size >= state.jobsIndex.total_pages) {
-            m.redraw();
-            return;
-        }
-        
-        // Find next unloaded page
-        let nextPage = 1;
-        while (state.loadedPages.has(nextPage) && nextPage <= state.jobsIndex.total_pages) {
-            nextPage++;
-        }
-        
-        if (nextPage <= state.jobsIndex.total_pages) {
-            try {
-                const pageData = await api.getJobsPage(nextPage);
-                state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
-                state.loadedPages.add(nextPage);
-                // Recursively check if we need more
-                await JobsPage.ensureSufficientJobs();
-            } catch (err) {
-                console.error(`Error loading page ${nextPage}:`, err);
-                m.redraw();
+            state.allLoadedJobs = [];
+            state.loadedPages = new Set();
+            
+            // Automatically load ALL pages from the API
+            const pagePromises = [];
+            for (let i = 1; i <= index.total_pages; i++) {
+                pagePromises.push(api.getJobsPage(i));
             }
+            
+            // Load all pages in parallel for speed
+            const pages = await Promise.all(pagePromises);
+            
+            // Combine all jobs from all pages
+            pages.forEach((page, idx) => {
+                state.allLoadedJobs = [...state.allLoadedJobs, ...page.jobs];
+                state.loadedPages.add(idx + 1);
+            });
+            
+            state.loading = false;
+            m.redraw();
+        } catch (err) {
+            console.error('Error loading jobs:', err);
+            state.loading = false;
+            m.redraw();
         }
     },
     
@@ -415,8 +400,8 @@ const JobsPage = {
     
     navigateToPage: async (pageNumber) => {
         JobsPage.displayPage = pageNumber;
-        await JobsPage.ensureSufficientJobs();
         window.scrollTo(0, 0);
+        m.redraw();
     },
     
     renderPagination: (totalPages) => {
@@ -508,37 +493,16 @@ const JobsPage = {
                             onclick: () => {
                                 state.itemsPerPage = size;
                                 JobsPage.displayPage = 1;
-                                JobsPage.ensureSufficientJobs();
+                                m.redraw();
                             }
                         }, size)
                     )
                 ]),
                 m('div', { class: 'text-sm text-gray-600' }, [
                     hasActiveFilters ? 
-                        `Showing ${jobs.length} of ${total} filtered jobs (from ${loadedJobsCount} loaded / ${totalJobsInAPI} total)` :
-                        `Showing ${jobs.length} of ${totalJobsInAPI} total jobs (${loadedJobsCount} loaded, ${state.loadedPages.size}/${state.jobsIndex.total_pages} pages)`
-                ]),
-                // Load more from API button
-                state.loadedPages.size < state.jobsIndex.total_pages && m('button', {
-                    class: 'btn btn-xs btn-outline',
-                    onclick: async () => {
-                        state.loading = true;
-                        // Find next unloaded page
-                        let nextPage = 1;
-                        while (state.loadedPages.has(nextPage) && nextPage <= state.jobsIndex.total_pages) {
-                            nextPage++;
-                        }
-                        try {
-                            const pageData = await api.getJobsPage(nextPage);
-                            state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
-                            state.loadedPages.add(nextPage);
-                        } catch (err) {
-                            console.error(`Error loading page ${nextPage}:`, err);
-                        }
-                        state.loading = false;
-                        m.redraw();
-                    }
-                }, `Load More API Pages (${state.loadedPages.size}/${state.jobsIndex.total_pages})`)
+                        `Showing ${jobs.length} of ${total} filtered jobs` :
+                        `Showing ${jobs.length} of ${totalJobsInAPI} jobs`
+                ])
             ]),
             
             // Top pagination
