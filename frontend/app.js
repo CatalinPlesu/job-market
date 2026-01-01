@@ -355,12 +355,16 @@ const JobsPage = {
     displayPage: 1, // Current display page for filtered results
     
     oninit: async () => {
+        // Skip if data is already loaded
+        if (state.allLoadedJobs && state.allLoadedJobs.length > 0) {
+            return;
+        }
+        
         state.loading = true;
         try {
             // Load index first to know how many pages we need
             const index = await api.getJobsIndex();
             state.jobsIndex = index;
-            state.allLoadedJobs = [];
             state.loadedPages = new Set();
             
             // Automatically load ALL pages from the API
@@ -372,9 +376,9 @@ const JobsPage = {
             // Load all pages in parallel for speed
             const pages = await Promise.all(pagePromises);
             
-            // Combine all jobs from all pages
+            // Combine all jobs from all pages efficiently
+            state.allLoadedJobs = pages.flatMap(page => page.jobs);
             pages.forEach((page, idx) => {
-                state.allLoadedJobs = [...state.allLoadedJobs, ...page.jobs];
                 state.loadedPages.add(idx + 1);
             });
             
