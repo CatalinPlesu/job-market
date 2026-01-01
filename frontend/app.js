@@ -32,6 +32,21 @@ const state = {
 };
 
 // Utility Functions
+// Helper to check if filters are active
+const hasActiveFilters = (filters) => {
+    return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
+};
+
+// Map filter keys to metadata keys
+const filterKeyToMetadataKey = {
+    'city': 'location',
+    'company': 'company_name'
+};
+
+const getMetadataKey = (filterKey) => {
+    return filterKeyToMetadataKey[filterKey] || filterKey;
+};
+
 const formatSalary = (salary) => {
     if (!salary) return 'Not specified';
     
@@ -474,8 +489,7 @@ const FilterPanel = {
                     if (filterValue === null || filterValue === undefined || filterValue === '') continue;
                     
                     // Map filter keys to metadata keys
-                    const metadataKey = filterKey === 'city' ? 'location' : 
-                                       filterKey === 'company' ? 'company_name' : filterKey;
+                    const metadataKey = getMetadataKey(filterKey);
                     
                     if (state.jobsIndex.metadata[metadataKey]) {
                         const metadataItems = state.jobsIndex.metadata[metadataKey];
@@ -796,9 +810,9 @@ const JobsPage = {
     },
     
     getDisplayedJobs: () => {
-        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
+        const isFiltered = hasActiveFilters(state.filters);
         
-        if (hasActiveFilters) {
+        if (isFiltered) {
             // When filtering, work with loaded jobs only
             const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
             const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
@@ -829,12 +843,12 @@ const JobsPage = {
         JobsPage.displayPage = pageNumber;
         window.scrollTo(0, 0);
         
-        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
+        const isFiltered = hasActiveFilters(state.filters);
         
         // If not filtering, we need to ensure the actual page from metadata is loaded
-        if (!hasActiveFilters && state.jobsIndex) {
+        if (!isFiltered && state.jobsIndex) {
             // Calculate which metadata page contains the jobs we need
-            const jobsPerApiPage = 100; // From index.json: "jobs_per_page": 100
+            const jobsPerApiPage = state.jobsIndex.jobs_per_page || 100;
             const startJobIndex = (pageNumber - 1) * state.itemsPerPage;
             const endJobIndex = startJobIndex + state.itemsPerPage;
             
