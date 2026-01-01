@@ -12,7 +12,7 @@ class GeneratorConfig:
     COMPANY_BLACKLIST_FILE = 'config/company_blacklist.txt'
     
     # Output
-    OUTPUT_DIR = 'pages/api'
+    OUTPUT_DIR = 'frontend/api'
     INDENT_JSON = False  # Set True for debugging
     
     # Version
