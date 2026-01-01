@@ -521,9 +521,11 @@ const FilterPanel = {
                                     }
                                 }, [
                                     m('option', { value: '' }, 'All'),
-                                    ...availableOptions.map(f => 
-                                        m('option', { value: f }, `${f} (${optionCounts[f] || 0})`)
-                                    )
+                                    ...availableOptions
+                                        .filter(f => (optionCounts[f] || 0) > 0)  // Only show options with at least 1 job
+                                        .map(f => 
+                                            m('option', { value: f }, `${f} (${optionCounts[f]})`)
+                                        )
                                 ])
                             ]);
                         })
