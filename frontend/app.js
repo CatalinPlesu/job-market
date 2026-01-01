@@ -531,19 +531,27 @@ const FilterPanel = {
                             const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
                             const currentFieldIndex = hierarchyLevels.indexOf(field.key);
                             
-                            // Get jobs filtered by all OTHER filters (excluding this field and its children in hierarchy)
-                            const filtersWithoutThisField = { ...state.filters };
-                            delete filtersWithoutThisField[field.key];
+                            // Determine which filters to use for calculating options
+                            let filterForOptions;
                             
-                            // If this field is part of the hierarchy, also exclude child fields from filtering
+                            // If this field is part of the hierarchy, use special filtering logic
                             if (currentFieldIndex !== -1) {
-                                // Remove all fields that come after this one in the hierarchy
-                                for (let i = currentFieldIndex + 1; i < hierarchyLevels.length; i++) {
-                                    delete filtersWithoutThisField[hierarchyLevels[i]];
+                                // For hierarchy fields, ONLY use parent fields in the hierarchy
+                                // Ignore all other filters (seniority, location, etc.) AND child fields
+                                filterForOptions = {};
+                                for (let i = 0; i < currentFieldIndex; i++) {
+                                    const parentKey = hierarchyLevels[i];
+                                    if (state.filters[parentKey]) {
+                                        filterForOptions[parentKey] = state.filters[parentKey];
+                                    }
                                 }
+                            } else {
+                                // For non-hierarchical fields, exclude this field but include all others
+                                filterForOptions = { ...state.filters };
+                                delete filterForOptions[field.key];
                             }
                             
-                            const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filtersWithoutThisField));
+                            const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
                             
                             // Extract unique values from filtered jobs for this field
                             const availableValuesSet = new Set();
