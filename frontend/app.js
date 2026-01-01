@@ -16,7 +16,12 @@ const state = {
     jobs: [],
     allLoadedJobs: [], // Cache of all jobs loaded so far
     loadedPages: new Set(), // Track which pages have been loaded
-    filters: {},
+    filters: {
+        salaryMin: null,
+        salaryMax: null,
+        experienceMin: null,
+        experienceMax: null
+    },
     loading: false,
     analysisIndex: null,
     selectedAnalysis: null,
@@ -128,17 +133,17 @@ const HomePage = {
 const JobListItem = {
     view: (vnode) => {
         const job = vnode.attrs.job;
-        return m('div', { class: 'job-item px-2' }, [
+        return m('div', { class: 'job-item px-2 py-1 border-b border-base-300' }, [
             m('div', { class: 'flex items-start gap-2' }, [
-                m('span', { class: 'text-xs text-gray-500 mt-1' }, `${vnode.attrs.index}.`),
+                m('span', { class: 'text-xs opacity-60 mt-1' }, `${vnode.attrs.index}.`),
                 m('div', { class: 'flex-1' }, [
                     m('a', { 
                         href: `#!/jobs/${job.id}`,
-                        class: 'job-title font-medium hover:underline',
+                        class: 'job-title font-medium hover:underline text-base-content',
                         oncreate: m.route.link
                     }, job.title),
-                    m('div', { class: 'job-meta flex flex-wrap gap-2 mt-1' }, [
-                        job.company && m('span', { class: 'badge badge-ghost badge-sm' }, job.company),
+                    m('div', { class: 'job-meta flex flex-wrap gap-2 mt-1 text-sm opacity-70' }, [
+                        job.company && m('span', { class: 'badge badge-outline badge-sm' }, job.company),
                         job.location && job.location.city && m('span', job.location.city),
                         job.salary && m('span', formatSalary(job.salary)),
                         job.posting_date && m('span', formatDate(job.posting_date))
@@ -152,7 +157,7 @@ const JobListItem = {
 // Filter matching logic
 const matchesFilters = (job, filters) => {
     for (const [key, value] of Object.entries(filters)) {
-        if (!value) continue;
+        if (value === null || value === undefined || value === '') continue;
         
         switch (key) {
             case 'job_function':
@@ -178,6 +183,24 @@ const matchesFilters = (job, filters) => {
                 break;
             case 'contract_type':
                 if (job.employment && job.employment.contract !== value) return false;
+                break;
+            case 'salaryMin':
+                // Check if job's min salary (in MDL if available, otherwise convert) is >= filter min
+                const jobMinSalary = job.salary?.min_mdl || job.salary?.min;
+                if (jobMinSalary && jobMinSalary < value) return false;
+                break;
+            case 'salaryMax':
+                // Check if job's max salary (in MDL if available, otherwise convert) is <= filter max
+                const jobMaxSalary = job.salary?.max_mdl || job.salary?.max;
+                if (jobMaxSalary && jobMaxSalary > value) return false;
+                break;
+            case 'experienceMin':
+                const jobExpYears = job.requirements?.experience_years;
+                if (jobExpYears !== null && jobExpYears !== undefined && jobExpYears < value) return false;
+                break;
+            case 'experienceMax':
+                const jobExpYearsMax = job.requirements?.experience_years;
+                if (jobExpYearsMax !== null && jobExpYearsMax !== undefined && jobExpYearsMax > value) return false;
                 break;
         }
     }
@@ -220,7 +243,7 @@ const getAvailableOptions = (jobs, filterKey) => {
     return Array.from(options).sort();
 };
 
-// Filter Component with Hierarchical Filtering
+// Filter Component with Hierarchical Filtering (Left Sidebar)
 const FilterPanel = {
     showAdvanced: false,
     view: () => {
@@ -228,6 +251,15 @@ const FilterPanel = {
         
         // Get filtered jobs based on current filters for hierarchical filtering
         const filteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
+        
+        // Calculate salary range from all jobs
+        const salaryRange = { min: 0, max: 100000 };
+        state.allLoadedJobs.forEach(job => {
+            const minSalary = job.salary?.min_mdl || job.salary?.min;
+            const maxSalary = job.salary?.max_mdl || job.salary?.max;
+            if (minSalary && minSalary > 0) salaryRange.min = Math.min(salaryRange.min === 0 ? minSalary : salaryRange.min, minSalary);
+            if (maxSalary) salaryRange.max = Math.max(salaryRange.max, maxSalary);
+        });
         
         // All available filter fields
         const filterFields = [
@@ -248,60 +280,111 @@ const FilterPanel = {
         const basicFilters = filterFields.filter(f => f.basic);
         const advancedFilters = filterFields.filter(f => !f.basic);
         
-        const handleFilterChange = async () => {
+        const handleFilterChange = () => {
             JobsPage.displayPage = 1;
-            // Trigger loading more pages if needed
-            await JobsPage.ensureSufficientJobs();
             m.redraw();
         };
         
-        return m('div', { class: 'bg-base-200 p-4 rounded-lg mb-4' }, [
+        return m('div', { class: 'bg-base-200 p-4 rounded-lg h-full overflow-y-auto' }, [
             m('div', { class: 'flex justify-between items-center mb-4' }, [
-                m('h3', { class: 'font-bold' }, 'Filters'),
-                m('div', { class: 'flex gap-2' }, [
-                    m('button', { 
-                        class: 'btn btn-xs btn-ghost',
-                        onclick: () => FilterPanel.showAdvanced = !FilterPanel.showAdvanced
-                    }, FilterPanel.showAdvanced ? 'Show Less' : 'Show More'),
-                    m('button', { 
-                        class: 'btn btn-xs btn-ghost',
-                        onclick: () => {
-                            state.filters = {};
-                            handleFilterChange();
-                        }
-                    }, 'Clear All')
+                m('h3', { class: 'font-bold text-lg' }, 'Filters'),
+                m('button', { 
+                    class: 'btn btn-xs btn-ghost',
+                    onclick: () => {
+                        state.filters = {
+                            salaryMin: null,
+                            salaryMax: null,
+                            experienceMin: null,
+                            experienceMax: null
+                        };
+                        handleFilterChange();
+                    }
+                }, 'Clear All')
+            ]),
+            
+            // Salary Range Filter
+            m('div', { class: 'form-control mb-6' }, [
+                m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Salary Range (MDL)')),
+                m('div', { class: 'space-y-2' }, [
+                    m('div', { class: 'flex gap-2 items-center' }, [
+                        m('input', { 
+                            type: 'number',
+                            class: 'input input-bordered input-sm flex-1',
+                            placeholder: 'Min',
+                            value: state.filters.salaryMin || '',
+                            oninput: (e) => {
+                                state.filters.salaryMin = e.target.value ? parseInt(e.target.value) : null;
+                                handleFilterChange();
+                            }
+                        }),
+                        m('span', '-'),
+                        m('input', { 
+                            type: 'number',
+                            class: 'input input-bordered input-sm flex-1',
+                            placeholder: 'Max',
+                            value: state.filters.salaryMax || '',
+                            oninput: (e) => {
+                                state.filters.salaryMax = e.target.value ? parseInt(e.target.value) : null;
+                                handleFilterChange();
+                            }
+                        })
+                    ]),
+                    state.filters.salaryMin && m('div', { class: 'text-xs opacity-70' }, 
+                        `Min: ${state.filters.salaryMin.toLocaleString()} MDL`
+                    ),
+                    state.filters.salaryMax && m('div', { class: 'text-xs opacity-70' }, 
+                        `Max: ${state.filters.salaryMax.toLocaleString()} MDL`
+                    )
                 ])
             ]),
             
-            // Active filters badges
-            Object.keys(state.filters).length > 0 && m('div', { class: 'flex flex-wrap gap-2 mb-4' },
-                Object.entries(state.filters).map(([key, value]) => 
-                    value && m('span', { class: 'badge badge-primary gap-2' }, [
-                        `${key.replace(/_/g, ' ')}: ${value}`,
-                        m('button', { 
-                            class: 'btn btn-xs btn-circle btn-ghost',
-                            onclick: () => {
-                                delete state.filters[key];
+            // Experience Years Filter
+            m('div', { class: 'form-control mb-6' }, [
+                m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Experience (Years)')),
+                m('div', { class: 'space-y-2' }, [
+                    m('div', { class: 'flex gap-2 items-center' }, [
+                        m('input', { 
+                            type: 'number',
+                            class: 'input input-bordered input-sm flex-1',
+                            placeholder: 'Min',
+                            min: 0,
+                            value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
+                            oninput: (e) => {
+                                state.filters.experienceMin = e.target.value ? parseInt(e.target.value) : null;
                                 handleFilterChange();
                             }
-                        }, '×')
-                    ])
-                )
-            ),
+                        }),
+                        m('span', '-'),
+                        m('input', { 
+                            type: 'number',
+                            class: 'input input-bordered input-sm flex-1',
+                            placeholder: 'Max',
+                            min: 0,
+                            value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
+                            oninput: (e) => {
+                                state.filters.experienceMax = e.target.value ? parseInt(e.target.value) : null;
+                                handleFilterChange();
+                            }
+                        })
+                    ]),
+                    (state.filters.experienceMin !== null || state.filters.experienceMax !== null) && 
+                        m('div', { class: 'text-xs opacity-70' }, 
+                            `${state.filters.experienceMin || 0} - ${state.filters.experienceMax || '∞'} years`
+                        )
+                ])
+            ]),
+            
+            m('div', { class: 'divider' }),
             
             // Basic filters
-            m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4' },
+            m('div', { class: 'space-y-4 mb-4' },
                 basicFilters.map(field => 
                     m('div', { class: 'form-control' }, [
                         m('label', { class: 'label' }, [
-                            m('span', { class: 'label-text' }, field.label),
-                            filteredJobs.length > 0 && state.filters[field.key] && 
-                                m('span', { class: 'label-text-alt text-xs' }, 
-                                    `(${getAvailableOptions(filteredJobs, field.key).length} options)`
-                                )
+                            m('span', { class: 'label-text' }, field.label)
                         ]),
                         m('select', { 
-                            class: 'select select-bordered select-sm',
+                            class: 'select select-bordered select-sm w-full',
                             value: state.filters[field.key] || '',
                             onchange: (e) => {
                                 if (e.target.value) {
@@ -321,13 +404,19 @@ const FilterPanel = {
                 )
             ),
             
+            // Show/hide advanced filters toggle
+            m('button', { 
+                class: 'btn btn-sm btn-ghost w-full mb-2',
+                onclick: () => FilterPanel.showAdvanced = !FilterPanel.showAdvanced
+            }, FilterPanel.showAdvanced ? 'Hide Advanced ▲' : 'Show Advanced ▼'),
+            
             // Advanced filters (collapsible)
-            FilterPanel.showAdvanced && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+            FilterPanel.showAdvanced && m('div', { class: 'space-y-4' },
                 advancedFilters.map(field => 
                     m('div', { class: 'form-control' }, [
                         m('label', { class: 'label' }, m('span', { class: 'label-text' }, field.label)),
                         m('select', { 
-                            class: 'select select-bordered select-sm',
+                            class: 'select select-bordered select-sm w-full',
                             value: state.filters[field.key] || '',
                             onchange: (e) => {
                                 if (e.target.value) {
@@ -476,57 +565,65 @@ const JobsPage = {
     
     view: () => {
         const { jobs, total, totalPages } = JobsPage.getDisplayedJobs();
-        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k]);
+        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k] !== null && state.filters[k] !== undefined && state.filters[k] !== '');
         
         // Calculate accurate job counts
         const totalJobsInAPI = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
         const loadedJobsCount = state.allLoadedJobs.length;
         
-        return m('div', { class: 'container mx-auto px-4 py-8' }, [
-            m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
-            
-            state.jobsIndex && m(FilterPanel),
-            
-            // Page size selector and status
-            state.jobsIndex && m('div', { class: 'flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4' }, [
-                m('div', { class: 'text-sm flex items-center gap-2' }, [
-                    m('span', 'Items per page:'),
-                    state.availablePageSizes.map(size =>
-                        m('button', {
-                            class: `btn btn-xs ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'}`,
-                            onclick: () => {
-                                state.itemsPerPage = size;
-                                JobsPage.displayPage = 1;
-                                m.redraw();
-                            }
-                        }, size)
-                    )
-                ]),
-                m('div', { class: 'text-sm text-gray-600' }, [
-                    hasActiveFilters ? 
-                        `Showing ${jobs.length} of ${total} filtered jobs` :
-                        `Showing ${jobs.length} of ${totalJobsInAPI} jobs`
-                ])
+        return m('div', { class: 'flex h-screen' }, [
+            // Left Sidebar - Filters
+            state.jobsIndex && m('div', { class: 'w-80 border-r border-base-300 overflow-y-auto' }, [
+                m(FilterPanel)
             ]),
             
-            // Top pagination
-            state.jobsIndex && JobsPage.renderPagination(totalPages),
-            
-            state.loading ? m(Loading) : [
-                m('div', { class: 'bg-base-100 rounded-lg shadow my-4 p-4' }, [
-                    jobs.length > 0 ? 
-                        jobs.map((job, idx) => m(JobListItem, { 
-                            job, 
-                            index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
-                        })) :
-                        m('div', { class: 'text-center py-8 text-gray-500' }, 
-                            hasActiveFilters ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
-                        )
-                ]),
-                
-                // Bottom pagination
-                JobsPage.renderPagination(totalPages)
-            ]
+            // Main Content Area
+            m('div', { class: 'flex-1 overflow-y-auto' }, [
+                m('div', { class: 'container mx-auto px-4 py-8' }, [
+                    m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
+                    
+                    // Page size selector and status
+                    state.jobsIndex && m('div', { class: 'flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4' }, [
+                        m('div', { class: 'text-sm flex items-center gap-2' }, [
+                            m('span', 'Items per page:'),
+                            state.availablePageSizes.map(size =>
+                                m('button', {
+                                    class: `btn btn-xs ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'}`,
+                                    onclick: () => {
+                                        state.itemsPerPage = size;
+                                        JobsPage.displayPage = 1;
+                                        m.redraw();
+                                    }
+                                }, size)
+                            )
+                        ]),
+                        m('div', { class: 'text-sm opacity-70' }, [
+                            hasActiveFilters ? 
+                                `Showing ${jobs.length} of ${total} filtered jobs` :
+                                `Showing ${jobs.length} of ${totalJobsInAPI} jobs`
+                        ])
+                    ]),
+                    
+                    // Top pagination
+                    state.jobsIndex && JobsPage.renderPagination(totalPages),
+                    
+                    state.loading ? m(Loading) : [
+                        m('div', { class: 'bg-base-100 rounded-lg shadow my-4' }, [
+                            jobs.length > 0 ? 
+                                jobs.map((job, idx) => m(JobListItem, { 
+                                    job, 
+                                    index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
+                                })) :
+                                m('div', { class: 'text-center py-8 opacity-70' }, 
+                                    hasActiveFilters ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
+                                )
+                        ]),
+                        
+                        // Bottom pagination
+                        JobsPage.renderPagination(totalPages)
+                    ]
+                ])
+            ])
         ]);
     }
 };
