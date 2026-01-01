@@ -1209,7 +1209,7 @@ const AnalysisPage = {
                 data: {
                     labels: items.map(item => item.name || item.skill || item.benefit || item.company),
                     datasets: [{
-                        data: items.map(item => item.count),
+                        data: items.map(item => item.count || item.job_count),
                         backgroundColor: 'rgba(34, 197, 94, 0.7)',
                         borderColor: 'rgba(34, 197, 94, 1)',
                         borderWidth: 1
@@ -1227,9 +1227,9 @@ const AnalysisPage = {
                 }
             };
         }
-        // Time series data (line chart)
-        else if (data.time_series || data.trends) {
-            const series = data.time_series || data.trends;
+        // Time series data (line chart) - check for various time series field names
+        else if (data.time_series || data.trends || data.salary_trends || data.market_trends) {
+            const series = data.time_series || data.trends || data.salary_trends || data.market_trends;
             const items = series.slice(0, 10);
             
             chartConfig = {
@@ -1329,6 +1329,171 @@ const AnalysisPage = {
                         ],
                         backgroundColor: 'rgba(239, 68, 68, 0.7)',
                         borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Education requirements (bar chart)
+        else if (data.education_requirements && data.education_requirements.length > 0) {
+            const items = data.education_requirements.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.education_level || item.education),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                        borderColor: 'rgba(168, 85, 247, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Duration distribution
+        else if (data.duration_distribution && data.duration_distribution.length > 0) {
+            const items = data.duration_distribution.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.range),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Hierarchy tree (horizontal bar for top levels)
+        else if (data.tree && data.tree.length > 0) {
+            const items = data.tree.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.name),
+                    datasets: [{
+                        data: items.map(item => item.average_salary || item.count),
+                        backgroundColor: 'rgba(234, 179, 8, 0.7)',
+                        borderColor: 'rgba(234, 179, 8, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Remote work trends (stacked area approximation with line chart)
+        else if (data.remote_trends && data.remote_trends.length > 0) {
+            const items = data.remote_trends.slice(0, 10);
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: items.map(item => item.period),
+                    datasets: [{
+                        label: 'Remote',
+                        data: items.map(item => item.remote?.count || 0),
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.3)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Skill trends (complex - show first skill's trend)
+        else if (data.skill_trends && Object.keys(data.skill_trends).length > 0) {
+            const firstSkill = Object.keys(data.skill_trends)[0];
+            const items = data.skill_trends[firstSkill].slice(0, 10);
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: items.map(item => item.period),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        borderColor: 'rgba(168, 85, 247, 1)',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Duration stats as fallback
+        else if (data.duration_stats) {
+            const stats = data.duration_stats;
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: ['Min', '25%', 'Avg', 'Median', '75%', 'Max'],
+                    datasets: [{
+                        data: [
+                            stats.min || 0,
+                            stats.percentile_25 || 0,
+                            stats.average || 0,
+                            stats.median || 0,
+                            stats.percentile_75 || 0,
+                            stats.max || 0
+                        ],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
                         borderWidth: 1
                     }]
                 },
