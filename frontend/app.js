@@ -1060,6 +1060,22 @@ const ChartHelpers = {
 
 // Analysis Page
 const AnalysisPage = {
+    // Helper function to get field value with fallback for backward compatibility
+    getFieldValue: (item, fieldName) => {
+        const fieldMap = {
+            'seniority': ['seniority', 'seniority_level'],
+            'location': ['location', 'city'],
+            'size': ['size', 'company_size'],
+            'education': ['education', 'education_level']
+        };
+        
+        if (fieldMap[fieldName]) {
+            for (const field of fieldMap[fieldName]) {
+                if (item[field]) return item[field];
+            }
+        }
+        return item[fieldName];
+    },
     oninit: () => {
         api.getAnalysisIndex().then(data => {
             state.analysisIndex = data;
@@ -1311,7 +1327,7 @@ const AnalysisPage = {
                 m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2 mb-4' }, 
                     items.map(item => 
                         m('div', { class: 'stat bg-base-200 rounded-lg p-2' }, [
-                            m('div', { class: 'stat-title text-xs' }, item.education || item.education_level),
+                            m('div', { class: 'stat-title text-xs' }, AnalysisPage.getFieldValue(item, 'education')),
                             m('div', { class: 'stat-value text-sm' }, `${Math.round(item.average || 0).toLocaleString()}`),
                             m('div', { class: 'stat-desc text-xs' }, `${item.count} jobs`)
                         ])
@@ -1322,7 +1338,7 @@ const AnalysisPage = {
                 m('div', { class: 'chart-container' }, [
                     m('canvas', {
                         oncreate: (vnode) => {
-                            const labels = items.map(item => item.education || item.education_level);
+                            const labels = items.map(item => AnalysisPage.getFieldValue(item, 'education'));
                             const avgSalaries = items.map(item => Math.round(item.average || 0));
                             const medianSalaries = items.map(item => Math.round(item.median || 0));
                             
@@ -1479,6 +1495,9 @@ const AnalysisPage = {
         
         if (!breakdownKey || !data[breakdownKey] || data[breakdownKey].length === 0) return null;
         
+        // Skip education - it has specialized rendering
+        if (breakdownKey === 'by_education') return null;
+        
         const items = data[breakdownKey].slice(0, 10); // Top 10
         const title = ChartHelpers.formatTitle(breakdownKey);
         
@@ -1588,8 +1607,8 @@ const AnalysisPage = {
             // Education level - specialized bar chart with statistics
             data.by_education && AnalysisPage.renderEducationChart(data),
             
-            // Breakdown pie chart (general) - but skip education since it has specialized rendering
-            (!data.by_education) && AnalysisPage.renderBreakdownChart(data),
+            // Breakdown pie chart (general)
+            AnalysisPage.renderBreakdownChart(data),
             
             // === TABLES AS FALLBACK (Collapsible for detail) ===
             
