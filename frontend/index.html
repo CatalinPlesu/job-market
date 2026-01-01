@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moldova Job Market</title>
+    
+    <!-- Tailwind CSS + DaisyUI via CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.6.0/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Mithril.js via CDN -->
+    <script src="https://unpkg.com/mithril/mithril.js"></script>
+    
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <style>
+        /* Extra slim job listings - Hacker News style */
+        .job-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .job-item:hover {
+            background-color: #f9f9f9;
+        }
+        .job-title {
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+        .job-meta {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        /* Ensure charts are responsive */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    
+    <!-- Main application script -->
+    <script src="app.js"></script>
+</body>
+</html>

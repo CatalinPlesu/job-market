@@ -1,0 +1,273 @@
+{
+  "version": "1.0",
+  "page": 1,
+  "total_pages": 3,
+  "jobs_per_page": 100,
+  "jobs": [
+    {
+      "id": 1,
+      "title": "Software Engineer",
+      "job_function": "Engineering",
+      "specialization": "Software Development",
+      "seniority_level": "mid",
+      "company": "TechCorp SRL",
+      "company_size": "medium",
+      "location": {
+        "city": "Chișinău",
+        "region": "Chișinău",
+        "country": "Moldova",
+        "remote_work": "hybrid"
+      },
+      "salary": {
+        "min": 15000,
+        "max": 25000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "flexible"
+      },
+      "requirements": {
+        "education": "bachelor",
+        "experience_years": 3,
+        "languages": ["Romanian", "English"],
+        "hard_skills": ["Python", "JavaScript", "SQL", "Docker"],
+        "soft_skills": ["Communication", "Teamwork"],
+        "certifications": []
+      },
+      "benefits": [
+        "Health insurance",
+        "Professional development budget",
+        "Flexible working hours"
+      ],
+      "posting_date": "2025-12-15",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/1"
+      },
+      "parsed_view": {
+        "responsibilities": [
+          "Develop and maintain web applications",
+          "Collaborate with cross-functional teams",
+          "Write clean, maintainable code"
+        ],
+        "work_environment": ["Modern office", "Collaborative team"],
+        "professional_development": ["Training budget", "Conference attendance"]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Sales Manager",
+      "job_function": "Sales",
+      "specialization": "B2B Sales",
+      "seniority_level": "senior",
+      "company": "RetailChain",
+      "company_size": "large",
+      "location": {
+        "city": "Chișinău",
+        "region": "Chișinău",
+        "country": "Moldova",
+        "remote_work": "on-site"
+      },
+      "salary": {
+        "min": 12000,
+        "max": 18000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "standard"
+      },
+      "requirements": {
+        "education": "bachelor",
+        "experience_years": 5,
+        "languages": ["Romanian", "Russian", "English"],
+        "hard_skills": ["CRM", "Sales Strategy"],
+        "soft_skills": ["Leadership", "Communication", "Negotiation"],
+        "certifications": []
+      },
+      "benefits": [
+        "Commission structure",
+        "Company car",
+        "Health insurance"
+      ],
+      "posting_date": "2025-12-20",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/2"
+      },
+      "parsed_view": {
+        "responsibilities": [
+          "Manage sales team",
+          "Develop sales strategies",
+          "Meet quarterly targets"
+        ],
+        "work_environment": ["Professional office"],
+        "professional_development": ["Sales training"]
+      }
+    },
+    {
+      "id": 3,
+      "title": "Data Analyst",
+      "job_function": "Engineering",
+      "specialization": "Business Analysis",
+      "seniority_level": "junior",
+      "company": "FinanceGroup",
+      "company_size": "medium",
+      "location": {
+        "city": "Chișinău",
+        "region": "Chișinău",
+        "country": "Moldova",
+        "remote_work": "remote"
+      },
+      "salary": {
+        "min": 10000,
+        "max": 15000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "flexible"
+      },
+      "requirements": {
+        "education": "bachelor",
+        "experience_years": 1,
+        "languages": ["English"],
+        "hard_skills": ["Python", "SQL", "Excel", "Power BI"],
+        "soft_skills": ["Problem-solving", "Attention to detail"],
+        "certifications": []
+      },
+      "benefits": [
+        "Remote work",
+        "Training budget",
+        "Health insurance"
+      ],
+      "posting_date": "2025-12-25",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/3"
+      },
+      "parsed_view": {
+        "responsibilities": [
+          "Analyze business data",
+          "Create reports and dashboards",
+          "Provide insights to stakeholders"
+        ],
+        "work_environment": ["Remote-first"],
+        "professional_development": ["Data science courses"]
+      }
+    },
+    {
+      "id": 4,
+      "title": "Marketing Specialist",
+      "job_function": "Marketing",
+      "specialization": "Digital Marketing",
+      "seniority_level": "mid",
+      "company": "TechCorp SRL",
+      "company_size": "medium",
+      "location": {
+        "city": "Chișinău",
+        "region": "Chișinău",
+        "country": "Moldova",
+        "remote_work": "hybrid"
+      },
+      "salary": {
+        "min": 11000,
+        "max": 16000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "flexible"
+      },
+      "requirements": {
+        "education": "bachelor",
+        "experience_years": 3,
+        "languages": ["Romanian", "English"],
+        "hard_skills": ["SEO", "Google Ads", "Social Media"],
+        "soft_skills": ["Creativity", "Communication"],
+        "certifications": []
+      },
+      "benefits": [
+        "Flexible hours",
+        "Health insurance",
+        "Creative workspace"
+      ],
+      "posting_date": "2025-12-28",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/4"
+      },
+      "parsed_view": {
+        "responsibilities": [
+          "Plan and execute marketing campaigns",
+          "Manage social media channels",
+          "Analyze campaign performance"
+        ],
+        "work_environment": ["Creative office"],
+        "professional_development": ["Marketing certifications"]
+      }
+    },
+    {
+      "id": 5,
+      "title": "Project Manager",
+      "job_function": "Engineering",
+      "specialization": "Project Management",
+      "seniority_level": "senior",
+      "company": "ManufacturingCo",
+      "company_size": "large",
+      "location": {
+        "city": "Bălți",
+        "region": "Bălți",
+        "country": "Moldova",
+        "remote_work": "on-site"
+      },
+      "salary": {
+        "min": 18000,
+        "max": 28000,
+        "currency": "MDL",
+        "period": "month"
+      },
+      "employment": {
+        "type": "full-time",
+        "contract": "permanent",
+        "schedule": "standard"
+      },
+      "requirements": {
+        "education": "master",
+        "experience_years": 7,
+        "languages": ["Romanian", "English"],
+        "hard_skills": ["Agile", "Scrum", "Risk Management"],
+        "soft_skills": ["Leadership", "Problem-solving", "Communication"],
+        "certifications": ["PMP"]
+      },
+      "benefits": [
+        "Health insurance",
+        "Company car",
+        "Performance bonuses"
+      ],
+      "posting_date": "2025-12-30",
+      "source": {
+        "site": "jobsite.md",
+        "url": "https://jobsite.md/job/5"
+      },
+      "parsed_view": {
+        "responsibilities": [
+          "Lead project teams",
+          "Manage project timelines and budgets",
+          "Coordinate with stakeholders"
+        ],
+        "work_environment": ["Manufacturing facility"],
+        "professional_development": ["Project management training"]
+      }
+    }
+  ]
+}

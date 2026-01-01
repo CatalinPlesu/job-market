@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "available_analyses": [
+    {
+      "id": "salary-overview",
+      "title": "Salary Analysis Overview",
+      "endpoint": "/api/analysis/salary-overview.json",
+      "last_updated": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "skills-demand",
+      "title": "Most In-Demand Skills",
+      "endpoint": "/api/analysis/skills-demand.json"
+    },
+    {
+      "id": "market-trends",
+      "title": "Job Market Trends Over Time",
+      "endpoint": "/api/analysis/market-trends.json",
+      "temporal": true
+    }
+  ],
+  "data_summary": {
+    "total_jobs": 250,
+    "date_range": {
+      "start": "2025-12-01",
+      "end": "2026-01-01"
+    },
+    "jobs_with_salary": 200,
+    "unique_companies": 25,
+    "unique_skills": 150
+  }
+}

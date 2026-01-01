@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "total_jobs": 250,
+  "total_pages": 3,
+  "jobs_per_page": 100,
+  "metadata": {
+    "date_range": {
+      "earliest": "2025-12-01",
+      "latest": "2026-01-01"
+    }
+  },
+  "filters": {
+    "title": ["Software Engineer", "Sales Manager", "Data Analyst", "Project Manager", "Marketing Specialist"],
+    "job_function": ["Engineering", "Sales", "Marketing", "Healthcare", "Finance"],
+    "seniority_level": ["entry", "junior", "mid", "senior", "lead", "manager"],
+    "industry": ["Technology", "Healthcare", "Manufacturing", "Finance", "Retail"],
+    "department": ["Engineering", "Sales", "HR", "Operations", "Marketing"],
+    "job_family": ["Technical", "Business", "Creative"],
+    "specialization": ["Software Development", "Quality Assurance", "Business Analysis"],
+    "employment_type": ["full-time", "part-time", "contract"],
+    "contract_type": ["permanent", "fixed-term", "internship"],
+    "work_schedule": ["standard", "flexible", "shift"],
+    "shift_details": ["day", "night", "rotating"],
+    "remote_work": ["remote", "hybrid", "on-site"],
+    "travel_requirements": ["none", "occasional", "frequent"],
+    "education_level": ["none", "highschool", "bachelor", "master", "phd"],
+    "city": ["Chișinău", "Bălți", "Tiraspol"],
+    "region": ["Chișinău", "Bălți"],
+    "country": ["Moldova"],
+    "company": ["TechCorp SRL", "HealthPlus MD", "FinanceGroup", "RetailChain", "ManufacturingCo"],
+    "company_size": ["startup", "small", "medium", "large", "enterprise"],
+    "currency": ["MDL", "EUR", "USD"],
+    "salary_period": ["hour", "month", "year"],
+    "hard_skills": ["Python", "JavaScript", "SQL", "Docker", "React", "Java"],
+    "soft_skills": ["Communication", "Teamwork", "Problem-solving", "Leadership"],
+    "languages": ["Romanian", "English", "Russian"],
+    "certifications": ["AWS Solutions Architect", "PMP"],
+    "licenses": ["Driver's License Category B"],
+    "benefits": ["Health insurance", "Training budget", "Flexible hours"],
+    "work_environment": ["Modern office", "Remote-friendly"],
+    "professional_development": ["Training budget", "Conference attendance"],
+    "work_life_balance": ["Flexible hours", "Work from home"],
+    "physical_requirements": ["Sitting for long periods"],
+    "work_conditions": ["Air-conditioned office"],
+    "special_requirements": ["Security clearance"]
+  }
+}
