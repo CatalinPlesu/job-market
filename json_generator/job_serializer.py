@@ -1,10 +1,14 @@
 """Job serialization to JSON format."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .currency_converter import CurrencyConverter
+
 from src.data_database import JobDetail
 
 
-def serialize_job(job: JobDetail, currency_converter=None) -> Dict[str, Any]:
+def serialize_job(job: JobDetail, currency_converter: Optional['CurrencyConverter'] = None) -> Dict[str, Any]:
     """
     Convert JobDetail object to JSON-serializable dictionary.
     
@@ -90,7 +94,7 @@ def serialize_job(job: JobDetail, currency_converter=None) -> Dict[str, Any]:
     return result
 
 
-def serialize_jobs(jobs: List[JobDetail], currency_converter=None) -> List[Dict[str, Any]]:
+def serialize_jobs(jobs: List[JobDetail], currency_converter: Optional['CurrencyConverter'] = None) -> List[Dict[str, Any]]:
     """
     Convert list of JobDetail objects to JSON-serializable list.
     

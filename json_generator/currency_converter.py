@@ -32,6 +32,10 @@ class CurrencyConverter:
         """
         Convert an amount from a given currency to MDL.
         
+        The API returns exchange rates from MDL to other currencies.
+        If rates['USD'] = 0.057, it means 1 MDL = 0.057 USD.
+        To convert USD to MDL: amount_usd / 0.057 = amount_mdl
+        
         Args:
             amount: Amount to convert.
             from_currency: Source currency code (e.g., 'USD', 'EUR').
@@ -52,20 +56,7 @@ class CurrencyConverter:
         if from_currency not in self.rates:
             return None
         
-        # Convert: amount_in_mdl = amount_in_source / rate
-        # Example: 100 USD, rate USD=17.5 (1 MDL = 17.5 USD means 1 USD = 1/17.5 MDL)
-        # So: 100 USD = 100 / 17.5 = 5.71 MDL
-        # Wait, that doesn't make sense. Let me reconsider.
-        
-        # The API returns rates from base (MDL) to other currencies
-        # So if base=MDL and rates['USD']=17.5, it means 1 MDL = 17.5 USD
-        # To convert USD to MDL: amount_usd / rate_usd = amount_mdl
-        # Example: 100 USD / 17.5 = 5.71 MDL
-        
-        # Actually, let me check the API behavior more carefully
-        # If base=MDL and we get rates['USD']=0.057, it means 1 MDL = 0.057 USD
-        # So to convert USD to MDL: amount_usd / 0.057 = amount_mdl
-        
+        # Convert: amount_mdl = amount_source_currency / rate
         rate = self.rates[from_currency]
         converted = amount / rate if rate > 0 else None
         
