@@ -1018,6 +1018,35 @@ const JobDetailPage = {
     }
 };
 
+// Helper object for field name mapping (backward compatibility)
+const FieldMapping = {
+    map: {
+        'seniority': ['seniority', 'seniority_level'],
+        'location': ['location', 'city'],
+        'size': ['size', 'company_size'],
+        'education': ['education', 'education_level']
+    },
+    getValue: (item, fieldName) => {
+        if (FieldMapping.map[fieldName]) {
+            for (const field of FieldMapping.map[fieldName]) {
+                if (item[field]) return item[field];
+            }
+        }
+        return item[fieldName];
+    },
+    extractLabel: (item) => {
+        // Try known field mappings first
+        for (const fieldName of ['function', 'seniority', 'location', 'size', 'education']) {
+            const value = fieldName === 'function' ? item.function : FieldMapping.getValue(item, fieldName);
+            if (value) return value;
+        }
+        // Fallback to other common fields
+        return item.employment_type || item.remote_option || 
+               item.benefit || item.name || item.skill || 
+               item.company || 'Unknown';
+    }
+};
+
 // Chart Helper Functions
 const ChartHelpers = {
     createChart: (canvas, config) => {
@@ -1042,12 +1071,8 @@ const ChartHelpers = {
             key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
     },
     extractLabel: (item) => {
-        // Extract label from item based on various possible field names
-        return item.function || item.seniority || item.location || 
-               item.size || item.education || item.education_level ||
-               item.employment_type || item.remote_option || 
-               item.benefit || item.name || item.skill || 
-               item.company || 'Unknown';
+        // Use centralized field mapping for consistency
+        return FieldMapping.extractLabel(item);
     },
     generateColors: (count) => {
         // Generate an array of colors for charts
@@ -1062,19 +1087,7 @@ const ChartHelpers = {
 const AnalysisPage = {
     // Helper function to get field value with fallback for backward compatibility
     getFieldValue: (item, fieldName) => {
-        const fieldMap = {
-            'seniority': ['seniority', 'seniority_level'],
-            'location': ['location', 'city'],
-            'size': ['size', 'company_size'],
-            'education': ['education', 'education_level']
-        };
-        
-        if (fieldMap[fieldName]) {
-            for (const field of fieldMap[fieldName]) {
-                if (item[field]) return item[field];
-            }
-        }
-        return item[fieldName];
+        return FieldMapping.getValue(item, fieldName);
     },
     oninit: () => {
         api.getAnalysisIndex().then(data => {
