@@ -17,7 +17,9 @@ const state = {
     filters: {},
     loading: false,
     analysisIndex: null,
-    selectedAnalysis: null
+    selectedAnalysis: null,
+    selectedAnalysisData: null,
+    showAnalysisModal: false
 };
 
 // Utility Functions
@@ -590,7 +592,7 @@ const JobDetailPage = {
                             ])
                         ])
                     ] : [
-                        // Source Info View
+                        // Source Info View - Show raw original job description
                         m('div', { class: 'space-y-4' }, [
                             m('div', [
                                 m('h3', { class: 'font-bold mb-2' }, 'Source Information'),
@@ -605,6 +607,24 @@ const JobDetailPage = {
                                 job.posting_date && m('p', { class: 'mt-2' }, [
                                     m('strong', 'Posted: '), 
                                     formatDate(job.posting_date)
+                                ])
+                            ]),
+                            // Show raw original data
+                            job.raw && m('div', { class: 'mt-4' }, [
+                                m('h3', { class: 'font-bold mb-2' }, 'Original Job Posting'),
+                                job.raw.original_title && m('div', { class: 'mb-2' }, [
+                                    m('p', { class: 'text-sm text-gray-500' }, 'Original Title:'),
+                                    m('p', { class: 'font-medium' }, job.raw.original_title)
+                                ]),
+                                job.raw.original_company && m('div', { class: 'mb-2' }, [
+                                    m('p', { class: 'text-sm text-gray-500' }, 'Original Company:'),
+                                    m('p', { class: 'font-medium' }, job.raw.original_company)
+                                ]),
+                                job.raw.original_description && m('div', { class: 'mt-4' }, [
+                                    m('p', { class: 'text-sm text-gray-500 mb-2' }, 'Original Description:'),
+                                    m('div', { class: 'bg-base-200 p-4 rounded-lg max-h-96 overflow-y-auto' }, [
+                                        m('pre', { class: 'whitespace-pre-wrap text-sm' }, job.raw.original_description)
+                                    ])
                                 ])
                             ])
                         ])
@@ -624,6 +644,196 @@ const AnalysisPage = {
             console.error('Error loading analysis index:', err);
             state.analysisIndex = { error: true };
         });
+    },
+    viewAnalysis: (analysis) => {
+        state.selectedAnalysis = analysis;
+        state.showAnalysisModal = true;
+        const filename = `${analysis.id}.json`;
+        api.getAnalysis(filename).then(data => {
+            state.selectedAnalysisData = data;
+            m.redraw();
+        }).catch(err => {
+            console.error(`Error loading ${filename}:`, err);
+            state.selectedAnalysisData = { error: `Failed to load ${filename}` };
+            m.redraw();
+        });
+    },
+    renderAnalysisData: (data) => {
+        if (!data) return m(Loading);
+        if (data.error) return m('div', { class: 'alert alert-error' }, data.error);
+        
+        // Render based on analysis type
+        return m('div', { class: 'space-y-4' }, [
+            // Overall stats if present
+            data.overall && m('div', { class: 'stats stats-vertical lg:stats-horizontal shadow w-full' }, [
+                data.overall.count && m('div', { class: 'stat' }, [
+                    m('div', { class: 'stat-title' }, 'Sample Size'),
+                    m('div', { class: 'stat-value text-primary' }, data.overall.count.toLocaleString())
+                ]),
+                data.overall.average && m('div', { class: 'stat' }, [
+                    m('div', { class: 'stat-title' }, 'Average'),
+                    m('div', { class: 'stat-value' }, `${Math.round(data.overall.average).toLocaleString()} ${data.overall.currency || 'MDL'}`)
+                ]),
+                data.overall.median && m('div', { class: 'stat' }, [
+                    m('div', { class: 'stat-title' }, 'Median'),
+                    m('div', { class: 'stat-value' }, `${Math.round(data.overall.median).toLocaleString()} ${data.overall.currency || 'MDL'}`)
+                ]),
+                data.overall.min && m('div', { class: 'stat' }, [
+                    m('div', { class: 'stat-title' }, 'Range'),
+                    m('div', { class: 'stat-value text-sm' }, 
+                        `${Math.round(data.overall.min).toLocaleString()} - ${Math.round(data.overall.max).toLocaleString()}`)
+                ])
+            ]),
+            
+            // Distribution chart
+            data.distribution && m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                m('div', { class: 'card-body' }, [
+                    m('h3', { class: 'card-title' }, 'Distribution'),
+                    m('div', { class: 'overflow-x-auto' }, [
+                        m('table', { class: 'table table-zebra' }, [
+                            m('thead', [
+                                m('tr', [
+                                    m('th', 'Range'),
+                                    m('th', 'Count'),
+                                    m('th', 'Percentage'),
+                                    m('th', 'Visual')
+                                ])
+                            ]),
+                            m('tbody', 
+                                data.distribution.map(item => 
+                                    m('tr', [
+                                        m('td', item.range || `${item.min}-${item.max}`),
+                                        m('td', item.count.toLocaleString()),
+                                        m('td', `${item.percentage?.toFixed(1) || '0'}%`),
+                                        m('td', [
+                                            m('progress', { 
+                                                class: 'progress progress-primary w-32', 
+                                                value: item.percentage || 0, 
+                                                max: 100 
+                                            })
+                                        ])
+                                    ])
+                                )
+                            )
+                        ])
+                    ])
+                ])
+            ]),
+            
+            // By function/category data
+            (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education) && 
+            m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                m('div', { class: 'card-body' }, [
+                    m('h3', { class: 'card-title' }, 'Breakdown'),
+                    m('div', { class: 'overflow-x-auto' }, [
+                        m('table', { class: 'table table-zebra' }, [
+                            m('thead', [
+                                m('tr', [
+                                    m('th', 'Category'),
+                                    m('th', 'Count'),
+                                    m('th', 'Average'),
+                                    m('th', 'Median')
+                                ])
+                            ]),
+                            m('tbody', 
+                                (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education || []).map(item => 
+                                    m('tr', [
+                                        m('td', { class: 'font-medium' }, 
+                                            item.function || item.seniority || item.location || item.size || item.education || item.name
+                                        ),
+                                        m('td', item.count?.toLocaleString() || 'N/A'),
+                                        m('td', item.average ? `${Math.round(item.average).toLocaleString()} MDL` : 'N/A'),
+                                        m('td', item.median ? `${Math.round(item.median).toLocaleString()} MDL` : 'N/A')
+                                    ])
+                                )
+                            )
+                        ])
+                    ])
+                ])
+            ]),
+            
+            // Top skills/companies
+            (data.top_skills || data.top_companies) && m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                m('div', { class: 'card-body' }, [
+                    m('h3', { class: 'card-title' }, data.top_skills ? 'Top Skills' : 'Top Companies'),
+                    m('div', { class: 'overflow-x-auto' }, [
+                        m('table', { class: 'table table-zebra' }, [
+                            m('thead', [
+                                m('tr', [
+                                    m('th', '#'),
+                                    m('th', 'Name'),
+                                    m('th', 'Count'),
+                                    m('th', 'Percentage')
+                                ])
+                            ]),
+                            m('tbody', 
+                                (data.top_skills || data.top_companies || []).slice(0, 20).map((item, idx) => 
+                                    m('tr', [
+                                        m('td', idx + 1),
+                                        m('td', { class: 'font-medium' }, item.name || item.skill || item.company),
+                                        m('td', item.count?.toLocaleString() || 'N/A'),
+                                        m('td', [
+                                            m('progress', { 
+                                                class: 'progress progress-secondary w-24', 
+                                                value: item.percentage || 0, 
+                                                max: 100 
+                                            }),
+                                            m('span', { class: 'text-xs ml-2' }, `${item.percentage?.toFixed(1) || 0}%`)
+                                        ])
+                                    ])
+                                )
+                            )
+                        ])
+                    ])
+                ])
+            ]),
+            
+            // Time series data
+            data.time_series && m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                m('div', { class: 'card-body' }, [
+                    m('h3', { class: 'card-title' }, 'Trend Over Time'),
+                    m('div', { class: 'overflow-x-auto' }, [
+                        m('table', { class: 'table table-sm' }, [
+                            m('thead', [
+                                m('tr', [
+                                    m('th', 'Date'),
+                                    m('th', 'Count'),
+                                    m('th', 'Average'),
+                                    m('th', 'Change')
+                                ])
+                            ]),
+                            m('tbody', 
+                                data.time_series.map((item, idx) => {
+                                    const prevItem = idx > 0 ? data.time_series[idx - 1] : null;
+                                    const change = prevItem && item.average && prevItem.average ? 
+                                        ((item.average - prevItem.average) / prevItem.average * 100).toFixed(1) : null;
+                                    return m('tr', [
+                                        m('td', item.date || item.period),
+                                        m('td', item.count?.toLocaleString() || 'N/A'),
+                                        m('td', item.average ? Math.round(item.average).toLocaleString() : 'N/A'),
+                                        m('td', change ? [
+                                            m('span', { 
+                                                class: change > 0 ? 'text-success' : 'text-error' 
+                                            }, `${change > 0 ? '+' : ''}${change}%`)
+                                        ] : '-')
+                                    ]);
+                                })
+                            )
+                        ])
+                    ])
+                ])
+            ]),
+            
+            // Raw JSON view (collapsible)
+            m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
+                m('summary', { class: 'collapse-title font-medium' }, 'View Raw JSON'),
+                m('div', { class: 'collapse-content' }, [
+                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, 
+                        JSON.stringify(data, null, 2)
+                    )
+                ])
+            ])
+        ]);
     },
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
         m('h1', { class: 'text-3xl font-bold mb-6' }, 'Job Market Analysis'),
@@ -659,7 +869,7 @@ const AnalysisPage = {
                     m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
                         m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
                     ]),
-                    m('span', `${state.analysisIndex.available_analyses?.length || 0} analyses available. Click "View" to see details.`)
+                    m('span', `${state.analysisIndex.available_analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
                 ]),
             
             state.analysisIndex.available_analyses && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
@@ -667,33 +877,43 @@ const AnalysisPage = {
                     m('div', { class: 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow' }, [
                         m('div', { class: 'card-body' }, [
                             m('h2', { class: 'card-title text-lg' }, analysis.title),
-                            m('p', { class: 'text-xs text-gray-500' }, `File: ${analysis.id}.json`),
+                            m('p', { class: 'text-xs text-gray-500' }, `${analysis.id}.json`),
                             analysis.temporal && m('span', { class: 'badge badge-secondary mt-2' }, 'Time Series'),
-                            analysis.last_updated && m('p', { class: 'text-xs text-gray-500 mt-1' }, 
-                                `Updated: ${formatDate(analysis.last_updated)}`
-                            ),
                             m('div', { class: 'card-actions justify-end mt-4' }, [
                                 m('button', { 
                                     class: 'btn btn-primary btn-sm',
-                                    onclick: () => {
-                                        state.selectedAnalysis = analysis;
-                                        // Extract filename from id (e.g., "salary-overview" -> "salary-overview.json")
-                                        const filename = `${analysis.id}.json`;
-                                        api.getAnalysis(filename).then(data => {
-                                            console.log(`${analysis.title} data:`, data);
-                                            alert(`${analysis.title} data loaded. Check console for details.\n\nIn production, charts would be rendered here.`);
-                                        }).catch(err => {
-                                            console.error(`Error loading ${filename}:`, err);
-                                            alert(`Error loading analysis data. Check console for details.`);
-                                        });
-                                    }
-                                }, 'View Details')
+                                    onclick: () => AnalysisPage.viewAnalysis(analysis)
+                                }, 'View Data')
                             ])
                         ])
                     ])
                 )
             )
-        ] : m(Loading)
+        ] : m(Loading),
+        
+        // Analysis Modal
+        state.showAnalysisModal && m('div', { class: 'modal modal-open' }, [
+            m('div', { class: 'modal-box max-w-4xl max-h-[90vh] overflow-y-auto' }, [
+                m('div', { class: 'flex justify-between items-start mb-4' }, [
+                    m('h3', { class: 'font-bold text-2xl' }, state.selectedAnalysis?.title),
+                    m('button', { 
+                        class: 'btn btn-sm btn-circle btn-ghost',
+                        onclick: () => {
+                            state.showAnalysisModal = false;
+                            state.selectedAnalysisData = null;
+                        }
+                    }, '✕')
+                ]),
+                AnalysisPage.renderAnalysisData(state.selectedAnalysisData)
+            ]),
+            m('div', { 
+                class: 'modal-backdrop', 
+                onclick: () => {
+                    state.showAnalysisModal = false;
+                    state.selectedAnalysisData = null;
+                }
+            })
+        ])
     ])
 };
 
