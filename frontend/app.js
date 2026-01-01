@@ -50,6 +50,30 @@ const getMetadataKey = (filterKey) => {
     return filterKeyToMetadataKey[filterKey] || filterKey;
 };
 
+// Helper to find filter metadata for active filters
+const getActiveFilterMetadata = (filters, jobsIndex) => {
+    if (!jobsIndex || !jobsIndex.metadata) return null;
+    
+    for (const [filterKey, filterValue] of Object.entries(filters)) {
+        if (filterValue === null || filterValue === undefined || filterValue === '') continue;
+        
+        const metadataKey = getMetadataKey(filterKey);
+        
+        if (jobsIndex.metadata[metadataKey]) {
+            const metadataItems = jobsIndex.metadata[metadataKey];
+            
+            // Find the matching metadata entry
+            for (const item of metadataItems) {
+                if (item.name === filterValue) {
+                    return item;
+                }
+            }
+        }
+    }
+    
+    return null;
+};
+
 const formatSalary = (salary) => {
     if (!salary) return 'Not specified';
     
@@ -484,56 +508,34 @@ const FilterPanel = {
             JobsPage.displayPage = 1;
             
             // Determine which pages we need to load for the current display page
-            if (state.jobsIndex && state.jobsIndex.metadata) {
+            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+            
+            // Calculate which pages are needed for the current display page
+            if (filterMetadata && filterMetadata.pages) {
                 const pagesToLoad = new Set();
-                let filterMetadata = null;
+                // We need to load enough pages to satisfy the current display page
+                const itemsNeeded = state.itemsPerPage;
+                let itemsAccumulated = 0;
                 
-                // Find metadata for the active filter
-                for (const [filterKey, filterValue] of Object.entries(state.filters)) {
-                    if (filterValue === null || filterValue === undefined || filterValue === '') continue;
-                    
-                    const metadataKey = getMetadataKey(filterKey);
-                    
-                    if (state.jobsIndex.metadata[metadataKey]) {
-                        const metadataItems = state.jobsIndex.metadata[metadataKey];
-                        
-                        // Find the matching metadata entry
-                        for (const item of metadataItems) {
-                            if (item.name === filterValue && item.pages) {
-                                filterMetadata = item;
-                                break;
-                            }
-                        }
-                        if (filterMetadata) break;
+                for (const pageInfo of filterMetadata.pages) {
+                    if (itemsAccumulated < itemsNeeded) {
+                        pagesToLoad.add(pageInfo.page);
+                        itemsAccumulated += pageInfo.count;
+                    } else {
+                        break;
                     }
                 }
                 
-                // Calculate which pages are needed for the current display page
-                if (filterMetadata && filterMetadata.pages) {
-                    // We need to load enough pages to satisfy the current display page
-                    const itemsNeeded = state.itemsPerPage;
-                    let itemsAccumulated = 0;
-                    
-                    for (const pageInfo of filterMetadata.pages) {
-                        if (itemsAccumulated < itemsNeeded) {
-                            pagesToLoad.add(pageInfo.page);
-                            itemsAccumulated += pageInfo.count;
-                        } else {
-                            break;
+                // Load the identified pages
+                if (pagesToLoad.size > 0) {
+                    const promises = [];
+                    for (const page of pagesToLoad) {
+                        if (!state.loadedPages.has(page)) {
+                            promises.push(JobsPage.loadPage(page));
                         }
                     }
-                    
-                    // Load the identified pages
-                    if (pagesToLoad.size > 0) {
-                        const promises = [];
-                        for (const page of pagesToLoad) {
-                            if (!state.loadedPages.has(page)) {
-                                promises.push(JobsPage.loadPage(page));
-                            }
-                        }
-                        if (promises.length > 0) {
-                            await Promise.all(promises);
-                        }
+                    if (promises.length > 0) {
+                        await Promise.all(promises);
                     }
                 }
             }
@@ -832,38 +834,19 @@ const JobsPage = {
         
         if (isFiltered) {
             // When filtering, use metadata to get the total count immediately
-            let totalFromMetadata = 0;
-            
-            // Calculate total from metadata for active filters
-            if (state.jobsIndex && state.jobsIndex.metadata) {
-                for (const [filterKey, filterValue] of Object.entries(state.filters)) {
-                    if (filterValue === null || filterValue === undefined || filterValue === '') continue;
-                    
-                    const metadataKey = getMetadataKey(filterKey);
-                    
-                    if (state.jobsIndex.metadata[metadataKey]) {
-                        const metadataItems = state.jobsIndex.metadata[metadataKey];
-                        
-                        // Find the matching metadata entry
-                        for (const item of metadataItems) {
-                            if (item.name === filterValue) {
-                                totalFromMetadata = item.count;
-                                break;
-                            }
-                        }
-                        break; // Only use first active filter for count
-                    }
-                }
-            }
+            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+            const totalFromMetadata = filterMetadata ? filterMetadata.count : 0;
             
             // Filter loaded jobs for display
             const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
             const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
             const end = start + state.itemsPerPage;
+            const effectiveTotal = totalFromMetadata > 0 ? totalFromMetadata : filtered.length;
+            
             return {
                 jobs: filtered.slice(start, end),
-                total: totalFromMetadata > 0 ? totalFromMetadata : filtered.length,
-                totalPages: Math.ceil((totalFromMetadata > 0 ? totalFromMetadata : filtered.length) / state.itemsPerPage),
+                total: effectiveTotal,
+                totalPages: Math.ceil(effectiveTotal / state.itemsPerPage),
                 isFiltered: true
             };
         } else {
@@ -888,29 +871,9 @@ const JobsPage = {
         
         const isFiltered = hasActiveFilters(state.filters);
         
-        if (isFiltered && state.jobsIndex && state.jobsIndex.metadata) {
+        if (isFiltered) {
             // When filtering, load pages based on filter metadata
-            let filterMetadata = null;
-            
-            // Find metadata for the active filter
-            for (const [filterKey, filterValue] of Object.entries(state.filters)) {
-                if (filterValue === null || filterValue === undefined || filterValue === '') continue;
-                
-                const metadataKey = getMetadataKey(filterKey);
-                
-                if (state.jobsIndex.metadata[metadataKey]) {
-                    const metadataItems = state.jobsIndex.metadata[metadataKey];
-                    
-                    // Find the matching metadata entry
-                    for (const item of metadataItems) {
-                        if (item.name === filterValue && item.pages) {
-                            filterMetadata = item;
-                            break;
-                        }
-                    }
-                    if (filterMetadata) break;
-                }
-            }
+            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
             
             // Calculate which pages are needed for the requested display page
             if (filterMetadata && filterMetadata.pages) {
@@ -948,7 +911,7 @@ const JobsPage = {
                     }
                 }
             }
-        } else if (!isFiltered && state.jobsIndex) {
+        } else if (state.jobsIndex) {
             // If not filtering, we need to ensure the actual page from metadata is loaded
             // Calculate which metadata page contains the jobs we need
             const jobsPerApiPage = state.jobsIndex.jobs_per_page || DEFAULT_JOBS_PER_API_PAGE;
