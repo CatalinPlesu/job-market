@@ -10,12 +10,4 @@ export default defineConfig({
     sourcemap: false,
     minify: 'esbuild',
   },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-    },
-  },
 })
