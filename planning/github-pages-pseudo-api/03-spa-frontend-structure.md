@@ -127,26 +127,46 @@ export interface JobsIndexResponse {
     date_range: DateRange;
     job_functions: CategoryMetadata[];
     seniority_levels: CategoryMetadata[];
+    specializations: CategoryMetadata[];
+    industries: CategoryMetadata[];
+    departments: CategoryMetadata[];
+    job_families: CategoryMetadata[];
     locations: CategoryMetadata[];
     remote_work: CategoryMetadata[];
+    employment_types: CategoryMetadata[];
+    contract_types: CategoryMetadata[];
+    work_schedules: CategoryMetadata[];
+    education_levels: CategoryMetadata[];
+    company_sizes: CategoryMetadata[];
     salary_ranges: SalaryRangeMetadata[];
     companies: CategoryMetadata[];
-    industries: CategoryMetadata[];
   };
   filters: {
     job_function: string[];
     seniority_level: string[];
+    specialization: string[];
+    industry: string[];
+    department: string[];
+    job_family: string[];
     location: string[];
     remote_work: string[];
     employment_type: string[];
-    industry: string[];
+    contract_type: string[];
+    work_schedule: string[];
+    education_level: string[];
+    company_size: string[];
   };
+}
+
+export interface PageInfo {
+  page: number;
+  count: number;
 }
 
 export interface CategoryMetadata {
   name: string;
   count: number;
-  pages: number[];
+  pages: PageInfo[];  // Enhanced: includes per-page counts
 }
 
 export interface SalaryRangeMetadata {
@@ -154,7 +174,7 @@ export interface SalaryRangeMetadata {
   max: number;
   currency: string;
   count: number;
-  pages: number[];
+  pages: PageInfo[];  // Enhanced: includes per-page counts
 }
 
 export interface JobsPageResponse {
@@ -453,7 +473,7 @@ function useFilters() {
     setFilters({});
   };
   
-  // Calculate which pages to load based on active filters
+  // Calculate which pages to load based on active filters with priority
   const relevantPages = useMemo(() => {
     if (!index || Object.keys(filters).length === 0) {
       return [1]; // No filters, show first page
@@ -463,7 +483,8 @@ function useFilters() {
     const pageSets = Object.entries(filters).map(([key, value]) => {
       const metadata = index.metadata[key];
       const item = metadata?.find(m => m.name === value);
-      return new Set(item?.pages || []);
+      // Extract page numbers from enhanced PageInfo structure
+      return new Set(item?.pages.map(p => p.page) || []);
     });
     
     // Intersection of all page sets
@@ -471,7 +492,25 @@ function useFilters() {
       new Set([...acc].filter(x => set.has(x)))
     );
     
-    return Array.from(intersection).sort((a, b) => a - b);
+    // Get pages with their item counts for smart prioritization
+    const pagesWithCounts = Array.from(intersection).map(pageNum => {
+      // Calculate total items on this page across all filters
+      let totalCount = 0;
+      Object.entries(filters).forEach(([key, value]) => {
+        const metadata = index.metadata[key];
+        const item = metadata?.find(m => m.name === value);
+        const pageInfo = item?.pages.find(p => p.page === pageNum);
+        if (pageInfo) {
+          totalCount += pageInfo.count;
+        }
+      });
+      return { page: pageNum, count: totalCount };
+    });
+    
+    // Sort by count (descending) to load pages with most matches first
+    return pagesWithCounts
+      .sort((a, b) => b.count - a.count)
+      .map(p => p.page);
   }, [filters, index]);
   
   return { filters, updateFilter, clearFilters, relevantPages };
@@ -483,6 +522,7 @@ function useFilters() {
 function FilteredJobList() {
   const { filters, relevantPages } = useFilters();
   const pageQueries = useJobsPages(relevantPages);
+  const { data: index } = useJobsIndex();
   
   const allJobs = useMemo(() => {
     return pageQueries
@@ -493,9 +533,33 @@ function FilteredJobList() {
   
   const isLoading = pageQueries.some(q => q.isLoading);
   
+  // Calculate expected total based on metadata
+  const expectedTotal = useMemo(() => {
+    if (!index || Object.keys(filters).length === 0) return null;
+    
+    // Sum up counts from page metadata
+    let total = 0;
+    Object.entries(filters).forEach(([key, value]) => {
+      const metadata = index.metadata[key];
+      const item = metadata?.find(m => m.name === value);
+      if (item) {
+        item.pages.forEach(p => total += p.count);
+      }
+    });
+    return total;
+  }, [filters, index]);
+  
   if (isLoading) return <Loading />;
   
-  return <JobList jobs={allJobs} />;
+  return (
+    <div>
+      <div className="results-info">
+        Found {allJobs.length} jobs
+        {expectedTotal && ` (${expectedTotal} total across ${relevantPages.length} pages)`}
+      </div>
+      <JobList jobs={allJobs} />
+    </div>
+  );
 }
 
 function matchesFilters(job: Job, filters: Filters): boolean {

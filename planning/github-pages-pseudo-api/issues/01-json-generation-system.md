@@ -48,7 +48,10 @@ pages/api/
 **JSON Schemas:** See `planning/github-pages-pseudo-api/02-json-api-generation.md` for detailed schemas.
 
 **Key Features:**
-- `/api/jobs/index.json` contains metadata showing which pages have jobs matching specific filters
+- `/api/jobs/index.json` contains comprehensive metadata for ALL filterable database fields
+- Metadata includes which pages have matching jobs WITH per-page item counts
+- Enhanced page structure: `{"page": 1, "count": 45}` instead of just page numbers
+- Supports complex filtering on all JobDetail fields (job_function, specialization, industry, seniority, location, education, employment type, contract type, work schedule, company size, etc.)
 - Each page JSON contains 100 jobs (configurable)
 - No contact emails, phones, or person names in output
 - Company names anonymized if on blacklist
@@ -76,7 +79,9 @@ pages/api/
 ### Success Criteria
 - [ ] Generates valid JSON according to schemas
 - [ ] All jobs appear exactly once across pages
-- [ ] Index metadata accurately maps filters to pages
+- [ ] Index metadata accurately maps ALL filterable fields to pages with per-page counts
+- [ ] Page metadata includes `{"page": N, "count": X}` format for every field
+- [ ] Metadata covers all database fields: job_function, specialization, industry, seniority_level, education_level, employment_type, contract_type, work_schedule, city, region, remote_work, company_name, company_size, and others
 - [ ] No sensitive data (emails, phones) in output
 - [ ] Generation completes in <30 seconds for 10,000 jobs
 - [ ] Total API size <20MB

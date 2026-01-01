@@ -66,37 +66,173 @@ This specification defines how to generate paginated JSON files from SQLite data
       "latest": "2026-01-01"
     },
     "job_functions": [
-      {"name": "Engineering", "count": 1234, "pages": [1, 2, 3, 15, 27]},
-      {"name": "Sales", "count": 876, "pages": [1, 4, 8, 12, 28]},
-      {"name": "Healthcare", "count": 654, "pages": [2, 5, 9, 13]}
+      {
+        "name": "Engineering", 
+        "count": 1234, 
+        "pages": [
+          {"page": 1, "count": 45},
+          {"page": 2, "count": 38},
+          {"page": 3, "count": 52},
+          {"page": 15, "count": 12},
+          {"page": 27, "count": 8}
+        ]
+      },
+      {
+        "name": "Sales", 
+        "count": 876, 
+        "pages": [
+          {"page": 1, "count": 28},
+          {"page": 4, "count": 19},
+          {"page": 8, "count": 34},
+          {"page": 12, "count": 15}
+        ]
+      }
     ],
     "seniority_levels": [
-      {"name": "junior", "count": 2000, "pages": [1, 2, 3, 4, 5]},
-      {"name": "mid", "count": 1800, "pages": [1, 3, 5, 7, 9]},
-      {"name": "senior", "count": 1200, "pages": [2, 4, 6, 8]}
+      {
+        "name": "junior", 
+        "count": 2000, 
+        "pages": [
+          {"page": 1, "count": 55},
+          {"page": 2, "count": 48},
+          {"page": 3, "count": 62}
+        ]
+      },
+      {
+        "name": "mid", 
+        "count": 1800, 
+        "pages": [
+          {"page": 1, "count": 45},
+          {"page": 3, "count": 38},
+          {"page": 5, "count": 51}
+        ]
+      }
     ],
     "locations": [
-      {"name": "Chișinău", "count": 3200, "pages": [1, 2, 3, 4]},
-      {"name": "Bălți", "count": 800, "pages": [5, 6, 12]}
+      {
+        "name": "Chișinău", 
+        "count": 3200, 
+        "pages": [
+          {"page": 1, "count": 82},
+          {"page": 2, "count": 78},
+          {"page": 3, "count": 91},
+          {"page": 4, "count": 73}
+        ]
+      }
     ],
     "remote_work": [
-      {"name": "on-site", "count": 3000, "pages": [1, 2, 3]},
-      {"name": "hybrid", "count": 1500, "pages": [1, 4, 7]},
-      {"name": "remote", "count": 932, "pages": [2, 5, 8]}
+      {
+        "name": "on-site", 
+        "count": 3000, 
+        "pages": [
+          {"page": 1, "count": 65},
+          {"page": 2, "count": 58},
+          {"page": 3, "count": 72}
+        ]
+      },
+      {
+        "name": "hybrid", 
+        "count": 1500, 
+        "pages": [
+          {"page": 1, "count": 35},
+          {"page": 4, "count": 28},
+          {"page": 7, "count": 42}
+        ]
+      }
     ],
     "salary_ranges": [
-      {"min": 0, "max": 10000, "currency": "MDL", "count": 1200, "pages": [1, 3, 5]},
-      {"min": 10000, "max": 20000, "currency": "MDL", "count": 2100, "pages": [2, 4, 6]},
-      {"min": 20000, "max": 50000, "currency": "MDL", "count": 1500, "pages": [7, 8, 9]}
+      {
+        "min": 0, 
+        "max": 10000, 
+        "currency": "MDL", 
+        "count": 1200, 
+        "pages": [
+          {"page": 1, "count": 22},
+          {"page": 3, "count": 18},
+          {"page": 5, "count": 25}
+        ]
+      }
     ],
     "companies": [
-      {"name": "Company A", "count": 45, "pages": [1, 2]},
-      {"name": "Company B", "count": 38, "pages": [1, 5]}
+      {
+        "name": "Company A", 
+        "count": 45, 
+        "pages": [
+          {"page": 1, "count": 28},
+          {"page": 2, "count": 17}
+        ]
+      }
     ],
     "industries": [
-      {"name": "Technology", "count": 1800, "pages": [1, 2, 3]},
-      {"name": "Manufacturing", "count": 1200, "pages": [4, 5, 6]},
-      {"name": "Healthcare", "count": 900, "pages": [7, 8]}
+      {
+        "name": "Technology", 
+        "count": 1800, 
+        "pages": [
+          {"page": 1, "count": 48},
+          {"page": 2, "count": 52},
+          {"page": 3, "count": 45}
+        ]
+      }
+    ],
+    "specializations": [
+      {
+        "name": "Software Development",
+        "count": 800,
+        "pages": [
+          {"page": 1, "count": 35},
+          {"page": 2, "count": 28}
+        ]
+      }
+    ],
+    "employment_types": [
+      {
+        "name": "full-time",
+        "count": 4200,
+        "pages": [
+          {"page": 1, "count": 85},
+          {"page": 2, "count": 82}
+        ]
+      }
+    ],
+    "contract_types": [
+      {
+        "name": "permanent",
+        "count": 3800,
+        "pages": [
+          {"page": 1, "count": 78},
+          {"page": 2, "count": 75}
+        ]
+      }
+    ],
+    "work_schedules": [
+      {
+        "name": "flexible",
+        "count": 1200,
+        "pages": [
+          {"page": 1, "count": 25},
+          {"page": 3, "count": 22}
+        ]
+      }
+    ],
+    "education_levels": [
+      {
+        "name": "bachelor",
+        "count": 2500,
+        "pages": [
+          {"page": 1, "count": 52},
+          {"page": 2, "count": 48}
+        ]
+      }
+    ],
+    "company_sizes": [
+      {
+        "name": "medium",
+        "count": 1600,
+        "pages": [
+          {"page": 1, "count": 38},
+          {"page": 2, "count": 35}
+        ]
+      }
     ]
   },
   "filters": {
@@ -105,19 +241,37 @@ This specification defines how to generate paginated JSON files from SQLite data
     "location": ["Chișinău", "Bălți", "Tiraspol", "..."],
     "remote_work": ["remote", "hybrid", "on-site"],
     "employment_type": ["full-time", "part-time", "contract", "..."],
-    "industry": ["Technology", "Healthcare", "Manufacturing", "..."]
+    "contract_type": ["permanent", "fixed-term", "internship", "..."],
+    "work_schedule": ["standard", "flexible", "shift", "..."],
+    "industry": ["Technology", "Healthcare", "Manufacturing", "..."],
+    "specialization": ["Software Development", "Quality Assurance", "..."],
+    "education_level": ["none", "highschool", "bachelor", "master", "phd"],
+    "company_size": ["startup", "small", "medium", "large", "enterprise"]
   }
 }
 ```
 
 **Purpose:** 
 - Enable smart pagination (jump to relevant pages without loading all)
-- Support client-side filtering
-- Provide overview statistics
-- Show which pages contain filtered results
+- Support client-side filtering on ALL database fields
+- Provide overview statistics with per-page item counts
+- Show which pages contain filtered results and how many items per page
 
-**Page Mapping Logic:**
-Each job appears on a page. Metadata includes which pages contain jobs matching specific filters. This allows the SPA to load only relevant pages when filtering.
+**Enhanced Page Mapping Logic:**
+Each job appears on a page. Metadata includes which pages contain jobs matching specific filters, **along with the count of matching items on each page**. This allows:
+1. The SPA to load only relevant pages when filtering
+2. Display "X items on page Y" information to users
+3. Smart page prioritization (load pages with more matching items first)
+
+**Comprehensive Field Coverage:**
+The metadata strategy covers **ALL filterable database fields**, including:
+- Job classification: job_function, specialization, industry, department, job_family
+- Experience: seniority_level, education_level, experience_years
+- Employment terms: employment_type, contract_type, work_schedule, shift_details
+- Location: city, region, country, remote_work
+- Company: company_name, company_size
+- Compensation: salary ranges (min/max/currency)
+- Any other field from JobDetail that users can filter by
 
 #### `/api/jobs/page-{N}.json`
 ```json
@@ -472,17 +626,18 @@ json-generator/
 
 ### Key Algorithms
 
-#### 1. Intelligent Index Building
+#### 1. Intelligent Index Building with Per-Page Counts
 ```python
 def build_index(jobs, jobs_per_page):
     """
     Create index.json with metadata for efficient filtering.
     
-    Algorithm:
+    Enhanced Algorithm:
     1. Assign each job to a page number
-    2. Group jobs by filter categories (function, location, etc.)
+    2. Group jobs by ALL filterable categories
     3. For each filter value, record which pages contain matching jobs
-    4. Return index with page mappings
+    4. Track count of matching items per page
+    5. Return index with comprehensive page mappings including counts
     """
     total_pages = ceil(len(jobs) / jobs_per_page)
     index = {
@@ -491,26 +646,132 @@ def build_index(jobs, jobs_per_page):
         'metadata': {}
     }
     
-    # Build category mappings
-    categories = ['job_function', 'seniority_level', 'city', 'remote_work']
+    # ALL filterable database fields
+    categories = [
+        'job_function', 'specialization', 'industry', 'department', 'job_family',
+        'seniority_level', 'education_level', 
+        'employment_type', 'contract_type', 'work_schedule', 'shift_details',
+        'city', 'region', 'country', 'remote_work',
+        'company_name', 'company_size'
+    ]
+    
     for category in categories:
         category_map = {}
+        
         for i, job in enumerate(jobs):
             page = (i // jobs_per_page) + 1
-            value = job.get(category)
+            value = get_field_value(job, category)
+            
             if value:
                 if value not in category_map:
-                    category_map[value] = {'count': 0, 'pages': set()}
+                    category_map[value] = {
+                        'count': 0, 
+                        'pages': {}  # Dict to track count per page
+                    }
+                
                 category_map[value]['count'] += 1
-                category_map[value]['pages'].add(page)
+                
+                # Track per-page counts
+                if page not in category_map[value]['pages']:
+                    category_map[value]['pages'][page] = 0
+                category_map[value]['pages'][page] += 1
         
-        # Convert sets to sorted lists
+        # Convert to final format with page/count pairs
         index['metadata'][category] = [
-            {'name': k, 'count': v['count'], 'pages': sorted(v['pages'])}
+            {
+                'name': k, 
+                'count': v['count'], 
+                'pages': [
+                    {'page': page, 'count': count}
+                    for page, count in sorted(v['pages'].items())
+                ]
+            }
             for k, v in category_map.items()
         ]
     
+    # Special handling for salary ranges
+    index['metadata']['salary_ranges'] = build_salary_range_metadata(jobs, jobs_per_page)
+    
     return index
+
+
+def get_field_value(job, field):
+    """
+    Get the value of a field from job, handling foreign keys and nested structures.
+    Works with all database fields from JobDetail model.
+    """
+    # Handle foreign key relationships
+    field_mappings = {
+        'job_function': lambda j: j.job_function.name if j.job_function else None,
+        'specialization': lambda j: j.specialization.name if j.specialization else None,
+        'industry': lambda j: j.industry.name if j.industry else None,
+        'seniority_level': lambda j: j.seniority_level.name if j.seniority_level else None,
+        'city': lambda j: j.city.name if j.city else None,
+        'remote_work': lambda j: j.remote_work.name if j.remote_work else None,
+        'company_name': lambda j: j.company_name_ref.name if j.company_name_ref else None,
+        # ... add all other foreign key fields
+    }
+    
+    if field in field_mappings:
+        return field_mappings[field](job)
+    
+    return getattr(job, field, None)
+
+
+def build_salary_range_metadata(jobs, jobs_per_page):
+    """
+    Build metadata for salary ranges with per-page counts.
+    Groups jobs into salary brackets.
+    """
+    ranges = [
+        (0, 10000),
+        (10000, 20000),
+        (20000, 30000),
+        (30000, 50000),
+        (50000, float('inf'))
+    ]
+    
+    range_map = {}
+    
+    for i, job in enumerate(jobs):
+        if not job.min_salary:
+            continue
+        
+        page = (i // jobs_per_page) + 1
+        avg_salary = (job.min_salary + job.max_salary) / 2 if job.max_salary else job.min_salary
+        
+        for min_val, max_val in ranges:
+            if min_val <= avg_salary < max_val:
+                range_key = f'{min_val}-{max_val}' if max_val != float('inf') else f'{min_val}+'
+                
+                if range_key not in range_map:
+                    range_map[range_key] = {
+                        'min': min_val,
+                        'max': max_val if max_val != float('inf') else None,
+                        'currency': 'MDL',  # Assuming normalized
+                        'count': 0,
+                        'pages': {}
+                    }
+                
+                range_map[range_key]['count'] += 1
+                if page not in range_map[range_key]['pages']:
+                    range_map[range_key]['pages'][page] = 0
+                range_map[range_key]['pages'][page] += 1
+                break
+    
+    return [
+        {
+            'min': v['min'],
+            'max': v['max'],
+            'currency': v['currency'],
+            'count': v['count'],
+            'pages': [
+                {'page': page, 'count': count}
+                for page, count in sorted(v['pages'].items())
+            ]
+        }
+        for k, v in range_map.items()
+    ]
 ```
 
 #### 2. Temporal Data Aggregation
