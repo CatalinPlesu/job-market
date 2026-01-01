@@ -112,6 +112,16 @@ The generator automatically:
 - Anonymizes companies listed in blacklist file
 - Uses minimal data necessary for public API
 
+## Job Data Fields
+
+### Raw Job Description
+The generator includes the original job description text in the `raw.original_description` field:
+- **Source**: Pulled from `job_description` column in `job_details` table (data.db)
+- **Content**: Complete original job posting text as scraped from the source
+- **Note**: If this field is empty in the generated JSON, ensure the `job_description` column is being populated during the LLM processing stage (Stage 7 - Structure Data with LLM)
+
+The raw description allows users to view the complete, unprocessed job posting alongside the structured data extracted by the LLM.
+
 ## Performance
 
 **Optimized for Memory Efficiency:**

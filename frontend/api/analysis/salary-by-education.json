@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-by-education",
+  "title": "Salary by Education Level",
+  "generated_at": "2026-01-01T13:27:45.243047Z",
+  "type": "static",
+  "data": {
+    "by_education": [
+      {
+        "count": 30,
+        "sum": 336250.0,
+        "average": 11208.333333333334,
+        "median": 11750.0,
+        "min": 750.0,
+        "max": 22500.0,
+        "percentile_25": 8000.0,
+        "percentile_75": 15000.0,
+        "education_level": "none",
+        "order": 0
+      },
+      {
+        "count": 21,
+        "sum": 174325.0,
+        "average": 8301.190476190477,
+        "median": 10000.0,
+        "min": 825.0,
+        "max": 20000.0,
+        "percentile_25": 1750.0,
+        "percentile_75": 13500.0,
+        "education_level": "highschool",
+        "order": 1
+      },
+      {
+        "count": 15,
+        "sum": 171375.0,
+        "average": 11425.0,
+        "median": 12500.0,
+        "min": 825.0,
+        "max": 22500.0,
+        "percentile_25": 850.0,
+        "percentile_75": 17000.0,
+        "education_level": "vocational",
+        "order": 2
+      },
+      {
+        "count": 22,
+        "sum": 380350.0,
+        "average": 17288.636363636364,
+        "median": 15500.0,
+        "min": 1500.0,
+        "max": 45000.0,
+        "percentile_25": 14000.0,
+        "percentile_75": 20500.0,
+        "education_level": "bachelor",
+        "order": 4
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bar_chart",
+      "line_chart"
+    ],
+    "recommended_chart": "bar_chart"
+  }
+}

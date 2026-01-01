@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-trends",
+  "title": "Salary Evolution Over Time",
+  "generated_at": "2026-01-01T13:27:52.338016Z",
+  "type": "temporal",
+  "data": {
+    "granularity": "daily",
+    "salary_trends": [
+      {
+        "count": 132,
+        "sum": 1553487.5,
+        "average": 11768.844696969696,
+        "median": 12000.0,
+        "min": 550.0,
+        "max": 33250.0,
+        "percentile_25": 7250.0,
+        "percentile_75": 16000.0,
+        "period": "2025-12-25"
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "line_chart",
+      "area_chart"
+    ],
+    "recommended_chart": "line_chart"
+  }
+}

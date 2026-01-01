@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "analysis_id": "remote-work-trends",
+  "title": "Remote Work Adoption Trends",
+  "generated_at": "2026-01-01T13:27:52.499247Z",
+  "type": "temporal",
+  "data": {
+    "granularity": "daily",
+    "remote_trends": [
+      {
+        "period": "2025-12-25",
+        "total_jobs": 300,
+        "on-site": {
+          "count": 276,
+          "percentage": 92.0
+        },
+        "remote": {
+          "count": 8,
+          "percentage": 2.67
+        },
+        "hybrid": {
+          "count": 16,
+          "percentage": 5.33
+        }
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "stacked_area",
+      "line_chart",
+      "stacked_bar"
+    ],
+    "recommended_chart": "stacked_area"
+  }
+}

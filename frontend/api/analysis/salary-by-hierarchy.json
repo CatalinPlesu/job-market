@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-by-hierarchy",
+  "title": "Salary Analysis by Job Hierarchy",
+  "generated_at": "2026-01-01T13:28:04.955720Z",
+  "type": "static",
+  "data": {
+    "hierarchy_levels": [
+      "job_function",
+      "specialization",
+      "seniority_level"
+    ],
+    "tree": [
+      {
+        "name": "Sales",
+        "level": "job_function",
+        "count": 23,
+        "average_salary": 14881.52,
+        "median_salary": 13500.0,
+        "salary_range": {
+          "min": 825.0,
+          "max": 45000.0
+        }
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "tree_map",
+      "sunburst",
+      "hierarchical_tree"
+    ],
+    "recommended_chart": "sunburst"
+  }
+}

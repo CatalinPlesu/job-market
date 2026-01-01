@@ -1,0 +1,133 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-01-01T13:28:05.012944Z",
+  "total_analyses": 21,
+  "analyses": [
+    {
+      "id": "salary-overview",
+      "title": "Overall Salary Analysis",
+      "type": "static",
+      "file": "salary-overview.json"
+    },
+    {
+      "id": "salary-by-function",
+      "title": "Salary by Job Function",
+      "type": "static",
+      "file": "salary-by-function.json"
+    },
+    {
+      "id": "salary-by-seniority",
+      "title": "Salary by Seniority Level",
+      "type": "static",
+      "file": "salary-by-seniority.json"
+    },
+    {
+      "id": "salary-by-location",
+      "title": "Salary by Location",
+      "type": "static",
+      "file": "salary-by-location.json"
+    },
+    {
+      "id": "salary-by-company-size",
+      "title": "Salary by Company Size",
+      "type": "static",
+      "file": "salary-by-company-size.json"
+    },
+    {
+      "id": "salary-by-education",
+      "title": "Salary by Education Level",
+      "type": "static",
+      "file": "salary-by-education.json"
+    },
+    {
+      "id": "skills-demand",
+      "title": "Top In-Demand Skills",
+      "type": "static",
+      "file": "skills-demand.json"
+    },
+    {
+      "id": "skills-salary",
+      "title": "Skills to Salary Correlation",
+      "type": "static",
+      "file": "skills-salary.json"
+    },
+    {
+      "id": "skill-combinations",
+      "title": "Common Skill Combinations",
+      "type": "static",
+      "file": "skill-combinations.json"
+    },
+    {
+      "id": "employment-types",
+      "title": "Employment Types Distribution",
+      "type": "static",
+      "file": "employment-types.json"
+    },
+    {
+      "id": "remote-work",
+      "title": "Remote Work Availability",
+      "type": "static",
+      "file": "remote-work.json"
+    },
+    {
+      "id": "benefits",
+      "title": "Most Common Benefits",
+      "type": "static",
+      "file": "benefits.json"
+    },
+    {
+      "id": "requirements",
+      "title": "Job Requirements Overview",
+      "type": "static",
+      "file": "requirements.json"
+    },
+    {
+      "id": "top-companies",
+      "title": "Top Hiring Companies",
+      "type": "static",
+      "file": "top-companies.json"
+    },
+    {
+      "id": "posting-trends",
+      "title": "Job Posting Volume Trends",
+      "type": "temporal",
+      "file": "posting-trends.json"
+    },
+    {
+      "id": "salary-trends",
+      "title": "Salary Evolution Over Time",
+      "type": "temporal",
+      "file": "salary-trends.json"
+    },
+    {
+      "id": "skills-trends",
+      "title": "Skills Demand Trends Over Time",
+      "type": "temporal",
+      "file": "skills-trends.json"
+    },
+    {
+      "id": "remote-work-trends",
+      "title": "Remote Work Adoption Trends",
+      "type": "temporal",
+      "file": "remote-work-trends.json"
+    },
+    {
+      "id": "job-duration",
+      "title": "Job Duration Analysis (Time to Fill)",
+      "type": "temporal",
+      "file": "job-duration.json"
+    },
+    {
+      "id": "market-health",
+      "title": "Market Health Indicators",
+      "type": "temporal",
+      "file": "market-health.json"
+    },
+    {
+      "id": "salary-by-hierarchy",
+      "title": "Salary Analysis by Job Hierarchy",
+      "type": "static",
+      "file": "salary-by-hierarchy.json"
+    }
+  ]
+}

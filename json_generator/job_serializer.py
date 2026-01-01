@@ -76,6 +76,11 @@ def serialize_job(job: JobDetail, currency_converter: Optional['CurrencyConverte
             'responsibilities': [resp.description for resp in job.responsibilities] if job.responsibilities else [],
             'work_environment': [env.description for env in job.work_environment] if job.work_environment else [],
             'professional_development': [pd.description for pd in job.professional_development] if job.professional_development else [],
+        },
+        'raw': {
+            'original_title': job.job_title,
+            'original_company': job.company_name,
+            'original_description': job.job_description,
         }
     }
     

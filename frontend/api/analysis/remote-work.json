@@ -1,0 +1,35 @@
+{
+  "version": "1.0",
+  "analysis_id": "remote-work",
+  "title": "Remote Work Availability",
+  "generated_at": "2026-01-01T13:27:45.658188Z",
+  "type": "static",
+  "data": {
+    "remote_options": [
+      {
+        "remote_option": "on-site",
+        "count": 276,
+        "percentage": 92.0
+      },
+      {
+        "remote_option": "hybrid",
+        "count": 16,
+        "percentage": 5.33
+      },
+      {
+        "remote_option": "remote",
+        "count": 8,
+        "percentage": 2.67
+      }
+    ],
+    "total_jobs": 300
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "pie_chart",
+      "bar_chart",
+      "donut_chart"
+    ],
+    "recommended_chart": "pie_chart"
+  }
+}
