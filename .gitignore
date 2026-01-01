@@ -28,3 +28,6 @@ scheduler_state_*.json
 # Test files
 test_*.py
 *_test.py
+
+# GitHub Pages - track structure but not generated API files
+pages/api/
