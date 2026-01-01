@@ -32,11 +32,28 @@ def serialize_job(job: JobDetail, currency_converter: Optional['CurrencyConverte
         'period': job.salary_period.name if job.salary_period else None,
     }
     
-    # Add MDL conversion if converter available
-    if currency_converter and currency:
-        converted = currency_converter.convert_salary_range(min_salary, max_salary, currency)
-        salary_dict['min_mdl'] = converted['min_mdl']
-        salary_dict['max_mdl'] = converted['max_mdl']
+    # Add MDL conversion
+    # If no currency specified, assume MDL (reasonable default for Moldova market)
+    # If currency is MDL, use original values
+    # Otherwise, convert using currency converter if available
+    if min_salary is not None or max_salary is not None:
+        # Ensure currency is a string and normalize to uppercase
+        effective_currency = str(currency).upper() if currency else 'MDL'
+        
+        if effective_currency == 'MDL':
+            # Already in MDL, no conversion needed
+            salary_dict['min_mdl'] = min_salary
+            salary_dict['max_mdl'] = max_salary
+        elif currency_converter:
+            # Convert to MDL
+            converted = currency_converter.convert_salary_range(min_salary, max_salary, effective_currency)
+            salary_dict['min_mdl'] = converted['min_mdl']
+            salary_dict['max_mdl'] = converted['max_mdl']
+        else:
+            # No converter available and not MDL - can't convert
+            # Set to None to indicate conversion not available
+            salary_dict['min_mdl'] = None
+            salary_dict['max_mdl'] = None
     
     result = {
         'id': job.id,
