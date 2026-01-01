@@ -251,9 +251,7 @@ const FilterPanel = {
         const handleFilterChange = async () => {
             JobsPage.displayPage = 1;
             // Trigger loading more pages if needed
-            if (JobsPage.ensureSufficientJobs) {
-                await JobsPage.ensureSufficientJobs();
-            }
+            await JobsPage.ensureSufficientJobs();
             m.redraw();
         };
         
@@ -367,7 +365,9 @@ const JobsPage = {
             state.loadedPages = new Set([1]);
             state.loading = false;
             // Load additional pages if needed for initial display
-            JobsPage.ensureSufficientJobs();
+            JobsPage.ensureSufficientJobs().catch(err => {
+                console.error('Error loading sufficient jobs:', err);
+            });
         });
     },
     
@@ -382,9 +382,13 @@ const JobsPage = {
             return;
         }
         
-        // Load next unloaded page
-        const nextPage = state.loadedPages.size + 1;
-        if (nextPage <= state.jobsIndex.total_pages && !state.loadedPages.has(nextPage)) {
+        // Find next unloaded page
+        let nextPage = 1;
+        while (state.loadedPages.has(nextPage) && nextPage <= state.jobsIndex.total_pages) {
+            nextPage++;
+        }
+        
+        if (nextPage <= state.jobsIndex.total_pages) {
             try {
                 const pageData = await api.getJobsPage(nextPage);
                 state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
@@ -478,7 +482,11 @@ const JobsPage = {
                         class: 'btn btn-sm btn-outline ml-4',
                         onclick: async () => {
                             state.loading = true;
-                            const nextPage = state.loadedPages.size + 1;
+                            // Find next unloaded page
+                            let nextPage = 1;
+                            while (state.loadedPages.has(nextPage) && nextPage <= state.jobsIndex.total_pages) {
+                                nextPage++;
+                            }
                             try {
                                 const pageData = await api.getJobsPage(nextPage);
                                 state.allLoadedJobs = [...state.allLoadedJobs, ...pageData.jobs];
