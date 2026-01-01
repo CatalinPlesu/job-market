@@ -1119,9 +1119,250 @@ const AnalysisPage = {
         };
         return previewMap[analysis.id] || 'Detailed analysis with visualizations and statistics';
     },
+    // Render mini chart preview for analysis card
+    renderMiniChart: (analysis) => {
+        if (!analysis.previewData || analysis.previewData.error) {
+            return m('div', { class: 'flex items-center justify-center h-32 text-xs opacity-60' }, 
+                'Loading preview...'
+            );
+        }
+        
+        const data = analysis.previewData;
+        
+        // Create mini chart based on data type
+        return m('div', { class: 'h-32' }, [
+            m('canvas', {
+                oncreate: (vnode) => {
+                    AnalysisPage.createMiniChart(vnode.dom, data, analysis.id);
+                },
+                onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+            })
+        ]);
+    },
+    // Create mini chart for preview
+    createMiniChart: (canvas, data, analysisId) => {
+        let chartConfig = null;
+        
+        // Distribution-based analyses (bar chart)
+        if (data.distribution && data.distribution.length > 0) {
+            const items = data.distribution.slice(0, 5);
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.range || `${item.min}-${item.max}`),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Breakdown analyses (top items - horizontal bar)
+        else if (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education) {
+            const breakdownKey = data.by_function ? 'by_function' : 
+                                data.by_seniority ? 'by_seniority' : 
+                                data.by_location ? 'by_location' : 
+                                data.by_company_size ? 'by_company_size' : 'by_education';
+            const items = data[breakdownKey].slice(0, 5);
+            
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => FieldMapping.extractLabel(item)),
+                    datasets: [{
+                        data: items.map(item => item.average || item.count),
+                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                        borderColor: 'rgba(168, 85, 247, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Top items (skills, companies, benefits)
+        else if (data.top_skills || data.top_companies || data.top_benefits) {
+            const itemsKey = data.top_skills ? 'top_skills' : data.top_companies ? 'top_companies' : 'top_benefits';
+            const items = data[itemsKey].slice(0, 5);
+            
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.name || item.skill || item.benefit || item.company),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Time series data (line chart)
+        else if (data.time_series || data.trends) {
+            const series = data.time_series || data.trends;
+            const items = series.slice(0, 10);
+            
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: items.map(item => item.date || item.period),
+                    datasets: [{
+                        data: items.map(item => item.count || item.new_jobs || item.average),
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        // Skills-salary (bubble style with bars)
+        else if (data.skills_salary || data.top_10_highest_paying) {
+            const items = (data.top_10_highest_paying || data.skills_salary).slice(0, 5);
+            
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: items.map(item => item.skill),
+                    datasets: [{
+                        data: items.map(item => item.average),
+                        backgroundColor: 'rgba(234, 179, 8, 0.7)',
+                        borderColor: 'rgba(234, 179, 8, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            };
+        }
+        // Employment types, remote work (doughnut for categorical data)
+        else if (data.employment_types || data.remote_options) {
+            const itemsKey = data.employment_types ? 'employment_types' : 'remote_options';
+            const items = data[itemsKey].slice(0, 4);
+            
+            chartConfig = {
+                type: 'doughnut',
+                data: {
+                    labels: items.map(item => item.type || item.option),
+                    datasets: [{
+                        data: items.map(item => item.count),
+                        backgroundColor: [
+                            'rgba(99, 102, 241, 0.7)',
+                            'rgba(168, 85, 247, 0.7)',
+                            'rgba(34, 197, 94, 0.7)',
+                            'rgba(234, 179, 8, 0.7)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '60%'
+                }
+            };
+        }
+        // Overall stats (simple stat display)
+        else if (data.overall) {
+            const stats = data.overall;
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: ['Min', '25%', 'Avg', 'Median', '75%', 'Max'],
+                    datasets: [{
+                        data: [
+                            stats.min || 0,
+                            stats.percentile_25 || 0,
+                            stats.average || 0,
+                            stats.median || 0,
+                            stats.percentile_75 || 0,
+                            stats.max || 0
+                        ],
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { display: false }
+                    }
+                }
+            };
+        }
+        
+        if (chartConfig) {
+            ChartHelpers.createChart(canvas, chartConfig);
+        }
+    },
     oninit: () => {
         api.getAnalysisIndex().then(data => {
             state.analysisIndex = data;
+            // Load preview data for each analysis
+            if (data.analyses) {
+                data.analyses.forEach(analysis => {
+                    analysis.previewData = null; // Initialize
+                    api.getAnalysis(`${analysis.id}.json`).then(response => {
+                        analysis.previewData = response.data || response;
+                        m.redraw();
+                    }).catch(err => {
+                        console.error(`Error loading preview for ${analysis.id}:`, err);
+                    });
+                });
+            }
         }).catch(err => {
             console.error('Error loading analysis index:', err);
             state.analysisIndex = { error: true };
@@ -1890,9 +2131,9 @@ const AnalysisPage = {
                                 analysis.type && m('span', { class: 'badge badge-outline badge-sm' }, analysis.type)
                             ]),
                             
-                            // Preview section
+                            // Preview section with mini chart
                             m('div', { class: 'bg-base-200 rounded-lg p-3 mt-2' }, [
-                                m('div', { class: 'flex items-center justify-between' }, [
+                                m('div', { class: 'flex items-center justify-between mb-2' }, [
                                     m('span', { class: 'text-xs opacity-70' }, 'Quick Preview'),
                                     m('div', { class: 'flex items-center gap-1 text-primary' }, [
                                         m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
@@ -1901,9 +2142,7 @@ const AnalysisPage = {
                                         m('span', { class: 'text-xs font-medium' }, 'Click for details')
                                     ])
                                 ]),
-                                m('div', { class: 'text-sm mt-2 opacity-80' }, 
-                                    AnalysisPage.getPreviewText(analysis)
-                                )
+                                AnalysisPage.renderMiniChart(analysis)
                             ])
                         ])
                     ])
