@@ -2,7 +2,7 @@
   "version": "1.0",
   "analysis_id": "market-health",
   "title": "Market Health Indicators",
-  "generated_at": "2026-01-01T17:59:36.688419Z",
+  "generated_at": "2026-01-01T19:19:55.709663Z",
   "type": "temporal",
   "data": {
     "granularity": "monthly",

@@ -2,19 +2,19 @@
   "version": "1.0",
   "analysis_id": "salary-by-location",
   "title": "Salary by Location",
-  "generated_at": "2026-01-01T17:59:20.836972Z",
+  "generated_at": "2026-01-01T19:19:42.160812Z",
   "type": "static",
   "data": {
     "by_location": [
       {
-        "count": 85,
-        "sum": 1030087.5,
-        "average": 12118.676470588236,
-        "median": 12500.0,
-        "min": 750.0,
-        "max": 33250.0,
-        "percentile_25": 6500.0,
-        "percentile_75": 17000.0,
+        "count": 86,
+        "sum": 1512107.1665738402,
+        "average": 17582.64147178884,
+        "median": 16121.19780284685,
+        "min": 850.0,
+        "max": 46124.68761007028,
+        "percentile_25": 12500.0,
+        "percentile_75": 20000.0,
         "location": "Chișinău",
         "city": "Chișinău"
       }

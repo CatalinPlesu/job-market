@@ -2,19 +2,19 @@
   "version": "1.0",
   "analysis_id": "salary-by-company-size",
   "title": "Salary by Company Size",
-  "generated_at": "2026-01-01T17:59:20.889444Z",
+  "generated_at": "2026-01-01T19:19:42.208942Z",
   "type": "static",
   "data": {
     "by_company_size": [
       {
         "count": 19,
-        "sum": 99450.0,
-        "average": 5234.210526315789,
-        "median": 1900.0,
-        "min": 825.0,
-        "max": 17000.0,
-        "percentile_25": 850.0,
-        "percentile_75": 10000.0,
+        "sum": 343741.17332722055,
+        "average": 18091.64070143266,
+        "median": 16242.395605693699,
+        "min": 6500.0,
+        "max": 33545.227352778384,
+        "percentile_25": 14000.0,
+        "percentile_75": 17000.0,
         "size": "enterprise",
         "company_size": "enterprise",
         "order": 4

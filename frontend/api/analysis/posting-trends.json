@@ -2,7 +2,7 @@
   "version": "1.0",
   "analysis_id": "posting-trends",
   "title": "Job Posting Volume Trends",
-  "generated_at": "2026-01-01T17:59:21.854077Z",
+  "generated_at": "2026-01-01T19:19:43.041653Z",
   "type": "temporal",
   "data": {
     "granularity": "monthly",
