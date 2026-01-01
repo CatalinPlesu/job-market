@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "analysis_id": "skills-salary",
+  "title": "Skills to Salary Correlation",
+  "generated_at": "2026-01-01T13:27:45.391131Z",
+  "type": "static",
+  "data": {
+    "skills_salary": [
+      {
+        "count": 13,
+        "sum": 191600.0,
+        "average": 14738.461538461539,
+        "median": 850.0,
+        "min": 825.0,
+        "max": 45000.0,
+        "percentile_25": 825.0,
+        "percentile_75": 25000.0,
+        "skill": "CRM"
+      },
+      {
+        "count": 10,
+        "sum": 92187.5,
+        "average": 9218.75,
+        "median": 7000.0,
+        "min": 825.0,
+        "max": 20000.0,
+        "percentile_25": 850.0,
+        "percentile_75": 19837.5,
+        "skill": "Negotiation"
+      }
+    ],
+    "top_10_highest_paying": [
+      {
+        "count": 13,
+        "sum": 191600.0,
+        "average": 14738.461538461539,
+        "median": 850.0,
+        "min": 825.0,
+        "max": 45000.0,
+        "percentile_25": 825.0,
+        "percentile_75": 25000.0,
+        "skill": "CRM"
+      },
+      {
+        "count": 10,
+        "sum": 92187.5,
+        "average": 9218.75,
+        "median": 7000.0,
+        "min": 825.0,
+        "max": 20000.0,
+        "percentile_25": 850.0,
+        "percentile_75": 19837.5,
+        "skill": "Negotiation"
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bubble_chart",
+      "scatter_plot",
+      "bar_chart"
+    ],
+    "recommended_chart": "bubble_chart"
+  }
+}

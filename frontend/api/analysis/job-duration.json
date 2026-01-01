@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "analysis_id": "job-duration",
+  "title": "Job Duration Analysis (Time to Fill)",
+  "generated_at": "2026-01-01T13:27:52.621733Z",
+  "type": "temporal",
+  "data": {
+    "duration_stats": {
+      "count": 112,
+      "sum": 200,
+      "average": 1.7857142857142858,
+      "median": 2.0,
+      "min": 0,
+      "max": 2,
+      "percentile_25": 2,
+      "percentile_75": 2
+    },
+    "duration_distribution": [
+      {
+        "range": "0-7",
+        "min": 0,
+        "max": 7,
+        "count": 112,
+        "percentage": 100.0
+      }
+    ],
+    "long_running_jobs": []
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "histogram",
+      "box_plot",
+      "table"
+    ],
+    "recommended_chart": "histogram"
+  }
+}

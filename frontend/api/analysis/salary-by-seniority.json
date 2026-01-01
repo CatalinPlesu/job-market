@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-by-seniority",
+  "title": "Salary by Seniority Level",
+  "generated_at": "2026-01-01T13:27:45.118131Z",
+  "type": "static",
+  "data": {
+    "by_seniority": [
+      {
+        "count": 50,
+        "sum": 482700.0,
+        "average": 9654.0,
+        "median": 10000.0,
+        "min": 850.0,
+        "max": 20000.0,
+        "percentile_25": 3600.0,
+        "percentile_75": 13500.0,
+        "seniority_level": "entry",
+        "order": 0
+      },
+      {
+        "count": 14,
+        "sum": 190587.5,
+        "average": 13613.392857142857,
+        "median": 15000.0,
+        "min": 6000.0,
+        "max": 22000.0,
+        "percentile_25": 8000.0,
+        "percentile_75": 16000.0,
+        "seniority_level": "junior",
+        "order": 1
+      },
+      {
+        "count": 17,
+        "sum": 312477.5,
+        "average": 18381.029411764706,
+        "median": 12500.0,
+        "min": 1000.0,
+        "max": 51577.5,
+        "percentile_25": 11500.0,
+        "percentile_75": 20500.0,
+        "seniority_level": "mid",
+        "order": 2
+      },
+      {
+        "count": 28,
+        "sum": 364650.0,
+        "average": 13023.214285714286,
+        "median": 15000.0,
+        "min": 825.0,
+        "max": 30000.0,
+        "percentile_25": 1250.0,
+        "percentile_75": 20000.0,
+        "seniority_level": "manager",
+        "order": 5
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "line_chart",
+      "bar_chart"
+    ],
+    "recommended_chart": "line_chart"
+  }
+}

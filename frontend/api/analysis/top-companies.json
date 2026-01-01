@@ -1,0 +1,271 @@
+{
+  "version": "1.0",
+  "analysis_id": "top-companies",
+  "title": "Top Hiring Companies",
+  "generated_at": "2026-01-01T13:27:45.951711Z",
+  "type": "static",
+  "data": {
+    "top_companies": [
+      {
+        "company": "NANU MARKET SRL",
+        "job_count": 18,
+        "percentage": 6.0
+      },
+      {
+        "company": "Moldcell",
+        "job_count": 16,
+        "percentage": 5.33
+      },
+      {
+        "company": "Roslin",
+        "job_count": 16,
+        "percentage": 5.33
+      },
+      {
+        "company": "ProImobil",
+        "job_count": 12,
+        "percentage": 4.0
+      },
+      {
+        "company": "Roslin Solutions",
+        "job_count": 11,
+        "percentage": 3.67
+      },
+      {
+        "company": "Grafit Holding",
+        "job_count": 10,
+        "percentage": 3.33
+      },
+      {
+        "company": "Oratorica",
+        "job_count": 9,
+        "percentage": 3.0
+      },
+      {
+        "company": "AFC CENTER",
+        "job_count": 8,
+        "percentage": 2.67
+      },
+      {
+        "company": "Foxi",
+        "job_count": 8,
+        "percentage": 2.67
+      },
+      {
+        "company": "Bolle Blu",
+        "job_count": 7,
+        "percentage": 2.33
+      },
+      {
+        "company": "FinComBank - Banca de Finante si Comert SA",
+        "job_count": 7,
+        "percentage": 2.33
+      },
+      {
+        "company": "KMB",
+        "job_count": 6,
+        "percentage": 2.0
+      },
+      {
+        "company": "PUNTO BIANCO",
+        "job_count": 5,
+        "percentage": 1.67
+      },
+      {
+        "company": "Mercure Hotel",
+        "job_count": 5,
+        "percentage": 1.67
+      },
+      {
+        "company": "Sapico",
+        "job_count": 5,
+        "percentage": 1.67
+      },
+      {
+        "company": "Catrinici Transporte",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Banca Națională a Moldovei",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Lapmol SRL",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Global Store",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Dekada group",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "dita estfarm",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Kub.md",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Business Class",
+        "job_count": 4,
+        "percentage": 1.33
+      },
+      {
+        "company": "Spitalul International Medpark",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "vitalitifruct-grup s.r.l",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "Invest Credit SRL",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "Masbalt SRL",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "bojo-vin srl",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "rogob",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "ambianta",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "Rogob",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "magnum ifer",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "easyhire staff srl",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "Romstal",
+        "job_count": 3,
+        "percentage": 1.0
+      },
+      {
+        "company": "Wizz Air",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "Delucru.md",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "TV8",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "Dyninno",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "VEO Worldwide Services",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "cooperativa de consum slobozia mare",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "hr solutions",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "viatel bpo",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "îcs ”farmina” srl",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "newtrans-service srl",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "Casa Curata",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "victoriabank s.a.",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "aprotehpro s.r.l.",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "Aventus Finance Moldova",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "Auto Office",
+        "job_count": 2,
+        "percentage": 0.67
+      },
+      {
+        "company": "Parkopedia Parking Services",
+        "job_count": 2,
+        "percentage": 0.67
+      }
+    ],
+    "total_jobs": 300,
+    "total_companies": 109
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bar_chart",
+      "horizontal_bar",
+      "table"
+    ],
+    "recommended_chart": "horizontal_bar"
+  }
+}

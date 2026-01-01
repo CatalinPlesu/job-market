@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-by-function",
+  "title": "Salary by Job Function",
+  "generated_at": "2026-01-01T13:27:45.064395Z",
+  "type": "static",
+  "data": {
+    "by_function": [
+      {
+        "count": 23,
+        "sum": 342275.0,
+        "average": 14881.521739130434,
+        "median": 13500.0,
+        "min": 825.0,
+        "max": 45000.0,
+        "percentile_25": 8000.0,
+        "percentile_75": 20000.0,
+        "function": "Sales"
+      }
+    ],
+    "top_10": [
+      {
+        "count": 23,
+        "sum": 342275.0,
+        "average": 14881.521739130434,
+        "median": 13500.0,
+        "min": 825.0,
+        "max": 45000.0,
+        "percentile_25": 8000.0,
+        "percentile_75": 20000.0,
+        "function": "Sales"
+      }
+    ]
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bar_chart",
+      "horizontal_bar"
+    ],
+    "recommended_chart": "horizontal_bar"
+  }
+}
