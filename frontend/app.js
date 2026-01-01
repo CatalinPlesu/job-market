@@ -1092,6 +1092,33 @@ const AnalysisPage = {
     getFieldValue: (item, fieldName) => {
         return FieldMapping.getValue(item, fieldName);
     },
+    // Get preview text for analysis based on its type
+    getPreviewText: (analysis) => {
+        const previewMap = {
+            'salary-overview': 'Overall salary statistics across all jobs with distribution ranges',
+            'salary-by-function': 'Salary breakdown by different job functions and roles',
+            'salary-by-seniority': 'Salary progression across seniority levels from entry to executive',
+            'salary-by-location': 'Salary comparison across different cities and regions',
+            'salary-by-company-size': 'How company size impacts salary ranges',
+            'salary-by-education': 'Salary correlation with education level requirements',
+            'skills-demand': 'Most in-demand skills in the job market',
+            'skills-salary': 'Skills that command the highest salaries',
+            'skill-combinations': 'Common skill pairings in job postings',
+            'employment-types': 'Distribution of full-time, part-time, and contract positions',
+            'remote-work': 'Remote work availability and trends',
+            'benefits': 'Most frequently offered employee benefits',
+            'requirements': 'Common job requirements and qualifications',
+            'top-companies': 'Companies posting the most jobs',
+            'posting-trends': 'Job posting volume over time',
+            'salary-trends': 'Salary changes and trends over time',
+            'skills-trends': 'Evolving skill demand over time',
+            'remote-work-trends': 'Remote work adoption trends',
+            'job-duration': 'How long job postings remain active',
+            'market-health': 'Overall job market health indicators',
+            'salary-by-hierarchy': 'Salary structure across organizational hierarchy'
+        };
+        return previewMap[analysis.id] || 'Detailed analysis with visualizations and statistics';
+    },
     oninit: () => {
         api.getAnalysisIndex().then(data => {
             state.analysisIndex = data;
@@ -1842,36 +1869,41 @@ const AnalysisPage = {
                     m('span', `${state.analysisIndex.analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
                 ]),
             
-            state.analysisIndex.analyses && m('div', { class: 'bg-base-100 rounded-lg shadow' },
+            state.analysisIndex.analyses && m('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4' },
                 state.analysisIndex.analyses.map((analysis, idx) => 
-                    m('div', { class: 'analysis-item px-4 py-3 border-b border-base-300 hover:bg-base-200 transition-colors' }, [
-                        m('div', { class: 'flex items-start justify-between gap-4' }, [
-                            m('div', { class: 'flex-1' }, [
-                                m('div', { class: 'flex items-center gap-2' }, [
-                                    m('span', { class: 'text-sm opacity-60' }, `${idx + 1}.`),
-                                    m('a', { 
-                                        href: `#!/analysis/${analysis.id}`,
-                                        class: 'font-medium text-lg hover:underline text-primary',
-                                        oncreate: m.route.link
-                                    }, analysis.title)
-                                ]),
-                                m('div', { class: 'flex flex-wrap gap-2 mt-2 ml-6' }, [
-                                    m('span', { class: 'badge badge-ghost badge-sm' }, analysis.id),
-                                    analysis.temporal && m('span', { class: 'badge badge-secondary badge-sm' }, 'Time Series'),
-                                    analysis.type && m('span', { class: 'badge badge-outline badge-sm' }, analysis.type)
-                                ])
+                    m('a', { 
+                        href: `#!/analysis/${analysis.id}`,
+                        oncreate: m.route.link,
+                        class: 'card bg-base-100 shadow-lg hover:shadow-xl transition-shadow cursor-pointer border border-base-300'
+                    }, [
+                        m('div', { class: 'card-body p-4' }, [
+                            // Header with number and title
+                            m('div', { class: 'flex items-start gap-2 mb-2' }, [
+                                m('span', { class: 'text-sm opacity-60 mt-1' }, `${idx + 1}.`),
+                                m('h3', { class: 'card-title text-base flex-1' }, analysis.title)
                             ]),
-                            m('div', { class: 'flex-shrink-0' }, [
-                                m('a', { 
-                                    class: 'btn btn-primary btn-sm',
-                                    href: `#!/analysis/${analysis.id}`,
-                                    oncreate: m.route.link
-                                }, [
-                                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4 mr-1', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
-                                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
-                                    ]),
-                                    'View'
-                                ])
+                            
+                            // Badges
+                            m('div', { class: 'flex flex-wrap gap-2 mb-3' }, [
+                                m('span', { class: 'badge badge-ghost badge-sm' }, analysis.id),
+                                analysis.temporal && m('span', { class: 'badge badge-secondary badge-sm' }, 'Time Series'),
+                                analysis.type && m('span', { class: 'badge badge-outline badge-sm' }, analysis.type)
+                            ]),
+                            
+                            // Preview section
+                            m('div', { class: 'bg-base-200 rounded-lg p-3 mt-2' }, [
+                                m('div', { class: 'flex items-center justify-between' }, [
+                                    m('span', { class: 'text-xs opacity-70' }, 'Quick Preview'),
+                                    m('div', { class: 'flex items-center gap-1 text-primary' }, [
+                                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+                                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
+                                        ]),
+                                        m('span', { class: 'text-xs font-medium' }, 'Click for details')
+                                    ])
+                                ]),
+                                m('div', { class: 'text-sm mt-2 opacity-80' }, 
+                                    AnalysisPage.getPreviewText(analysis)
+                                )
                             ])
                         ])
                     ])
