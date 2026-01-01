@@ -14,8 +14,8 @@ def main():
     
     parser.add_argument(
         '--output',
-        default='pages/api/analysis',
-        help='Output directory for JSON files (default: pages/api/analysis)'
+        default='frontend/api/analysis',
+        help='Output directory for JSON files (default: frontend/api/analysis)'
     )
     
     parser.add_argument(
