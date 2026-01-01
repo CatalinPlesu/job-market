@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "employment-types",
+  "title": "Employment Types Distribution",
+  "generated_at": "2026-01-01T17:47:37.635969Z",
+  "type": "static",
+  "data": {
+    "error": "No employment type data available"
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "pie_chart",
+      "bar_chart",
+      "donut_chart"
+    ],
+    "recommended_chart": "pie_chart"
+  }
+}

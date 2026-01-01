@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-by-company-size",
+  "title": "Salary by Company Size",
+  "generated_at": "2026-01-01T17:47:37.631399Z",
+  "type": "static",
+  "data": {
+    "error": "Insufficient data",
+    "count": 0
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bar_chart",
+      "grouped_bar"
+    ],
+    "recommended_chart": "bar_chart"
+  }
+}

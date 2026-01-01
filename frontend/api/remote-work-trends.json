@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "remote-work-trends",
+  "title": "Remote Work Adoption Trends",
+  "generated_at": "2026-01-01T17:47:37.644765Z",
+  "type": "temporal",
+  "data": {
+    "error": "No remote work data available"
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "stacked_area",
+      "line_chart",
+      "stacked_bar"
+    ],
+    "recommended_chart": "stacked_area"
+  }
+}

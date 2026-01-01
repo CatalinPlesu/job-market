@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "skill-combinations",
+  "title": "Common Skill Combinations",
+  "generated_at": "2026-01-01T17:47:37.635628Z",
+  "type": "static",
+  "data": {
+    "error": "No skill combinations data available"
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "network_graph",
+      "heatmap",
+      "table"
+    ],
+    "recommended_chart": "network_graph"
+  }
+}

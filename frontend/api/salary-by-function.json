@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-by-function",
+  "title": "Salary by Job Function",
+  "generated_at": "2026-01-01T17:47:37.627114Z",
+  "type": "static",
+  "data": {
+    "error": "Insufficient data",
+    "count": 0
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bar_chart",
+      "horizontal_bar"
+    ],
+    "recommended_chart": "horizontal_bar"
+  }
+}

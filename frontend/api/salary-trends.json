@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "analysis_id": "salary-trends",
+  "title": "Salary Evolution Over Time",
+  "generated_at": "2026-01-01T17:47:37.643983Z",
+  "type": "temporal",
+  "data": {
+    "error": "No salary data available"
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "line_chart",
+      "area_chart"
+    ],
+    "recommended_chart": "line_chart"
+  }
+}

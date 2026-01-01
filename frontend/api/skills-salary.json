@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "skills-salary",
+  "title": "Skills to Salary Correlation",
+  "generated_at": "2026-01-01T17:47:37.635114Z",
+  "type": "static",
+  "data": {
+    "error": "No skills-salary data available"
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "bubble_chart",
+      "scatter_plot",
+      "bar_chart"
+    ],
+    "recommended_chart": "bubble_chart"
+  }
+}

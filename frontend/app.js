@@ -1298,6 +1298,173 @@ const AnalysisPage = {
             ])
         ]);
     },
+    renderEducationChart: (data) => {
+        if (!data || !data.by_education || data.by_education.length === 0) return null;
+        
+        const items = data.by_education;
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, 'Salary by Education Level'),
+                
+                // Statistics cards
+                m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2 mb-4' }, 
+                    items.map(item => 
+                        m('div', { class: 'stat bg-base-200 rounded-lg p-2' }, [
+                            m('div', { class: 'stat-title text-xs' }, item.education || item.education_level),
+                            m('div', { class: 'stat-value text-sm' }, `${Math.round(item.average || 0).toLocaleString()}`),
+                            m('div', { class: 'stat-desc text-xs' }, `${item.count} jobs`)
+                        ])
+                    )
+                ),
+                
+                // Bar chart with grouped data
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = items.map(item => item.education || item.education_level);
+                            const avgSalaries = items.map(item => Math.round(item.average || 0));
+                            const medianSalaries = items.map(item => Math.round(item.median || 0));
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Average Salary',
+                                        data: avgSalaries,
+                                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                                        borderColor: 'rgba(99, 102, 241, 1)',
+                                        borderWidth: 1
+                                    }, {
+                                        label: 'Median Salary',
+                                        data: medianSalaries,
+                                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
+                                        borderColor: 'rgba(168, 85, 247, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: (value) => `${value.toLocaleString()} MDL`
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const item = items[context.dataIndex];
+                                                    const label = context.dataset.label || '';
+                                                    const value = context.parsed.y;
+                                                    return [
+                                                        `${label}: ${value.toLocaleString()} MDL`,
+                                                        `Jobs: ${item.count}`,
+                                                        `Min: ${Math.round(item.min || 0).toLocaleString()} MDL`,
+                                                        `Max: ${Math.round(item.max || 0).toLocaleString()} MDL`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
+    renderSkillsSalaryChart: (data) => {
+        if (!data || !data.top_10_highest_paying || data.top_10_highest_paying.length === 0) return null;
+        
+        const skills = data.top_10_highest_paying;
+        
+        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h3', { class: 'card-title' }, 'Top 10 Highest Paying Skills'),
+                m('p', { class: 'text-sm text-gray-600 mb-4' }, 'Skills with the highest average salaries'),
+                
+                // Horizontal bar chart with statistics
+                m('div', { class: 'chart-container' }, [
+                    m('canvas', {
+                        oncreate: (vnode) => {
+                            const labels = skills.map(item => item.skill);
+                            const averages = skills.map(item => Math.round(item.average || 0));
+                            const medians = skills.map(item => Math.round(item.median || 0));
+                            
+                            ChartHelpers.createChart(vnode.dom, {
+                                type: 'bar',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Average Salary',
+                                        data: averages,
+                                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                                        borderColor: 'rgba(34, 197, 94, 1)',
+                                        borderWidth: 1
+                                    }, {
+                                        label: 'Median Salary',
+                                        data: medians,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                                        borderColor: 'rgba(59, 130, 246, 1)',
+                                        borderWidth: 1
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                callback: (value) => `${value.toLocaleString()} MDL`
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const item = skills[context.dataIndex];
+                                                    const label = context.dataset.label || '';
+                                                    const value = context.parsed.x;
+                                                    return [
+                                                        `${label}: ${value.toLocaleString()} MDL`,
+                                                        `Jobs: ${item.count}`,
+                                                        `Min: ${Math.round(item.min || 0).toLocaleString()} MDL`,
+                                                        `Max: ${Math.round(item.max || 0).toLocaleString()} MDL`,
+                                                        `25th percentile: ${Math.round(item.percentile_25 || 0).toLocaleString()} MDL`,
+                                                        `75th percentile: ${Math.round(item.percentile_75 || 0).toLocaleString()} MDL`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        },
+                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
+                    })
+                ])
+            ])
+        ]);
+    },
     renderBreakdownChart: (data) => {
         // Check for various breakdown formats
         const breakdownKey = data.by_function ? 'by_function' : 
@@ -1411,12 +1578,18 @@ const AnalysisPage = {
             data.top_companies && AnalysisPage.renderTopItemsChart(data, 'top_companies', 'Top Companies'),
             data.top_benefits && AnalysisPage.renderTopItemsChart(data, 'top_benefits', 'Most Common Benefits'),
             
+            // Specialized skills-salary visualization
+            data.skills_salary && AnalysisPage.renderSkillsSalaryChart(data),
+            
             // Requirements charts
             data.education_requirements && AnalysisPage.renderBreakdownChart({ education_requirements: data.education_requirements }),
             data.experience_requirements && AnalysisPage.renderDistributionChart({ distribution: data.experience_requirements }),
             
-            // Breakdown pie chart (general)
-            AnalysisPage.renderBreakdownChart(data),
+            // Education level - specialized bar chart with statistics
+            data.by_education && AnalysisPage.renderEducationChart(data),
+            
+            // Breakdown pie chart (general) - but skip education since it has specialized rendering
+            (!data.by_education) && AnalysisPage.renderBreakdownChart(data),
             
             // === TABLES AS FALLBACK (Collapsible for detail) ===
             
@@ -1634,19 +1807,36 @@ const AnalysisPage = {
                     m('span', `${state.analysisIndex.analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
                 ]),
             
-            state.analysisIndex.analyses && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
-                state.analysisIndex.analyses.map(analysis => 
-                    m('div', { class: 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow' }, [
-                        m('div', { class: 'card-body' }, [
-                            m('h2', { class: 'card-title text-lg' }, analysis.title),
-                            m('p', { class: 'text-xs text-gray-500' }, `${analysis.id}.json`),
-                            analysis.temporal && m('span', { class: 'badge badge-secondary mt-2' }, 'Time Series'),
-                            m('div', { class: 'card-actions justify-end mt-4' }, [
+            state.analysisIndex.analyses && m('div', { class: 'bg-base-100 rounded-lg shadow' },
+                state.analysisIndex.analyses.map((analysis, idx) => 
+                    m('div', { class: 'analysis-item px-4 py-3 border-b border-base-300 hover:bg-base-200 transition-colors' }, [
+                        m('div', { class: 'flex items-start justify-between gap-4' }, [
+                            m('div', { class: 'flex-1' }, [
+                                m('div', { class: 'flex items-center gap-2' }, [
+                                    m('span', { class: 'text-sm opacity-60' }, `${idx + 1}.`),
+                                    m('a', { 
+                                        href: `#!/analysis/${analysis.id}`,
+                                        class: 'font-medium text-lg hover:underline text-primary',
+                                        oncreate: m.route.link
+                                    }, analysis.title)
+                                ]),
+                                m('div', { class: 'flex flex-wrap gap-2 mt-2 ml-6' }, [
+                                    m('span', { class: 'badge badge-ghost badge-sm' }, analysis.id),
+                                    analysis.temporal && m('span', { class: 'badge badge-secondary badge-sm' }, 'Time Series'),
+                                    analysis.type && m('span', { class: 'badge badge-outline badge-sm' }, analysis.type)
+                                ])
+                            ]),
+                            m('div', { class: 'flex-shrink-0' }, [
                                 m('a', { 
                                     class: 'btn btn-primary btn-sm',
                                     href: `#!/analysis/${analysis.id}`,
                                     oncreate: m.route.link
-                                }, 'View Analysis')
+                                }, [
+                                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4 mr-1', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+                                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
+                                    ]),
+                                    'View'
+                                ])
                             ])
                         ])
                     ])

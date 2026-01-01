@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "analysis_id": "remote-work",
+  "title": "Remote Work Availability",
+  "generated_at": "2026-01-01T17:47:37.637159Z",
+  "type": "static",
+  "data": {
+    "error": "No remote work data available"
+  },
+  "visualization_hints": {
+    "chart_types": [
+      "pie_chart",
+      "bar_chart",
+      "donut_chart"
+    ],
+    "recommended_chart": "pie_chart"
+  }
+}
