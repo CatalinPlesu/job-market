@@ -766,8 +766,9 @@ const AnalysisPage = {
         state.selectedAnalysis = analysis;
         state.showAnalysisModal = true;
         const filename = `${analysis.id}.json`;
-        api.getAnalysis(filename).then(data => {
-            state.selectedAnalysisData = data;
+        api.getAnalysis(filename).then(response => {
+            // Extract the data field from the response
+            state.selectedAnalysisData = response.data || response;
             m.redraw();
         }).catch(err => {
             console.error(`Error loading ${filename}:`, err);
@@ -986,11 +987,11 @@ const AnalysisPage = {
                     m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
                         m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
                     ]),
-                    m('span', `${state.analysisIndex.available_analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
+                    m('span', `${state.analysisIndex.analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
                 ]),
             
-            state.analysisIndex.available_analyses && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
-                state.analysisIndex.available_analyses.map(analysis => 
+            state.analysisIndex.analyses && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+                state.analysisIndex.analyses.map(analysis => 
                     m('div', { class: 'card bg-base-100 shadow-xl hover:shadow-2xl transition-shadow' }, [
                         m('div', { class: 'card-body' }, [
                             m('h2', { class: 'card-title text-lg' }, analysis.title),
