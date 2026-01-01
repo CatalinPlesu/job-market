@@ -1229,7 +1229,8 @@ const AnalysisPage = {
                     m('canvas', {
                         oncreate: (vnode) => {
                             const labels = topItems.map(item => 
-                                item.name || item.skill || item.company || item.function || item.seniority || item.location || 'Unknown'
+                                item.name || item.skill || item.company || item.function || 
+                                item.seniority || item.location || item.benefit || 'Unknown'
                             );
                             const values = topItems.map(item => item.count);
                             
@@ -1280,25 +1281,36 @@ const AnalysisPage = {
         ]);
     },
     renderBreakdownChart: (data) => {
+        // Check for various breakdown formats
         const breakdownKey = data.by_function ? 'by_function' : 
                             data.by_seniority ? 'by_seniority' : 
                             data.by_location ? 'by_location' : 
                             data.by_company_size ? 'by_company_size' : 
-                            data.by_education ? 'by_education' : null;
+                            data.by_education ? 'by_education' : 
+                            data.employment_types ? 'employment_types' :
+                            data.remote_options ? 'remote_options' :
+                            data.education_requirements ? 'education_requirements' :
+                            data.top_benefits ? 'top_benefits' : null;
         
         if (!breakdownKey || !data[breakdownKey] || data[breakdownKey].length === 0) return null;
         
         const items = data[breakdownKey].slice(0, 10); // Top 10
-        const title = breakdownKey.replace('by_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const title = breakdownKey.includes('by_') ? 
+            breakdownKey.replace('by_', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) :
+            breakdownKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
         
         return m('div', { class: 'card bg-base-100 shadow-xl' }, [
             m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, `Breakdown by ${title}`),
+                m('h3', { class: 'card-title' }, `${title}`),
                 m('div', { class: 'chart-container' }, [
                     m('canvas', {
                         oncreate: (vnode) => {
+                            // Extract labels based on data structure
                             const labels = items.map(item => 
-                                item.function || item.seniority || item.location || item.size || item.education || 'Unknown'
+                                item.function || item.seniority || item.location || 
+                                item.size || item.education || item.education_level ||
+                                item.employment_type || item.remote_option || 
+                                item.benefit || item.name || 'Unknown'
                             );
                             const values = items.map(item => item.count);
                             
@@ -1338,8 +1350,9 @@ const AnalysisPage = {
                                                     const item = items[context.dataIndex];
                                                     const label = context.label || '';
                                                     const count = item.count || 0;
+                                                    const percentage = item.percentage ? ` (${item.percentage.toFixed(1)}%)` : '';
                                                     const avg = item.average ? ` (Avg: ${Math.round(item.average).toLocaleString()} MDL)` : '';
-                                                    return `${label}: ${count}${avg}`;
+                                                    return `${label}: ${count}${percentage}${avg}`;
                                                 }
                                             }
                                         }
@@ -1391,8 +1404,13 @@ const AnalysisPage = {
             // Top items charts (skills, companies, etc.)
             data.top_skills && AnalysisPage.renderTopItemsChart(data, 'top_skills', 'Top In-Demand Skills'),
             data.top_companies && AnalysisPage.renderTopItemsChart(data, 'top_companies', 'Top Companies'),
+            data.top_benefits && AnalysisPage.renderTopItemsChart(data, 'top_benefits', 'Most Common Benefits'),
             
-            // Breakdown pie chart
+            // Requirements charts
+            data.education_requirements && AnalysisPage.renderBreakdownChart({ education_requirements: data.education_requirements }),
+            data.experience_requirements && AnalysisPage.renderDistributionChart({ distribution: data.experience_requirements }),
+            
+            // Breakdown pie chart (general)
             AnalysisPage.renderBreakdownChart(data),
             
             // === TABLES AS FALLBACK (Collapsible for detail) ===
@@ -1530,6 +1548,33 @@ const AnalysisPage = {
                                         ] : '-')
                                     ]);
                                 })
+                            )
+                        ])
+                    ])
+                ])
+            ]),
+            
+            // Skill combinations table (if present)
+            data.top_combinations && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
+                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Skill Combinations (Detailed)'),
+                m('div', { class: 'collapse-content' }, [
+                    m('div', { class: 'overflow-x-auto' }, [
+                        m('table', { class: 'table table-zebra' }, [
+                            m('thead', [
+                                m('tr', [
+                                    m('th', 'Skill 1'),
+                                    m('th', 'Skill 2'),
+                                    m('th', 'Count')
+                                ])
+                            ]),
+                            m('tbody', 
+                                data.top_combinations.slice(0, 30).map(item => 
+                                    m('tr', [
+                                        m('td', { class: 'font-medium' }, item.skill1),
+                                        m('td', { class: 'font-medium' }, item.skill2),
+                                        m('td', item.count?.toLocaleString() || 'N/A')
+                                    ])
+                                )
                             )
                         ])
                     ])
