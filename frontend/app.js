@@ -113,12 +113,14 @@ const HomePage = {
                         m('a', { 
                             class: 'stats shadow cursor-pointer hover:shadow-xl transition-shadow justify-center',
                             href: '#!/jobs',
-                            oncreate: m.route.link 
+                            oncreate: m.route.link,
+                            role: 'button',
+                            'aria-label': 'Browse all jobs'
                         }, [
                             m('div', { class: 'stat place-items-center' }, [
                                 m('div', { class: 'stat-title' }, 'Total Jobs'),
                                 m('div', { class: 'stat-value text-primary' }, state.jobsIndex.total_jobs.toLocaleString()),
-                                m('div', { class: 'stat-desc' }, 'Click to browse →')
+                                m('div', { class: 'stat-desc' }, 'Click to browse jobs')
                             ])
                         ])
                     : m(Loading)
