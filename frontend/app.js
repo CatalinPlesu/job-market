@@ -144,120 +144,199 @@ const JobListItem = {
     }
 };
 
-// Filter Component
+// Filter matching logic
+const matchesFilters = (job, filters) => {
+    for (const [key, value] of Object.entries(filters)) {
+        if (!value) continue;
+        
+        switch (key) {
+            case 'job_function':
+                if (job.job_function !== value) return false;
+                break;
+            case 'seniority_level':
+                if (job.seniority_level !== value) return false;
+                break;
+            case 'city':
+                if (job.location && job.location.city !== value) return false;
+                break;
+            case 'remote_work':
+                if (job.location && job.location.remote_work !== value) return false;
+                break;
+            case 'industry':
+                if (job.industry !== value) return false;
+                break;
+            case 'company':
+                if (job.company !== value) return false;
+                break;
+            case 'employment_type':
+                if (job.employment && job.employment.type !== value) return false;
+                break;
+            case 'contract_type':
+                if (job.employment && job.employment.contract !== value) return false;
+                break;
+        }
+    }
+    return true;
+};
+
+// Get available filter options based on current filters (hierarchical)
+const getAvailableOptions = (jobs, filterKey) => {
+    const options = new Set();
+    jobs.forEach(job => {
+        let value;
+        switch (filterKey) {
+            case 'job_function':
+                value = job.job_function;
+                break;
+            case 'seniority_level':
+                value = job.seniority_level;
+                break;
+            case 'city':
+                value = job.location?.city;
+                break;
+            case 'remote_work':
+                value = job.location?.remote_work;
+                break;
+            case 'industry':
+                value = job.industry;
+                break;
+            case 'company':
+                value = job.company;
+                break;
+            case 'employment_type':
+                value = job.employment?.type;
+                break;
+            case 'contract_type':
+                value = job.employment?.contract;
+                break;
+        }
+        if (value) options.add(value);
+    });
+    return Array.from(options).sort();
+};
+
+// Filter Component with Hierarchical Filtering
 const FilterPanel = {
+    showAdvanced: false,
     view: () => {
         if (!state.jobsIndex) return null;
         
+        // Get filtered jobs based on current filters for hierarchical filtering
+        const filteredJobs = state.jobs.filter(job => matchesFilters(job, state.filters));
+        
+        // All available filter fields
+        const filterFields = [
+            { key: 'job_function', label: 'Job Function', basic: true },
+            { key: 'seniority_level', label: 'Seniority', basic: true },
+            { key: 'city', label: 'City', basic: true },
+            { key: 'remote_work', label: 'Remote Work', basic: true },
+            { key: 'industry', label: 'Industry', basic: true },
+            { key: 'company', label: 'Company', basic: true },
+            { key: 'employment_type', label: 'Employment Type', basic: false },
+            { key: 'contract_type', label: 'Contract Type', basic: false },
+            { key: 'department', label: 'Department', basic: false },
+            { key: 'specialization', label: 'Specialization', basic: false },
+            { key: 'education_level', label: 'Education', basic: false },
+            { key: 'company_size', label: 'Company Size', basic: false }
+        ];
+        
+        const basicFilters = filterFields.filter(f => f.basic);
+        const advancedFilters = filterFields.filter(f => !f.basic);
+        
         return m('div', { class: 'bg-base-200 p-4 rounded-lg mb-4' }, [
-            m('h3', { class: 'font-bold mb-4' }, 'Filters'),
-            m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' }, [
-                // Job Function Filter
-                m('div', { class: 'form-control' }, [
-                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Job Function')),
-                    m('select', { 
-                        class: 'select select-bordered select-sm',
-                        onchange: (e) => {
-                            state.filters.job_function = e.target.value;
+            m('div', { class: 'flex justify-between items-center mb-4' }, [
+                m('h3', { class: 'font-bold' }, 'Filters'),
+                m('div', { class: 'flex gap-2' }, [
+                    m('button', { 
+                        class: 'btn btn-xs btn-ghost',
+                        onclick: () => FilterPanel.showAdvanced = !FilterPanel.showAdvanced
+                    }, FilterPanel.showAdvanced ? 'Show Less' : 'Show More'),
+                    m('button', { 
+                        class: 'btn btn-xs btn-ghost',
+                        onclick: () => {
+                            state.filters = {};
                             state.currentPage = 1;
+                            m.redraw();
                         }
-                    }, [
-                        m('option', { value: '' }, 'All'),
-                        ...(state.jobsIndex.filters.job_function || []).map(f => 
-                            m('option', { value: f }, f)
-                        )
-                    ])
-                ]),
-                // Seniority Filter
-                m('div', { class: 'form-control' }, [
-                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Seniority')),
-                    m('select', { 
-                        class: 'select select-bordered select-sm',
-                        onchange: (e) => {
-                            state.filters.seniority_level = e.target.value;
-                            state.currentPage = 1;
-                        }
-                    }, [
-                        m('option', { value: '' }, 'All'),
-                        ...(state.jobsIndex.filters.seniority_level || []).map(f => 
-                            m('option', { value: f }, f)
-                        )
-                    ])
-                ]),
-                // City Filter
-                m('div', { class: 'form-control' }, [
-                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'City')),
-                    m('select', { 
-                        class: 'select select-bordered select-sm',
-                        onchange: (e) => {
-                            state.filters.city = e.target.value;
-                            state.currentPage = 1;
-                        }
-                    }, [
-                        m('option', { value: '' }, 'All'),
-                        ...(state.jobsIndex.filters.city || []).map(f => 
-                            m('option', { value: f }, f)
-                        )
-                    ])
-                ]),
-                // Remote Work Filter
-                m('div', { class: 'form-control' }, [
-                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Remote Work')),
-                    m('select', { 
-                        class: 'select select-bordered select-sm',
-                        onchange: (e) => {
-                            state.filters.remote_work = e.target.value;
-                            state.currentPage = 1;
-                        }
-                    }, [
-                        m('option', { value: '' }, 'All'),
-                        ...(state.jobsIndex.filters.remote_work || []).map(f => 
-                            m('option', { value: f }, f)
-                        )
-                    ])
-                ]),
-                // Industry Filter
-                m('div', { class: 'form-control' }, [
-                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Industry')),
-                    m('select', { 
-                        class: 'select select-bordered select-sm',
-                        onchange: (e) => {
-                            state.filters.industry = e.target.value;
-                            state.currentPage = 1;
-                        }
-                    }, [
-                        m('option', { value: '' }, 'All'),
-                        ...(state.jobsIndex.filters.industry || []).map(f => 
-                            m('option', { value: f }, f)
-                        )
-                    ])
-                ]),
-                // Company Filter
-                m('div', { class: 'form-control' }, [
-                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Company')),
-                    m('select', { 
-                        class: 'select select-bordered select-sm',
-                        onchange: (e) => {
-                            state.filters.company = e.target.value;
-                            state.currentPage = 1;
-                        }
-                    }, [
-                        m('option', { value: '' }, 'All'),
-                        ...(state.jobsIndex.filters.company || []).slice(0, 50).map(f => 
-                            m('option', { value: f }, f)
-                        )
-                    ])
+                    }, 'Clear All')
                 ])
             ]),
-            m('div', { class: 'mt-4' }, [
-                m('button', { 
-                    class: 'btn btn-sm btn-ghost',
-                    onclick: () => {
-                        state.filters = {};
-                        state.currentPage = 1;
-                    }
-                }, 'Clear All Filters')
-            ])
+            
+            // Active filters badges
+            Object.keys(state.filters).length > 0 && m('div', { class: 'flex flex-wrap gap-2 mb-4' },
+                Object.entries(state.filters).map(([key, value]) => 
+                    value && m('span', { class: 'badge badge-primary gap-2' }, [
+                        `${key.replace(/_/g, ' ')}: ${value}`,
+                        m('button', { 
+                            class: 'btn btn-xs btn-circle btn-ghost',
+                            onclick: () => {
+                                delete state.filters[key];
+                                m.redraw();
+                            }
+                        }, '×')
+                    ])
+                )
+            ),
+            
+            // Basic filters
+            m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4' },
+                basicFilters.map(field => 
+                    m('div', { class: 'form-control' }, [
+                        m('label', { class: 'label' }, [
+                            m('span', { class: 'label-text' }, field.label),
+                            filteredJobs.length > 0 && state.filters[field.key] && 
+                                m('span', { class: 'label-text-alt text-xs' }, 
+                                    `(${getAvailableOptions(filteredJobs, field.key).length} options)`
+                                )
+                        ]),
+                        m('select', { 
+                            class: 'select select-bordered select-sm',
+                            value: state.filters[field.key] || '',
+                            onchange: (e) => {
+                                if (e.target.value) {
+                                    state.filters[field.key] = e.target.value;
+                                } else {
+                                    delete state.filters[field.key];
+                                }
+                                state.currentPage = 1;
+                                m.redraw();
+                            }
+                        }, [
+                            m('option', { value: '' }, 'All'),
+                            ...(state.jobsIndex.filters[field.key] || []).map(f => 
+                                m('option', { value: f }, f)
+                            )
+                        ])
+                    ])
+                )
+            ),
+            
+            // Advanced filters (collapsible)
+            FilterPanel.showAdvanced && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+                advancedFilters.map(field => 
+                    m('div', { class: 'form-control' }, [
+                        m('label', { class: 'label' }, m('span', { class: 'label-text' }, field.label)),
+                        m('select', { 
+                            class: 'select select-bordered select-sm',
+                            value: state.filters[field.key] || '',
+                            onchange: (e) => {
+                                if (e.target.value) {
+                                    state.filters[field.key] = e.target.value;
+                                } else {
+                                    delete state.filters[field.key];
+                                }
+                                state.currentPage = 1;
+                                m.redraw();
+                            }
+                        }, [
+                            m('option', { value: '' }, 'All'),
+                            ...(state.jobsIndex.filters[field.key] || []).map(f => 
+                                m('option', { value: f }, f)
+                            )
+                        ])
+                    ])
+                )
+            )
         ]);
     }
 };
@@ -275,53 +354,63 @@ const JobsPage = {
             state.loading = false;
         });
     },
-    view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
-        m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
+    view: () => {
+        // Apply client-side filtering
+        const filteredJobs = state.jobs.filter(job => matchesFilters(job, state.filters));
+        const hasActiveFilters = Object.keys(state.filters).some(k => state.filters[k]);
         
-        state.jobsIndex && m(FilterPanel),
-        
-        state.loading ? m(Loading) : [
-            m('div', { class: 'bg-base-100 rounded-lg shadow mb-4 p-4' }, [
-                m('div', { class: 'text-sm text-gray-600 mb-2' }, 
-                    `Showing ${state.jobs.length} jobs (Page ${state.currentPage} of ${state.jobsIndex ? state.jobsIndex.total_pages : '?'})`
-                ),
-                state.jobs.length > 0 ? 
-                    state.jobs.map((job, idx) => m(JobListItem, { job, index: idx + 1 + (state.currentPage - 1) * 100 })) :
-                    m('div', { class: 'text-center py-8 text-gray-500' }, 'No jobs found')
-            ]),
+        return m('div', { class: 'container mx-auto px-4 py-8' }, [
+            m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
             
-            // Pagination
-            state.jobsIndex && m('div', { class: 'flex justify-center gap-2' }, [
-                m('button', { 
-                    class: 'btn btn-sm',
-                    disabled: state.currentPage === 1,
-                    onclick: () => {
-                        state.currentPage--;
-                        state.loading = true;
-                        api.getJobsPage(state.currentPage).then(page => {
-                            state.jobs = page.jobs;
-                            state.loading = false;
-                            window.scrollTo(0, 0);
-                        });
-                    }
-                }, 'Previous'),
-                m('span', { class: 'btn btn-sm btn-ghost' }, `Page ${state.currentPage} of ${state.jobsIndex.total_pages}`),
-                m('button', { 
-                    class: 'btn btn-sm',
-                    disabled: state.currentPage === state.jobsIndex.total_pages,
-                    onclick: () => {
-                        state.currentPage++;
-                        state.loading = true;
-                        api.getJobsPage(state.currentPage).then(page => {
-                            state.jobs = page.jobs;
-                            state.loading = false;
-                            window.scrollTo(0, 0);
-                        });
-                    }
-                }, 'Next')
-            ])
-        ]
-    ])
+            state.jobsIndex && m(FilterPanel),
+            
+            state.loading ? m(Loading) : [
+                m('div', { class: 'bg-base-100 rounded-lg shadow mb-4 p-4' }, [
+                    m('div', { class: 'text-sm text-gray-600 mb-2' }, [
+                        hasActiveFilters ? 
+                            `Showing ${filteredJobs.length} filtered jobs (${state.jobs.length} total on page ${state.currentPage})` :
+                            `Showing ${state.jobs.length} jobs (Page ${state.currentPage} of ${state.jobsIndex ? state.jobsIndex.total_pages : '?'})`
+                    ]),
+                    filteredJobs.length > 0 ? 
+                        filteredJobs.map((job, idx) => m(JobListItem, { job, index: idx + 1 })) :
+                        m('div', { class: 'text-center py-8 text-gray-500' }, 
+                            hasActiveFilters ? 'No jobs match your filters' : 'No jobs found'
+                        )
+                ]),
+                
+                // Pagination
+                state.jobsIndex && m('div', { class: 'flex justify-center gap-2' }, [
+                    m('button', { 
+                        class: 'btn btn-sm',
+                        disabled: state.currentPage === 1,
+                        onclick: () => {
+                            state.currentPage--;
+                            state.loading = true;
+                            api.getJobsPage(state.currentPage).then(page => {
+                                state.jobs = page.jobs;
+                                state.loading = false;
+                                window.scrollTo(0, 0);
+                            });
+                        }
+                    }, 'Previous'),
+                    m('span', { class: 'btn btn-sm btn-ghost' }, `Page ${state.currentPage} of ${state.jobsIndex.total_pages}`),
+                    m('button', { 
+                        class: 'btn btn-sm',
+                        disabled: state.currentPage === state.jobsIndex.total_pages,
+                        onclick: () => {
+                            state.currentPage++;
+                            state.loading = true;
+                            api.getJobsPage(state.currentPage).then(page => {
+                                state.jobs = page.jobs;
+                                state.loading = false;
+                                window.scrollTo(0, 0);
+                            });
+                        }
+                    }, 'Next')
+                ])
+            ]
+        ]);
+    }
 };
 
 // Job Detail Page

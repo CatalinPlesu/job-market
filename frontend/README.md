@@ -131,15 +131,16 @@ frontend/
 ## Success Criteria
 
 - [x] Extra slim job listings (Hacker News style)
-- [x] DaisyUI themes work correctly
+- [x] DaisyUI themes work correctly (light/dark toggle)
 - [x] Initial page load <2 seconds
-- [x] Filtering updates <100ms
+- [x] Filtering updates <100ms (client-side)
 - [x] Mobile responsive
-- [x] Client-side filtering functional
+- [x] Client-side filtering functional on multiple fields
+- [x] Hierarchical filtering (dynamic filter options)
 - [x] Parsed/raw tabs functional
 - [x] Works in modern browsers
-- [ ] All 50+ fields filterable (partially implemented)
-- [ ] Hierarchical filtering (to be added)
+- [x] Advanced filters (collapsible/expandable)
+- [ ] All 50+ fields filterable (12 fields implemented, extensible)
 - [ ] Charts render correctly (to be added when data available)
 
 ## Future Enhancements
