@@ -31,3 +31,6 @@ scheduler_state_*.json
 # Test files
 test_*.py
 *_test.py
+
+# Generated analysis JSON files
+pages/

@@ -11,6 +11,14 @@ from config.settings import Config
 from datetime import datetime
 from pathlib import Path
 
+# Analysis engine imports
+try:
+    from analysis_engine.generator import AnalysisGenerator
+    from analysis_engine.config import AnalysisConfig
+    ANALYSIS_ENGINE_AVAILABLE = True
+except ImportError:
+    ANALYSIS_ENGINE_AVAILABLE = False
+
 
 # Menu Item Classes
 class ScrapeJobsListItem:
@@ -69,10 +77,130 @@ class StructureDataItem:
 
 class ProcessDataItem:
     def get_item_description(self):
-        return "Process Data"
+        return "Process Data (Generate Analysis)"
+    
+    def _get_positive_int_input(self, prompt, default_value_int):
+        """Helper method to get and validate positive integer input.
+        
+        Args:
+            prompt: The input prompt to display
+            default_value_int: The default value as an integer
+            
+        Returns:
+            A positive integer (user input or default)
+        """
+        user_input = input(prompt).strip()
+        if not user_input:
+            return default_value_int
+        
+        try:
+            value = int(user_input)
+            if value <= 0:
+                print(f"Invalid input (must be positive), using default: {default_value_int}")
+                return default_value_int
+            return value
+        except ValueError:
+            print(f"Invalid input, using default: {default_value_int}")
+            return default_value_int
     
     def execute(self):
-        process_data()
+        if not ANALYSIS_ENGINE_AVAILABLE:
+            print("\n✗ Analysis engine not available. Please ensure it's properly installed.")
+            return True
+        
+        print("\n" + "="*80)
+        print("ANALYSIS GENERATION")
+        print("="*80)
+        print("\nGenerate statistical analyses from job market data.")
+        print()
+        
+        # Configuration options
+        print("Configuration:")
+        print()
+        
+        # Output directory
+        default_output = "pages/api/analysis"
+        output_dir = input(f"Output directory [{default_output}]: ").strip()
+        if not output_dir:
+            output_dir = default_output
+        
+        # Time granularity
+        print("\nTime granularity for temporal analyses:")
+        print("  1. Daily")
+        print("  2. Weekly")
+        print("  3. Monthly (recommended)")
+        granularity_choice = input("Select granularity [3]: ").strip()
+        
+        granularity_map = {
+            "1": "daily",
+            "2": "weekly",
+            "3": "monthly",
+            "": "monthly"
+        }
+        granularity = granularity_map.get(granularity_choice, "monthly")
+        
+        # Use AnalysisConfig defaults
+        config_defaults = AnalysisConfig()
+        
+        # Min sample size
+        min_sample_size = self._get_positive_int_input(
+            f"\nMinimum sample size for analysis [{config_defaults.MIN_SAMPLE_SIZE}]: ",
+            config_defaults.MIN_SAMPLE_SIZE
+        )
+        
+        # Top N skills
+        top_n_skills = self._get_positive_int_input(
+            f"Top N skills to include [{config_defaults.TOP_N_SKILLS}]: ",
+            config_defaults.TOP_N_SKILLS
+        )
+        
+        # Top N companies
+        top_n_companies = self._get_positive_int_input(
+            f"Top N companies to include [{config_defaults.TOP_N_COMPANIES}]: ",
+            config_defaults.TOP_N_COMPANIES
+        )
+        
+        # Confirm
+        print("\n" + "-"*80)
+        print("Summary:")
+        print(f"  Output directory: {output_dir}")
+        print(f"  Time granularity: {granularity}")
+        print(f"  Min sample size: {min_sample_size}")
+        print(f"  Top N skills: {top_n_skills}")
+        print(f"  Top N companies: {top_n_companies}")
+        print("-"*80)
+        
+        confirm = input("\nProceed with analysis generation? (Y/n): ").strip().lower()
+        if confirm in ("n", "no"):
+            print("\nCancelled.")
+            return True
+        
+        # Configure and generate
+        print("\nConfiguring analysis engine...")
+        config = AnalysisConfig()
+        config.GRANULARITY = granularity
+        config.MIN_SAMPLE_SIZE = min_sample_size
+        config.TOP_N_SKILLS = top_n_skills
+        config.TOP_N_COMPANIES = top_n_companies
+        
+        generator = AnalysisGenerator(output_dir, config)
+        total_analyses = len(generator.analyses)
+        
+        print(f"\nGenerating {total_analyses} analyses to {output_dir}...")
+        print("="*80)
+        
+        exit_code = generator.generate_all()
+        
+        if exit_code == 0:
+            print("\n" + "="*80)
+            print("✓ Analysis generation completed successfully!")
+            print("="*80)
+            print(f"\nJSON files are available in: {output_dir}")
+        else:
+            print("\n" + "="*80)
+            print("✗ Analysis generation failed!")
+            print("="*80)
+        
         return True
 
 
