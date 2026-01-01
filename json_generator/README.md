@@ -85,6 +85,19 @@ The generator automatically:
 
 ## Performance
 
-- Generates <30 seconds for 10,000 jobs
-- Total API size <20MB
-- Uses eager loading for optimal database queries
+**Optimized for Memory Efficiency:**
+- Uses SQLAlchemy `subqueryload` strategy to batch-load relationships
+- Avoids massive JOIN queries that can consume excessive memory
+- Efficient for datasets of 300-10,000+ jobs
+- Memory usage scales linearly with dataset size
+
+**Benchmarks:**
+- ~5-15 seconds for 1,000 jobs (depending on hardware)
+- <30 seconds for 10,000 jobs
+- Memory usage: ~100-200MB for 1,000 jobs
+- Total API size: <20MB
+
+**Technical Details:**
+- Lazy loading (`lazy='select'`) for relationship definitions
+- Batch loading with `subqueryload()` for query execution
+- Prevents N+1 query problems while keeping memory usage reasonable

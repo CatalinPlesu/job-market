@@ -1,7 +1,7 @@
 """Database connector for querying job data."""
 
 from typing import List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, subqueryload
 from src.data_database import JobDetail, DataSessionLocal, get_data_db
 
 
@@ -24,7 +24,10 @@ class DatabaseConnector:
     
     def get_all_jobs(self) -> List[JobDetail]:
         """
-        Get all job details from database.
+        Get all job details from database with optimized loading.
+        
+        Uses subqueryload for efficient batch loading of relationships
+        to avoid N+1 queries while keeping memory usage reasonable.
         
         Returns:
             List of JobDetail objects with all relationships loaded.
@@ -32,8 +35,57 @@ class DatabaseConnector:
         if not self.session:
             raise RuntimeError("Database connector must be used as context manager")
         
-        # Query all jobs with eager loading of relationships
-        jobs = self.session.query(JobDetail).all()
+        # Query jobs with optimized subquery loading for relationships
+        # This loads relationships in separate queries, avoiding massive JOINs
+        query = self.session.query(JobDetail)
+        
+        # Load one-to-one relationships
+        query = query.options(
+            subqueryload(JobDetail.title),
+            subqueryload(JobDetail.job_function),
+            subqueryload(JobDetail.seniority_level),
+            subqueryload(JobDetail.industry),
+            subqueryload(JobDetail.department),
+            subqueryload(JobDetail.job_family),
+            subqueryload(JobDetail.specialization),
+            subqueryload(JobDetail.education_level),
+            subqueryload(JobDetail.employment_type),
+            subqueryload(JobDetail.contract_type),
+            subqueryload(JobDetail.work_schedule),
+            subqueryload(JobDetail.shift_details),
+            subqueryload(JobDetail.remote_work),
+            subqueryload(JobDetail.travel_requirements),
+            subqueryload(JobDetail.salary_currency),
+            subqueryload(JobDetail.salary_period),
+            subqueryload(JobDetail.city),
+            subqueryload(JobDetail.region),
+            subqueryload(JobDetail.country),
+            subqueryload(JobDetail.company),
+            subqueryload(JobDetail.company_size),
+        )
+        
+        # Load one-to-many relationships
+        query = query.options(
+            subqueryload(JobDetail.responsibilities),
+            subqueryload(JobDetail.languages),
+        )
+        
+        # Load many-to-many relationships
+        query = query.options(
+            subqueryload(JobDetail.hard_skills),
+            subqueryload(JobDetail.soft_skills),
+            subqueryload(JobDetail.certifications),
+            subqueryload(JobDetail.licenses),
+            subqueryload(JobDetail.benefits),
+            subqueryload(JobDetail.work_environment),
+            subqueryload(JobDetail.professional_development),
+            subqueryload(JobDetail.work_life_balance),
+            subqueryload(JobDetail.physical_requirements),
+            subqueryload(JobDetail.work_conditions),
+            subqueryload(JobDetail.special_requirements),
+        )
+        
+        jobs = query.all()
         return jobs
     
     def get_jobs_count(self) -> int:
