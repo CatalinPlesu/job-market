@@ -70,10 +70,118 @@ class StructureDataItem:
 
 class ProcessDataItem:
     def get_item_description(self):
-        return "Process Data"
+        return "Process Data (Generate Analysis)"
     
     def execute(self):
-        process_data()
+        from analysis_engine.generator import AnalysisGenerator
+        from analysis_engine.config import AnalysisConfig
+        
+        print("\n" + "="*80)
+        print("ANALYSIS GENERATION")
+        print("="*80)
+        print("\nGenerate statistical analyses from job market data.")
+        print()
+        
+        # Configuration options
+        print("Configuration:")
+        print()
+        
+        # Output directory
+        default_output = "pages/api/analysis"
+        output_dir = input(f"Output directory [{default_output}]: ").strip()
+        if not output_dir:
+            output_dir = default_output
+        
+        # Time granularity
+        print("\nTime granularity for temporal analyses:")
+        print("  1. Daily")
+        print("  2. Weekly")
+        print("  3. Monthly (recommended)")
+        granularity_choice = input("Select granularity [3]: ").strip()
+        
+        granularity_map = {
+            "1": "daily",
+            "2": "weekly",
+            "3": "monthly",
+            "": "monthly"
+        }
+        granularity = granularity_map.get(granularity_choice, "monthly")
+        
+        # Min sample size
+        default_min_size = "10"
+        min_size = input(f"\nMinimum sample size for analysis [{default_min_size}]: ").strip()
+        if not min_size:
+            min_size = default_min_size
+        
+        try:
+            min_sample_size = int(min_size)
+        except ValueError:
+            print(f"Invalid input, using default: {default_min_size}")
+            min_sample_size = int(default_min_size)
+        
+        # Top N skills
+        default_top_skills = "20"
+        top_skills = input(f"Top N skills to include [{default_top_skills}]: ").strip()
+        if not top_skills:
+            top_skills = default_top_skills
+        
+        try:
+            top_n_skills = int(top_skills)
+        except ValueError:
+            print(f"Invalid input, using default: {default_top_skills}")
+            top_n_skills = int(default_top_skills)
+        
+        # Top N companies
+        default_top_companies = "50"
+        top_companies = input(f"Top N companies to include [{default_top_companies}]: ").strip()
+        if not top_companies:
+            top_companies = default_top_companies
+        
+        try:
+            top_n_companies = int(top_companies)
+        except ValueError:
+            print(f"Invalid input, using default: {default_top_companies}")
+            top_n_companies = int(default_top_companies)
+        
+        # Confirm
+        print("\n" + "-"*80)
+        print("Summary:")
+        print(f"  Output directory: {output_dir}")
+        print(f"  Time granularity: {granularity}")
+        print(f"  Min sample size: {min_sample_size}")
+        print(f"  Top N skills: {top_n_skills}")
+        print(f"  Top N companies: {top_n_companies}")
+        print("-"*80)
+        
+        confirm = input("\nProceed with analysis generation? (Y/n): ").strip().lower()
+        if confirm in ("n", "no"):
+            print("\nCancelled.")
+            return True
+        
+        # Configure and generate
+        print("\nConfiguring analysis engine...")
+        config = AnalysisConfig()
+        config.GRANULARITY = granularity
+        config.MIN_SAMPLE_SIZE = min_sample_size
+        config.TOP_N_SKILLS = top_n_skills
+        config.TOP_N_COMPANIES = top_n_companies
+        
+        print(f"\nGenerating {21} analyses to {output_dir}...")
+        print("="*80)
+        
+        generator = AnalysisGenerator(output_dir, config)
+        exit_code = generator.generate_all()
+        
+        if exit_code == 0:
+            print("\n" + "="*80)
+            print("✓ Analysis generation completed successfully!")
+            print("="*80)
+            print(f"\nJSON files are available in: {output_dir}")
+        else:
+            print("\n" + "="*80)
+            print("✗ Analysis generation failed!")
+            print("="*80)
+        
         return True
 
 
