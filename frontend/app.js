@@ -2057,26 +2057,68 @@ const FilterPanel = {
                                         m('span', { class: 'badge badge-info badge-sm ml-2' }, state.filters[field.key].length)
                                 ]),
                                 isMultiSelect ? 
-                                    // Multi-select for many-to-many fields
-                                    m('select', { 
-                                        class: `select select-bordered select-sm w-full ${state.filters[field.key] && state.filters[field.key].length > 0 ? 'select-info' : ''}`,
-                                        multiple: true,
-                                        size: Math.min(5, Math.max(3, availableOptions.length)),
-                                        onchange: (e) => {
-                                            const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
-                                            state.filters[field.key] = selectedOptions.length > 0 ? selectedOptions : [];
-                                            // Clear cached counts so they refresh
-                                            FilterPanel.filterCounts = {};
-                                            handleFilterChange();
-                                        }
-                                    }, [
-                                        ...availableOptions.map(item => {
-                                            const isSelected = state.filters[field.key] && state.filters[field.key].includes(item.name);
-                                            return m('option', { 
-                                                value: item.name,
-                                                selected: isSelected
-                                            }, `${item.name} (${item.count})`);
-                                        })
+                                    // Multi-select for many-to-many fields - checkbox + dropdown pattern
+                                    m('div', { class: 'space-y-2' }, [
+                                        // Display selected items as checkboxes
+                                        state.filters[field.key] && state.filters[field.key].length > 0 && 
+                                            m('div', { class: 'space-y-1 mb-2 p-2 bg-base-100 rounded border border-base-300' }, 
+                                                state.filters[field.key].map(selectedValue => 
+                                                    m('label', { 
+                                                        class: 'flex items-center gap-2 cursor-pointer hover:bg-base-200 p-1 rounded',
+                                                        onclick: (e) => {
+                                                            e.preventDefault();
+                                                            // Remove this item from selection
+                                                            state.filters[field.key] = state.filters[field.key].filter(v => v !== selectedValue);
+                                                            if (state.filters[field.key].length === 0) {
+                                                                state.filters[field.key] = [];
+                                                            }
+                                                            // Clear cached counts so they refresh
+                                                            FilterPanel.filterCounts = {};
+                                                            handleFilterChange();
+                                                        }
+                                                    }, [
+                                                        m('input', { 
+                                                            type: 'checkbox',
+                                                            class: 'checkbox checkbox-sm checkbox-info',
+                                                            checked: true,
+                                                            onclick: (e) => e.stopPropagation() // Prevent double-triggering
+                                                        }),
+                                                        m('span', { class: 'text-sm flex-1' }, selectedValue)
+                                                    ])
+                                                )
+                                            ),
+                                        // Dropdown to add more items (without counts for performance)
+                                        m('select', { 
+                                            class: `select select-bordered select-sm w-full ${state.filters[field.key] && state.filters[field.key].length > 0 ? 'select-info' : ''}`,
+                                            value: '',
+                                            onchange: (e) => {
+                                                if (e.target.value) {
+                                                    // Add selected item to the filter array
+                                                    if (!state.filters[field.key]) {
+                                                        state.filters[field.key] = [];
+                                                    }
+                                                    if (!state.filters[field.key].includes(e.target.value)) {
+                                                        state.filters[field.key].push(e.target.value);
+                                                    }
+                                                    // Reset dropdown to show prompt
+                                                    e.target.value = '';
+                                                    // Clear cached counts so they refresh
+                                                    FilterPanel.filterCounts = {};
+                                                    handleFilterChange();
+                                                }
+                                            }
+                                        }, [
+                                            m('option', { value: '', disabled: true, selected: true }, 
+                                                state.filters[field.key] && state.filters[field.key].length > 0 
+                                                    ? 'Add more...' 
+                                                    : 'Select...'
+                                            ),
+                                            ...availableOptions
+                                                .filter(item => !state.filters[field.key] || !state.filters[field.key].includes(item.name))
+                                                .map(item => 
+                                                    m('option', { value: item.name }, item.name)
+                                                )
+                                        ])
                                     ])
                                     :
                                     // Single-select for many-to-one fields
