@@ -215,12 +215,47 @@ The frontend now supports comprehensive URL parameter management for enhanced us
 - [x] Advanced filters (collapsible/expandable)
 - [x] URL parameter support for filters and sorting
 - [x] Global search with URL integration
-- [ ] All 50+ fields filterable (12 fields implemented, extensible)
+- [x] All 30+ database fields filterable (19 single-select + 11 multi-select)
+- [x] Multi-select support for many-to-many relationships
 - [ ] Charts render correctly (to be added when data available)
+
+## Recent Filter Enhancements (2026-01)
+
+### Comprehensive Filtering System
+
+The frontend now supports **34 filterable fields** covering almost all data in the job_details table:
+
+**Single-Select Filters (19 fields)**:
+- Job Classification: title, job_function, seniority_level, industry, department, job_family, specialization
+- Work Arrangement: employment_type, contract_type, work_schedule, shift_details, remote_work, travel_required
+- Location: city, region, country
+- Company: company, company_size
+- Requirements: education_level
+
+**Multi-Select Filters (11 fields)**:
+- Technical: hard_skills, soft_skills, certifications, licenses_required
+- Benefits: benefits, work_environment, professional_development, work_life_balance
+- Conditions: physical_requirements, work_conditions, special_requirements
+
+**Range Filters (4 fields)**:
+- Salary range (min/max) and Experience (min/max)
+
+### Key Features
+
+- **Multi-Select with AND Logic**: When multiple items are selected in multi-select fields, jobs must have ALL selected items
+- **Dynamic Filter Counts**: Filter options show job counts that update based on current selections
+- **URL Persistence**: All filter selections are saved in URL for sharing and bookmarking
+- **Real-Time Updates**: Instant filtering on client-side with SQL.js
+- **Smart UI**: Multi-select fields show selection count badges
+
+### Documentation
+
+- **[FILTER_USAGE_GUIDE.md](../FILTER_USAGE_GUIDE.md)** - User guide with examples
+- **[FILTER_ENHANCEMENT_SUMMARY.md](../FILTER_ENHANCEMENT_SUMMARY.md)** - Technical implementation details
 
 ## Future Enhancements
 
-1. **Extended Filtering**: Add all 50+ database fields
+1. **OR Logic Toggle**: Allow users to choose AND/OR for multi-select filters
 2. **Hierarchical Filtering**: Dynamic filtering where selecting industry filters departments
 3. **Advanced Search**: Full-text search across job descriptions
 4. **Saved Filters**: Save and restore filter preferences
