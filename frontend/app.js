@@ -1,6 +1,95 @@
 // API Configuration
 const API_BASE = '/api';
 
+// Database Management
+const DatabaseManager = {
+    db: null,
+    loading: false,
+    loaded: false,
+    error: null,
+    
+    // Initialize SQL.js and load the database
+    async init() {
+        if (this.loaded) return this.db;
+        if (this.loading) {
+            // Wait for existing load to complete
+            while (this.loading) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return this.db;
+        }
+        
+        this.loading = true;
+        this.error = null;
+        
+        try {
+            console.log('Initializing SQL.js...');
+            
+            // Initialize SQL.js with CDN WASM files
+            const SQL = await initSqlJs({
+                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+            });
+            
+            console.log('Loading database file...');
+            
+            // Load the database file
+            const response = await fetch(`${API_BASE}/data.db`);
+            if (!response.ok) {
+                throw new Error(`Failed to load database: ${response.status} ${response.statusText}`);
+            }
+            
+            const buffer = await response.arrayBuffer();
+            console.log(`Database loaded: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+            
+            // Create database instance
+            this.db = new SQL.Database(new Uint8Array(buffer));
+            this.loaded = true;
+            this.loading = false;
+            
+            console.log('Database ready for queries');
+            return this.db;
+            
+        } catch (error) {
+            console.error('Database initialization failed:', error);
+            this.error = error;
+            this.loading = false;
+            throw error;
+        }
+    },
+    
+    // Execute a SQL query
+    query(sql, params = []) {
+        if (!this.db) {
+            throw new Error('Database not initialized. Call init() first.');
+        }
+        
+        try {
+            const results = this.db.exec(sql, params);
+            return results;
+        } catch (error) {
+            console.error('Query failed:', sql, error);
+            throw error;
+        }
+    },
+    
+    // Get query results as objects
+    queryObjects(sql, params = []) {
+        const results = this.query(sql, params);
+        if (results.length === 0) return [];
+        
+        const [result] = results;
+        const { columns, values } = result;
+        
+        return values.map(row => {
+            const obj = {};
+            columns.forEach((col, idx) => {
+                obj[col] = row[idx];
+            });
+            return obj;
+        });
+    }
+};
+
 // URL State Management Utilities
 const URLState = {
     // Parse query parameters from URL
@@ -91,6 +180,417 @@ const api = {
     getAnalysis: (filename) => m.request({ url: `${API_BASE}/analysis/${filename}` })
 };
 
+// SQL-based data access functions
+const dbApi = {
+    // Build WHERE clause from filters
+    buildWhereClause(filters, search) {
+        const conditions = [];
+        const params = {};
+        
+        // Text search across multiple fields
+        if (search && search.trim()) {
+            conditions.push(`(
+                jd.job_title LIKE :search OR
+                t.name LIKE :search OR
+                c.name LIKE :search OR
+                jf.name LIKE :search OR
+                sp.name LIKE :search
+            )`);
+            params.search = `%${search.trim()}%`;
+        }
+        
+        // Job function filter
+        if (filters.job_function) {
+            conditions.push('jf.name = :job_function');
+            params.job_function = filters.job_function;
+        }
+        
+        // Seniority filter
+        if (filters.seniority_level) {
+            conditions.push('sl.name = :seniority_level');
+            params.seniority_level = filters.seniority_level;
+        }
+        
+        // City filter
+        if (filters.city) {
+            conditions.push('ci.name = :city');
+            params.city = filters.city;
+        }
+        
+        // Remote work filter
+        if (filters.remote_work) {
+            conditions.push('rw.name = :remote_work');
+            params.remote_work = filters.remote_work;
+        }
+        
+        // Industry filter
+        if (filters.industry) {
+            conditions.push('ind.name = :industry');
+            params.industry = filters.industry;
+        }
+        
+        // Company filter
+        if (filters.company) {
+            conditions.push('c.name = :company');
+            params.company = filters.company;
+        }
+        
+        // Employment type filter
+        if (filters.employment_type) {
+            conditions.push('et.name = :employment_type');
+            params.employment_type = filters.employment_type;
+        }
+        
+        // Contract type filter
+        if (filters.contract_type) {
+            conditions.push('ct.name = :contract_type');
+            params.contract_type = filters.contract_type;
+        }
+        
+        // Department filter
+        if (filters.department) {
+            conditions.push('d.name = :department');
+            params.department = filters.department;
+        }
+        
+        // Specialization filter
+        if (filters.specialization) {
+            conditions.push('sp.name = :specialization');
+            params.specialization = filters.specialization;
+        }
+        
+        // Education level filter
+        if (filters.education_level) {
+            conditions.push('el.name = :education_level');
+            params.education_level = filters.education_level;
+        }
+        
+        // Company size filter
+        if (filters.company_size) {
+            conditions.push('cs.name = :company_size');
+            params.company_size = filters.company_size;
+        }
+        
+        // Salary range filters
+        if (filters.salaryMin !== null && filters.salaryMin !== undefined) {
+            conditions.push('jd.min_salary >= :salaryMin');
+            params.salaryMin = filters.salaryMin;
+        }
+        
+        if (filters.salaryMax !== null && filters.salaryMax !== undefined) {
+            conditions.push('jd.max_salary <= :salaryMax');
+            params.salaryMax = filters.salaryMax;
+        }
+        
+        // Experience filters
+        if (filters.experienceMin !== null && filters.experienceMin !== undefined) {
+            conditions.push('jd.experience_years >= :experienceMin');
+            params.experienceMin = filters.experienceMin;
+        }
+        
+        if (filters.experienceMax !== null && filters.experienceMax !== undefined) {
+            conditions.push('jd.experience_years <= :experienceMax');
+            params.experienceMax = filters.experienceMax;
+        }
+        
+        const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+        return { whereClause, params };
+    },
+    
+    // Build ORDER BY clause from sort option
+    buildOrderByClause(sortOption) {
+        const sortMap = {
+            'date_desc': 'jd.posting_date DESC',
+            'date_asc': 'jd.posting_date ASC',
+            'salary_desc': 'jd.min_salary DESC',
+            'salary_asc': 'jd.min_salary ASC',
+            'title_asc': 't.name ASC',
+            'title_desc': 't.name DESC',
+            'company_asc': 'c.name ASC',
+            'company_desc': 'c.name DESC'
+        };
+        
+        return sortMap[sortOption] || sortMap['date_desc'];
+    },
+    
+    // Get jobs with pagination, filtering, and sorting
+    async getJobs(page = 1, limit = 20, filters = {}, search = '', sort = 'date_desc') {
+        await DatabaseManager.init();
+        
+        const { whereClause, params } = this.buildWhereClause(filters, search);
+        const orderBy = this.buildOrderByClause(sort);
+        const offset = (page - 1) * limit;
+        
+        // Main query to get jobs
+        const jobsQuery = `
+            SELECT 
+                jd.id,
+                t.name as title,
+                jf.name as job_function,
+                sp.name as specialization,
+                sl.name as seniority_level,
+                c.name as company,
+                cs.name as company_size,
+                ci.name as city,
+                reg.name as region,
+                cou.name as country,
+                rw.name as remote_work,
+                jd.min_salary,
+                jd.max_salary,
+                curr.code as salary_currency,
+                sper.name as salary_period,
+                et.name as employment_type,
+                ct.name as contract_type,
+                ws.name as work_schedule,
+                el.name as education_level,
+                jd.experience_years,
+                jd.posting_date,
+                jd.site,
+                jd.job_url,
+                jd.job_title as original_title,
+                jd.company_name as original_company,
+                jd.job_description as original_description,
+                ind.name as industry,
+                d.name as department,
+                jf2.name as job_family,
+                sd.name as shift_details,
+                tr.name as travel_requirements
+            FROM job_details jd
+            LEFT JOIN titles t ON jd.title_id = t.id
+            LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+            LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+            LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+            LEFT JOIN companies c ON jd.company_name_id = c.id
+            LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+            LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN regions reg ON jd.region_id = reg.id
+            LEFT JOIN countries cou ON jd.country_id = cou.id
+            LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+            LEFT JOIN currencies curr ON jd.salary_currency_id = curr.id
+            LEFT JOIN salary_periods sper ON jd.salary_period_id = sper.id
+            LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+            LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+            LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+            LEFT JOIN education_levels el ON jd.required_education_id = el.id
+            LEFT JOIN industries ind ON jd.industry_id = ind.id
+            LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+            LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+            LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+            ${whereClause}
+            ORDER BY ${orderBy}
+            LIMIT ${limit} OFFSET ${offset}
+        `;
+        
+        const jobs = DatabaseManager.queryObjects(jobsQuery, params);
+        
+        // Get total count
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM job_details jd
+            LEFT JOIN titles t ON jd.title_id = t.id
+            LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+            LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+            LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+            LEFT JOIN companies c ON jd.company_name_id = c.id
+            LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+            LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+            LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+            LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+            LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN education_levels el ON jd.required_education_id = el.id
+            LEFT JOIN industries ind ON jd.industry_id = ind.id
+            ${whereClause}
+        `;
+        
+        const countResult = DatabaseManager.queryObjects(countQuery, params);
+        const total = countResult[0]?.total || 0;
+        
+        // Format jobs to match the JSON API structure
+        const formattedJobs = await Promise.all(jobs.map(job => this.formatJob(job)));
+        
+        return {
+            jobs: formattedJobs,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
+    },
+    
+    // Format a job to match JSON API structure
+    async formatJob(job) {
+        // Get related data (skills, benefits, etc.)
+        const hardSkills = await this.getJobSkills(job.id, 'hard_skills');
+        const softSkills = await this.getJobSkills(job.id, 'soft_skills');
+        const certifications = await this.getJobRelated(job.id, 'certifications');
+        const benefits = await this.getJobRelated(job.id, 'benefits');
+        const responsibilities = await this.getJobResponsibilities(job.id);
+        const languages = await this.getJobLanguages(job.id);
+        const workEnvironment = await this.getJobRelated(job.id, 'work_environment');
+        const professionalDevelopment = await this.getJobRelated(job.id, 'professional_development');
+        
+        return {
+            id: job.id,
+            title: job.title,
+            job_function: job.job_function,
+            specialization: job.specialization,
+            seniority_level: job.seniority_level,
+            company: job.company,
+            company_size: job.company_size,
+            location: {
+                city: job.city,
+                region: job.region,
+                country: job.country,
+                remote_work: job.remote_work
+            },
+            salary: {
+                min: job.min_salary,
+                max: job.max_salary,
+                currency: job.salary_currency || 'MDL',
+                period: job.salary_period,
+                min_mdl: job.min_salary, // For Moldova market, assume MDL
+                max_mdl: job.max_salary
+            },
+            employment: {
+                type: job.employment_type,
+                contract: job.contract_type,
+                schedule: job.work_schedule
+            },
+            requirements: {
+                education: job.education_level,
+                experience_years: job.experience_years,
+                languages: languages,
+                hard_skills: hardSkills,
+                soft_skills: softSkills,
+                certifications: certifications
+            },
+            benefits: benefits,
+            posting_date: job.posting_date,
+            source: {
+                site: job.site,
+                url: job.job_url
+            },
+            parsed_view: {
+                responsibilities: responsibilities,
+                work_environment: workEnvironment,
+                professional_development: professionalDevelopment
+            },
+            raw: {
+                original_title: job.original_title,
+                original_company: job.original_company,
+                original_description: job.original_description
+            },
+            industry: job.industry,
+            department: job.department,
+            job_family: job.job_family,
+            shift_details: job.shift_details,
+            travel_requirements: job.travel_requirements
+        };
+    },
+    
+    // Get job skills (hard or soft)
+    async getJobSkills(jobId, skillType) {
+        const table = skillType;
+        const query = `
+            SELECT s.name
+            FROM ${table} s
+            JOIN job_details_${table} js ON s.id = js.${table}_id
+            WHERE js.job_details_id = ${jobId}
+        `;
+        
+        const results = DatabaseManager.queryObjects(query);
+        return results.map(r => r.name);
+    },
+    
+    // Get job related data (benefits, certifications, etc.)
+    async getJobRelated(jobId, relationType) {
+        const columnName = relationType === 'benefits' || relationType === 'work_environment' || 
+                          relationType === 'professional_development' ? 'description' : 'name';
+        const query = `
+            SELECT r.${columnName} as value
+            FROM ${relationType} r
+            JOIN job_details_${relationType} jr ON r.id = jr.${relationType}_id
+            WHERE jr.job_details_id = ${jobId}
+        `;
+        
+        const results = DatabaseManager.queryObjects(query);
+        return results.map(r => r.value);
+    },
+    
+    // Get job responsibilities
+    async getJobResponsibilities(jobId) {
+        const query = `
+            SELECT description
+            FROM responsibilities
+            WHERE job_detail_id = ${jobId}
+        `;
+        
+        const results = DatabaseManager.queryObjects(query);
+        return results.map(r => r.description);
+    },
+    
+    // Get job languages
+    async getJobLanguages(jobId) {
+        const query = `
+            SELECT language
+            FROM job_languages
+            WHERE job_detail_id = ${jobId}
+        `;
+        
+        const results = DatabaseManager.queryObjects(query);
+        return results.map(r => r.language);
+    },
+    
+    // Get metadata for filters (distinct values with counts)
+    async getMetadata() {
+        await DatabaseManager.init();
+        
+        const metadata = {};
+        
+        // Helper function to get distinct values with counts
+        const getDistinctValues = (table, column, label) => {
+            const query = `
+                SELECT ${column} as name, COUNT(*) as count
+                FROM job_details jd
+                LEFT JOIN ${table} t ON jd.${table.slice(0, -1)}_id = t.id
+                WHERE t.${column} IS NOT NULL
+                GROUP BY t.${column}
+                ORDER BY count DESC, t.${column} ASC
+            `;
+            return DatabaseManager.queryObjects(query);
+        };
+        
+        // Get metadata for each filterable field
+        try {
+            metadata.job_function = getDistinctValues('job_functions', 'name', 'Job Function');
+            metadata.seniority_level = getDistinctValues('seniority_levels', 'name', 'Seniority');
+            metadata.location = getDistinctValues('cities', 'name', 'City');
+            metadata.remote_work = getDistinctValues('remote_work_options', 'name', 'Remote Work');
+            metadata.industry = getDistinctValues('industries', 'name', 'Industry');
+            metadata.company_name = getDistinctValues('companies', 'name', 'Company');
+            metadata.employment_type = getDistinctValues('employment_types', 'name', 'Employment Type');
+            metadata.contract_type = getDistinctValues('contract_types', 'name', 'Contract Type');
+            metadata.department = getDistinctValues('departments', 'name', 'Department');
+            metadata.specialization = getDistinctValues('specializations', 'name', 'Specialization');
+            metadata.education_level = getDistinctValues('education_levels', 'name', 'Education');
+            metadata.company_size = getDistinctValues('company_sizes', 'name', 'Company Size');
+        } catch (error) {
+            console.error('Error getting metadata:', error);
+        }
+        
+        // Get total jobs count
+        const totalQuery = 'SELECT COUNT(*) as total FROM job_details';
+        const totalResult = DatabaseManager.queryObjects(totalQuery);
+        const totalJobs = totalResult[0]?.total || 0;
+        
+        return {
+            total_jobs: totalJobs,
+            metadata: metadata
+        };
+    }
+};
+
 // Helper to check if filters are active
 const hasActiveFilters = (filters) => {
     return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
@@ -111,6 +611,9 @@ const state = {
         experienceMax: null
     },
     loading: false,
+    dbLoading: false,
+    dbLoaded: false,
+    dbError: null,
     analysisIndex: null,
     selectedAnalysis: null,
     selectedAnalysisData: null,
@@ -343,13 +846,44 @@ const Loading = {
 
 // Home Page
 const HomePage = {
-    oninit: () => {
-        api.getJobsIndex().then(data => {
-            state.jobsIndex = data;
-        });
+    oninit: async () => {
+        try {
+            state.dbLoading = true;
+            await DatabaseManager.init();
+            state.dbLoaded = true;
+            
+            const metadata = await dbApi.getMetadata();
+            state.jobsIndex = metadata;
+            state.dbLoading = false;
+            m.redraw();
+        } catch (error) {
+            console.error('Failed to load database:', error);
+            state.dbError = error;
+            state.dbLoading = false;
+            m.redraw();
+        }
     },
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
-        m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
+        state.dbLoading ? m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
+            m('div', { class: 'hero-content text-center' }, [
+                m('div', { class: 'max-w-md' }, [
+                    m('h1', { class: 'text-5xl font-bold mb-4' }, 'Moldova Job Market'),
+                    m('div', { class: 'flex flex-col items-center gap-4' }, [
+                        m('span', { class: 'loading loading-spinner loading-lg' }),
+                        m('p', { class: 'text-sm opacity-70' }, 'Loading job database...')
+                    ])
+                ])
+            ])
+        ]) : state.dbError ? m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
+            m('div', { class: 'hero-content text-center' }, [
+                m('div', { class: 'max-w-md' }, [
+                    m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
+                    m('div', { class: 'alert alert-error mt-6' }, [
+                        m('span', 'Failed to load database. Please make sure data.db is available in /api/')
+                    ])
+                ])
+            ])
+        ]) : m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
             m('div', { class: 'hero-content text-center' }, [
                 m('div', { class: 'max-w-md' }, [
                     m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
@@ -625,17 +1159,8 @@ const FilterPanel = {
     view: () => {
         if (!state.jobsIndex) return null;
         
-        // Get filtered jobs based on current filters for hierarchical filtering
-        const filteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
-        
-        // Calculate salary range from all jobs
+        // Calculate salary range - use reasonable defaults
         const salaryRange = { min: 0, max: 100000 };
-        state.allLoadedJobs.forEach(job => {
-            const minSalary = job.salary?.min_mdl || job.salary?.min;
-            const maxSalary = job.salary?.max_mdl || job.salary?.max;
-            if (minSalary && minSalary > 0) salaryRange.min = Math.min(salaryRange.min === 0 ? minSalary : salaryRange.min, minSalary);
-            if (maxSalary) salaryRange.max = Math.max(salaryRange.max, maxSalary);
-        });
         
         // All available filter fields - organized following schema order
         // Excludes non-filterable fields like contact info
@@ -689,44 +1214,11 @@ const FilterPanel = {
         const handleFilterChange = async () => {
             JobsPage.displayPage = 1;
             
-            // Determine which pages we need to load for the current display page
-            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-            
-            // Calculate which pages are needed for the current display page
-            if (filterMetadata && filterMetadata.pages) {
-                const pagesToLoad = new Set();
-                // We need to load enough pages to satisfy the current display page
-                const itemsNeeded = state.itemsPerPage;
-                let itemsAccumulated = 0;
-                
-                for (const pageInfo of filterMetadata.pages) {
-                    if (itemsAccumulated < itemsNeeded) {
-                        pagesToLoad.add(pageInfo.page);
-                        itemsAccumulated += pageInfo.count;
-                    } else {
-                        break;
-                    }
-                }
-                
-                // Load the identified pages
-                if (pagesToLoad.size > 0) {
-                    const promises = [];
-                    for (const page of pagesToLoad) {
-                        if (!state.loadedPages.has(page)) {
-                            promises.push(JobsPage.loadPage(page));
-                        }
-                    }
-                    if (promises.length > 0) {
-                        await Promise.all(promises);
-                    }
-                }
-            }
-            
             // Update URL with new filter state
             URLState.update();
             
-            // Trigger auto-load after filter change
-            setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
+            // Reload jobs with new filters
+            await JobsPage.loadJobs();
             m.redraw();
         };
         
@@ -1364,81 +1856,6 @@ const FilterPanel = {
 const JobsPage = {
     displayPage: 1, // Current display page for filtered results
     loadingMore: false,
-    autoLoadThreshold: 2, // Auto-load when within 2 pages of the end
-    
-    // Load a single page of jobs
-    loadPage: async (pageNum) => {
-        if (state.loadedPages.has(pageNum)) {
-            return; // Already loaded
-        }
-        
-        try {
-            const pageData = await api.getJobsPage(pageNum);
-            // Add jobs, avoiding duplicates
-            const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
-            state.allLoadedJobs.push(...newJobs);
-            newJobs.forEach(j => state.loadedJobIds.add(j.id));
-            state.loadedPages.add(pageNum);
-            return newJobs;
-        } catch (err) {
-            console.error(`Error loading page ${pageNum}:`, err);
-            return [];
-        }
-    },
-    
-    // Automatically load more pages if needed
-    autoLoadMoreIfNeeded: async () => {
-        if (JobsPage.loadingMore || !state.jobsIndex) return;
-        
-        // Check if all pages are already loaded
-        if (state.loadedPages.size >= state.jobsIndex.total_pages) return;
-        
-        // Limit automatic loading to prevent excessive memory use
-        // Max 15 pages (1500 jobs) loaded automatically
-        const maxAutoLoadPages = 15;
-        if (state.loadedPages.size >= maxAutoLoadPages) return;
-        
-        const { total, totalPages } = JobsPage.getDisplayedJobs();
-        const currentPage = JobsPage.displayPage;
-        
-        // Auto-load if we're near the end of available filtered results
-        // OR if we have very few results due to filtering
-        const nearEnd = currentPage >= totalPages - JobsPage.autoLoadThreshold;
-        const needsMoreData = total < state.itemsPerPage * 3; // Less than 3 pages worth of results
-        
-        if (nearEnd || needsMoreData) {
-            await JobsPage.loadMorePages(3);
-        }
-    },
-    
-    // Load next batch of pages
-    loadMorePages: async (numPages = 3) => {
-        if (JobsPage.loadingMore || !state.jobsIndex) return;
-        
-        // Find the first unloaded page
-        let nextPage = 1;
-        while (nextPage <= state.jobsIndex.total_pages && state.loadedPages.has(nextPage)) {
-            nextPage++;
-        }
-        
-        if (nextPage > state.jobsIndex.total_pages) return;
-        
-        JobsPage.loadingMore = true;
-        const promises = [];
-        let pagesLoaded = 0;
-        
-        // Load up to numPages starting from nextPage
-        for (let page = nextPage; page <= state.jobsIndex.total_pages && pagesLoaded < numPages; page++) {
-            if (!state.loadedPages.has(page)) {
-                promises.push(JobsPage.loadPage(page));
-                pagesLoaded++;
-            }
-        }
-        
-        await Promise.all(promises);
-        JobsPage.loadingMore = false;
-        m.redraw();
-    },
     
     oninit: async () => {
         // Initialize URL state before loading data
@@ -1453,95 +1870,48 @@ const JobsPage = {
             state.search = urlState.search;
         }
         
-        // Load index and first page only
+        // Ensure database is loaded
         state.loading = true;
         try {
-            // Load index first to know metadata
-            const index = await api.getJobsIndex();
-            state.jobsIndex = index;
+            await DatabaseManager.init();
+            state.dbLoaded = true;
             
-            // Initialize if needed
-            if (!state.allLoadedJobs) {
-                state.allLoadedJobs = [];
-                state.loadedJobIds = new Set();
-                state.loadedPages = new Set();
+            // Load metadata if not already loaded
+            if (!state.jobsIndex) {
+                const metadata = await dbApi.getMetadata();
+                state.jobsIndex = metadata;
             }
             
-            // Load only the first page initially for fast initial load
-            if (state.allLoadedJobs.length === 0) {
-                await JobsPage.loadPage(1);
-            }
+            // Load initial jobs
+            await JobsPage.loadJobs();
             
             state.loading = false;
             m.redraw();
         } catch (err) {
             console.error('Error loading jobs:', err);
+            state.dbError = err;
             state.loading = false;
             m.redraw();
         }
     },
     
-    getDisplayedJobs: () => {
-        const isFiltered = hasActiveFilters(state.filters);
-        
-        // Apply search filter if present
-        let jobsToDisplay = state.allLoadedJobs;
-        if (state.search && state.search.trim()) {
-            const searchTerm = state.search.toLowerCase().trim();
-            jobsToDisplay = jobsToDisplay.filter(job => {
-                const searchableText = [
-                    job.title || '',
-                    job.company || '',
-                    job.location?.city || '',
-                    job.job_function || '',
-                    job.industry || '',
-                    job.seniority_level || '',
-                    ...(job.requirements?.hard_skills || []),
-                    ...(job.requirements?.soft_skills || []),
-                    ...(job.requirements?.languages || [])
-                ].join(' ').toLowerCase();
-                return searchableText.includes(searchTerm);
-            });
-        }
-        
-        // Apply other filters
-        if (isFiltered) {
-            // When filtering, use metadata to get the total count immediately
-            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-            const totalFromMetadata = filterMetadata ? filterMetadata.count : 0;
+    loadJobs: async () => {
+        try {
+            const result = await dbApi.getJobs(
+                JobsPage.displayPage,
+                state.itemsPerPage,
+                state.filters,
+                state.search,
+                state.sort
+            );
             
-            // Filter loaded jobs for display
-            const filtered = jobsToDisplay.filter(job => matchesFilters(job, state.filters));
+            state.jobs = result.jobs;
+            state.totalJobs = result.total;
+            state.totalPages = result.totalPages;
             
-            // Apply sorting
-            const sortedFiltered = sortJobs(filtered, state.sort);
-            
-            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
-            const end = start + state.itemsPerPage;
-            const effectiveTotal = totalFromMetadata > 0 ? totalFromMetadata : sortedFiltered.length;
-            
-            return {
-                jobs: sortedFiltered.slice(start, end),
-                total: effectiveTotal,
-                totalPages: Math.ceil(effectiveTotal / state.itemsPerPage),
-                isFiltered: true
-            };
-        } else {
-            // When not filtering, use metadata to show total available
-            const totalJobsFromMetadata = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
-            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
-            const end = start + state.itemsPerPage;
-            
-            // Apply sorting to all jobs
-            const sortedJobs = sortJobs(jobsToDisplay, state.sort);
-            const displayJobs = sortedJobs.slice(start, end);
-            
-            return {
-                jobs: displayJobs,
-                total: totalJobsFromMetadata,
-                totalPages: Math.ceil(totalJobsFromMetadata / state.itemsPerPage),
-                isFiltered: false
-            };
+        } catch (err) {
+            console.error('Error loading jobs:', err);
+            state.jobs = [];
         }
     },
     
@@ -1552,75 +1922,8 @@ const JobsPage = {
         // Update URL with new page number
         URLState.update();
         
-        const isFiltered = hasActiveFilters(state.filters);
-        
-        if (isFiltered) {
-            // When filtering, load pages based on filter metadata
-            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-            
-            // Calculate which pages are needed for the requested display page
-            if (filterMetadata && filterMetadata.pages) {
-                const pagesToLoad = new Set();
-                const startItem = (pageNumber - 1) * state.itemsPerPage;
-                const endItem = startItem + state.itemsPerPage;
-                
-                let itemsAccumulated = 0;
-                
-                for (const pageInfo of filterMetadata.pages) {
-                    const pageStart = itemsAccumulated;
-                    const pageEnd = itemsAccumulated + pageInfo.count;
-                    
-                    // Check if this page overlaps with our display range
-                    if (pageEnd > startItem && pageStart < endItem) {
-                        pagesToLoad.add(pageInfo.page);
-                    }
-                    
-                    itemsAccumulated += pageInfo.count;
-                    
-                    // Stop if we've gone past what we need
-                    if (itemsAccumulated >= endItem) break;
-                }
-                
-                // Load the identified pages
-                if (pagesToLoad.size > 0) {
-                    const promises = [];
-                    for (const page of pagesToLoad) {
-                        if (!state.loadedPages.has(page)) {
-                            promises.push(JobsPage.loadPage(page));
-                        }
-                    }
-                    if (promises.length > 0) {
-                        await Promise.all(promises);
-                    }
-                }
-            }
-        } else if (state.jobsIndex) {
-            // If not filtering, we need to ensure the actual page from metadata is loaded
-            // Calculate which metadata page contains the jobs we need
-            const jobsPerApiPage = state.jobsIndex.jobs_per_page || DEFAULT_JOBS_PER_API_PAGE;
-            const startJobIndex = (pageNumber - 1) * state.itemsPerPage;
-            const endJobIndex = startJobIndex + state.itemsPerPage;
-            
-            // Determine which API pages we need
-            const startApiPage = Math.floor(startJobIndex / jobsPerApiPage) + 1;
-            const endApiPage = Math.floor((endJobIndex - 1) / jobsPerApiPage) + 1;
-            
-            // Load any missing pages
-            const pagesToLoad = [];
-            for (let apiPage = startApiPage; apiPage <= Math.min(endApiPage, state.jobsIndex.total_pages); apiPage++) {
-                if (!state.loadedPages.has(apiPage)) {
-                    pagesToLoad.push(JobsPage.loadPage(apiPage));
-                }
-            }
-            
-            if (pagesToLoad.length > 0) {
-                await Promise.all(pagesToLoad);
-            }
-        }
-        
-        // Trigger auto-load check after navigation
-        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
-        
+        // Load jobs for this page
+        await JobsPage.loadJobs();
         m.redraw();
     },
     
@@ -1691,11 +1994,9 @@ const JobsPage = {
     },
     
     view: () => {
-        const displayData = JobsPage.getDisplayedJobs();
-        const { jobs, total, totalPages, isFiltered } = displayData;
-        
-        // Auto-load more data if needed (non-blocking)
-        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 0);
+        const jobs = state.jobs || [];
+        const total = state.totalJobs || 0;
+        const totalPages = state.totalPages || 0;
         
         return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
@@ -1714,6 +2015,25 @@ const JobsPage = {
                                 jobs.map((job, idx) => m(JobListItem, { 
                                     job, 
                                     index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
+                                })) :
+                                m('div', { class: 'text-center py-8 opacity-70' }, 
+                                    hasActiveFilters(state.filters) || state.search ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
+                                )
+                        ]),
+                        
+                        // Bottom pagination
+                        JobsPage.renderPagination(totalPages),
+                        
+                        // Stats footer
+                        m('div', { class: 'text-center text-sm opacity-70 mt-4' }, 
+                            `Showing ${jobs.length > 0 ? ((JobsPage.displayPage - 1) * state.itemsPerPage) + 1 : 0} - ${((JobsPage.displayPage - 1) * state.itemsPerPage) + jobs.length} of ${total.toLocaleString()} jobs`
+                        )
+                    ]
+                ])
+            ])
+        ]);
+    }
+};
                                 })) :
                                 m('div', { class: 'text-center py-8 opacity-70' }, 
                                     isFiltered ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
@@ -1736,53 +2056,80 @@ const JobDetailPage = {
     oninit: async (vnode) => {
         const jobId = parseInt(vnode.attrs.id);
         
-        // First, check if job is already in loaded jobs
-        let foundJob = state.allLoadedJobs?.find(j => j.id === jobId);
-        
-        if (foundJob) {
-            JobDetailPage.job = foundJob;
-            return;
-        }
-        
-        // Job not in loaded pages, need to search for it
+        // Try to get job from database using SQL
         JobDetailPage.job = null;
         
-        // Load index if not already loaded
-        if (!state.jobsIndex) {
-            try {
-                state.jobsIndex = await api.getJobsIndex();
-            } catch (err) {
-                console.error('Error loading index:', err);
-                return;
-            }
-        }
-        
-        // Search through pages efficiently - load one page at a time
-        // Start with pages not yet loaded
         try {
-            for (let page = 1; page <= state.jobsIndex.total_pages; page++) {
-                // Skip if already loaded and checked
-                if (state.loadedPages?.has(page)) continue;
-                
-                const pageData = await api.getJobsPage(page);
-                const job = pageData.jobs.find(j => j.id === jobId);
-                
-                if (job) {
-                    JobDetailPage.job = job;
-                    // Also add to loaded jobs for caching, avoiding duplicates using the Set
-                    if (!state.allLoadedJobs) state.allLoadedJobs = [];
-                    if (!state.loadedJobIds) state.loadedJobIds = new Set();
-                    const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
-                    state.allLoadedJobs.push(...newJobs);
-                    newJobs.forEach(j => state.loadedJobIds.add(j.id));
-                    if (!state.loadedPages) state.loadedPages = new Set();
-                    state.loadedPages.add(page);
-                    m.redraw();
-                    return;
-                }
+            await DatabaseManager.init();
+            
+            // Query for specific job by ID
+            const query = `
+                SELECT 
+                    jd.id,
+                    t.name as title,
+                    jf.name as job_function,
+                    sp.name as specialization,
+                    sl.name as seniority_level,
+                    c.name as company,
+                    cs.name as company_size,
+                    ci.name as city,
+                    reg.name as region,
+                    cou.name as country,
+                    rw.name as remote_work,
+                    jd.min_salary,
+                    jd.max_salary,
+                    curr.code as salary_currency,
+                    sper.name as salary_period,
+                    et.name as employment_type,
+                    ct.name as contract_type,
+                    ws.name as work_schedule,
+                    el.name as education_level,
+                    jd.experience_years,
+                    jd.posting_date,
+                    jd.site,
+                    jd.job_url,
+                    jd.job_title as original_title,
+                    jd.company_name as original_company,
+                    jd.job_description as original_description,
+                    ind.name as industry,
+                    d.name as department,
+                    jf2.name as job_family,
+                    sd.name as shift_details,
+                    tr.name as travel_requirements
+                FROM job_details jd
+                LEFT JOIN titles t ON jd.title_id = t.id
+                LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                LEFT JOIN companies c ON jd.company_name_id = c.id
+                LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                LEFT JOIN cities ci ON jd.city_id = ci.id
+                LEFT JOIN regions reg ON jd.region_id = reg.id
+                LEFT JOIN countries cou ON jd.country_id = cou.id
+                LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                LEFT JOIN currencies curr ON jd.salary_currency_id = curr.id
+                LEFT JOIN salary_periods sper ON jd.salary_period_id = sper.id
+                LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                LEFT JOIN industries ind ON jd.industry_id = ind.id
+                LEFT JOIN departments d ON jd.department_id = d.id
+                LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                WHERE jd.id = ${jobId}
+            `;
+            
+            const jobs = DatabaseManager.queryObjects(query);
+            
+            if (jobs.length > 0) {
+                // Format the job
+                JobDetailPage.job = await dbApi.formatJob(jobs[0]);
+                m.redraw();
             }
         } catch (err) {
-            console.error('Error searching for job:', err);
+            console.error('Error loading job:', err);
         }
     },
     view: () => {

@@ -7,6 +7,7 @@ A single-page application (SPA) built with Mithril.js and DaisyUI for browsing j
 - **Mithril.js** - Lightweight SPA framework (via CDN)
 - **DaisyUI + Tailwind CSS** - UI components and styling (via CDN)
 - **Chart.js** - Data visualizations (via CDN)
+- **SQL.js** - Client-side SQLite via WebAssembly (via CDN)
 
 ## Features
 
@@ -70,15 +71,11 @@ Just copy the `frontend/` directory contents to your web server.
 
 ## API Structure
 
-The SPA expects JSON API files at `/api/`:
+The SPA now uses SQLite databases loaded client-side for instant filtering and querying:
 
 ```
 /api/
-├── jobs/
-│   ├── index.json          - Job metadata and filters
-│   ├── page-1.json          - Paginated jobs (page 1)
-│   ├── page-2.json          - Paginated jobs (page 2)
-│   └── page-N.json          - More paginated pages
+├── data.db                  - SQLite database with job data (user must copy this)
 └── analysis/
     ├── index.json           - Available analyses list
     ├── benefits.json        - Benefits analysis
@@ -89,11 +86,22 @@ The SPA expects JSON API files at `/api/`:
     └── ... (22 analysis files total)
 ```
 
-**Note**: There are no individual job detail files (`/api/jobs/{id}/detail.json`). Job details are retrieved from the paginated page files.
+### Database Setup
 
-Generate these files using the `json_generator` module:
+**Important:** You must copy the `data.db` database file to `frontend/api/` before deployment:
+
 ```bash
-python -m json_generator --output frontend/api
+# Copy database to frontend
+cp databases/data.db frontend/api/
+```
+
+The database is loaded once when the application initializes and all job queries are performed client-side using SQL.js (WebAssembly SQLite).
+
+### Analysis Data
+
+Analysis endpoints remain server-generated JSON files. Generate these using:
+```bash
+python -m analysis_engine --output frontend/api/analysis
 ```
 
 ## Customization
@@ -115,11 +123,19 @@ To add more filters, edit the `FilterPanel` component in `app.js`
 
 ## Performance
 
-- Initial page load: <2 seconds (target)
-- Filtering updates: <100ms (target)
+- **Initial database load**: Depends on database size (~1-5 seconds for 5-10MB)
+- **Filtering updates**: Instant (<50ms) - client-side SQL queries
+- **Sorting/pagination**: Instant - SQL ORDER BY and LIMIT
 - All assets loaded via CDN
 - Minimal dependencies
 - Client-side routing (no page reloads)
+- Database cached in memory after first load
+
+**Database Caching:**
+The SQLite database is loaded once on application startup and cached in browser memory. All subsequent queries execute instantly against the cached database. For large databases (>10MB), consider:
+- Using browser cache headers to cache the database file
+- Implementing service workers for offline support
+- Splitting into multiple smaller databases if needed
 
 ## Browser Support
 
