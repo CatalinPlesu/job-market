@@ -1747,7 +1747,9 @@ const FilterPanel = {
                         state.filters[suggestion.field] = [];
                     }
                     if (!Array.isArray(state.filters[suggestion.field])) {
-                        state.filters[suggestion.field] = [state.filters[suggestion.field]];
+                        // Convert existing value to array, filtering out null/undefined
+                        const existingValue = state.filters[suggestion.field];
+                        state.filters[suggestion.field] = existingValue ? [existingValue] : [];
                     }
                     // Add value if not already in the array
                     if (!state.filters[suggestion.field].includes(suggestion.value)) {
