@@ -258,18 +258,23 @@ class CopyDatabaseItem:
             destination (str/Path): Path to destination file
             
         Raises:
+            FileNotFoundError: If source file doesn't exist
             OSError: If copy operation fails
         """
         source_path = Path(source)
         
         if not source_path.exists():
-            print(f"\n⚠ Warning: {source_path.name} not found at {source_path}")
-            return
+            raise FileNotFoundError(f"Database file not found: {source_path}")
         
         print(f"Copying {source_path.name}...")
         shutil.copy2(source_path, destination)
         
-        # Show file size (use source to avoid potential issues if destination is inaccessible)
+        # Verify copy was successful by checking destination exists
+        dest_path = Path(destination)
+        if not dest_path.exists():
+            raise OSError(f"Failed to copy {source_path.name} to {destination}")
+        
+        # Show file size
         size_mb = source_path.stat().st_size / (1024 * 1024)
         print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
 
