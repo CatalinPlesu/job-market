@@ -264,5 +264,26 @@ def get_data_db():
         pass
 
 
+def migrate_schema():
+    """Migrate the database schema to add any missing columns"""
+    from sqlalchemy import inspect, text
+    
+    inspector = inspect(data_engine)
+    
+    # Check if job_details table exists
+    if 'job_details' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('job_details')]
+        
+        # Add llm_model column if it doesn't exist
+        if 'llm_model' not in columns:
+            with data_engine.connect() as conn:
+                conn.execute(text('ALTER TABLE job_details ADD COLUMN llm_model VARCHAR(200)'))
+                conn.commit()
+                print("✓ Added llm_model column to job_details table")
+
+
 # Create all tables in data database
 DataBase.metadata.create_all(data_engine)
+
+# Run migrations
+migrate_schema()
