@@ -3537,33 +3537,42 @@ LIMIT 20`),
         // Predefined Analyses
         m('div', { class: 'mb-8' }, [
             m('h2', { class: 'text-2xl font-bold mb-4' }, 'Predefined Analyses'),
-            m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
-                PredefinedAnalyses.map(analysis => 
-                    m('div', { class: 'card bg-base-100 shadow-lg hover:shadow-xl transition-shadow' }, [
-                        m('div', { class: 'card-body p-4' }, [
-                            m('h3', { class: 'card-title text-base' }, analysis.name),
-                            m('p', { class: 'text-sm opacity-70' }, analysis.description),
-                            m('div', { class: 'flex gap-2 mt-2' }, [
-                                m('span', { class: 'badge badge-outline badge-sm' }, analysis.chartType),
-                                m('span', { class: 'badge badge-secondary badge-sm' }, analysis.category)
-                            ]),
-                            m('div', { class: 'card-actions justify-end mt-4' }, [
-                                m('button', {
-                                    class: 'btn btn-sm btn-primary',
-                                    onclick: () => {
-                                        CustomAnalysisState.currentQuery = { ...analysis };
-                                        CustomAnalysisState.executeQuery(analysis.sql);
-                                        // Scroll to results
-                                        setTimeout(() => {
-                                            document.getElementById('query-builder')?.scrollIntoView({ behavior: 'smooth' });
-                                        }, 100);
-                                    }
-                                }, 'Run Analysis')
-                            ])
+            m('div', { class: 'overflow-x-auto' }, [
+                m('table', { class: 'table table-sm' }, [
+                    m('thead', [
+                        m('tr', [
+                            m('th', 'Name'),
+                            m('th', 'Description'),
+                            m('th', 'Chart Type'),
+                            m('th', 'Category'),
+                            m('th', 'Actions')
                         ])
-                    ])
-                )
-            )
+                    ]),
+                    m('tbody',
+                        PredefinedAnalyses.map(analysis => 
+                            m('tr', { class: 'hover' }, [
+                                m('td', { class: 'font-medium' }, analysis.name),
+                                m('td', { class: 'text-sm' }, analysis.description),
+                                m('td', m('span', { class: 'badge badge-outline badge-sm' }, analysis.chartType)),
+                                m('td', m('span', { class: 'badge badge-secondary badge-sm' }, analysis.category)),
+                                m('td', [
+                                    m('button', {
+                                        class: 'btn btn-xs btn-primary',
+                                        onclick: () => {
+                                            CustomAnalysisState.currentQuery = { ...analysis };
+                                            CustomAnalysisState.executeQuery(analysis.sql);
+                                            // Scroll to results
+                                            setTimeout(() => {
+                                                document.getElementById('query-builder')?.scrollIntoView({ behavior: 'smooth' });
+                                            }, 100);
+                                        }
+                                    }, 'Run')
+                                ])
+                            ])
+                        )
+                    )
+                ])
+            ])
         ]),
         
         // Custom Query Builder
@@ -3946,7 +3955,7 @@ LIMIT 20`),
             m('div', { class: 'card-body' }, [
                 m('h2', { class: 'card-title' }, 'Saved Queries'),
                 m('div', { class: 'overflow-x-auto' }, [
-                    m('table', { class: 'table' }, [
+                    m('table', { class: 'table table-sm' }, [
                         m('thead', [
                             m('tr', [
                                 m('th', 'Name'),
@@ -3957,14 +3966,14 @@ LIMIT 20`),
                         ]),
                         m('tbody',
                             CustomAnalysisState.savedQueries.map(query => 
-                                m('tr', [
+                                m('tr', { class: 'hover' }, [
                                     m('td', { class: 'font-medium' }, query.name),
-                                    m('td', query.description),
-                                    m('td', m('span', { class: 'badge badge-outline' }, query.chartType)),
+                                    m('td', { class: 'text-sm' }, query.description),
+                                    m('td', m('span', { class: 'badge badge-outline badge-sm' }, query.chartType)),
                                     m('td', [
                                         m('div', { class: 'flex gap-2' }, [
                                             m('button', {
-                                                class: 'btn btn-sm btn-ghost',
+                                                class: 'btn btn-xs btn-ghost',
                                                 onclick: () => {
                                                     CustomAnalysisState.currentQuery = { ...query };
                                                     CustomAnalysisState.executeQuery(query.sql);
@@ -3972,7 +3981,7 @@ LIMIT 20`),
                                                 }
                                             }, 'Load'),
                                             m('button', {
-                                                class: 'btn btn-sm btn-ghost text-error',
+                                                class: 'btn btn-xs btn-ghost text-error',
                                                 onclick: () => {
                                                     if (confirm(`Delete query "${query.name}"?`)) {
                                                         CustomAnalysisState.deleteQuery(query.id);
