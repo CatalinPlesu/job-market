@@ -803,25 +803,48 @@ def structure_data_with_llm():
     print("SYNCING JOB_CHECKS FROM SCRAPE.DB TO DATA.DB")
     print("="*80)
     
+    from src.scrape_database import JobCheck as ScrapeJobCheck
+    from sqlalchemy import func, and_
+    from sqlalchemy.orm import aliased
+    
     # Get all job URLs from data.db and check if they're alive in scrape.db
     with ScrapeSession() as scrape_session, DataSession() as data_session:
         # Get all job URLs from data.db
         job_urls = [url[0] for url in data_session.query(JobDetail.job_url).all()]
         
-        # For each job URL, check if it's still alive in scrape.db
-        alive_job_urls = []
-        for job_url in job_urls:
-            scrape_job = scrape_session.query(ScrapeJob).filter(ScrapeJob.job_url == job_url).first()
-            if scrape_job:
-                # Get the last check with HTTP status
-                from src.scrape_database import JobCheck as ScrapeJobCheck
-                last_check = scrape_session.query(ScrapeJobCheck).filter(
-                    ScrapeJobCheck.job_id == scrape_job.id,
-                    ScrapeJobCheck.http_status.isnot(None)
-                ).order_by(ScrapeJobCheck.check_date.desc()).first()
-                
-                # If no check exists or last check was 200, consider it alive
-                if not last_check or last_check.http_status == 200:
+        if not job_urls:
+            print("No jobs found in data.db.")
+        else:
+            # Fetch all scrape jobs with their last check status in one query
+            # Subquery to get the latest check date for each job
+            latest_check_subq = scrape_session.query(
+                ScrapeJobCheck.job_id,
+                func.max(ScrapeJobCheck.check_date).label('last_check_date')
+            ).filter(
+                ScrapeJobCheck.http_status.isnot(None)
+            ).group_by(ScrapeJobCheck.job_id).subquery()
+            
+            # Query to get jobs with their last check status
+            jobs_with_status = scrape_session.query(
+                ScrapeJob.job_url,
+                ScrapeJobCheck.http_status
+            ).outerjoin(
+                latest_check_subq,
+                ScrapeJob.id == latest_check_subq.c.job_id
+            ).outerjoin(
+                ScrapeJobCheck,
+                and_(
+                    ScrapeJobCheck.job_id == ScrapeJob.id,
+                    ScrapeJobCheck.check_date == latest_check_subq.c.last_check_date
+                )
+            ).filter(
+                ScrapeJob.job_url.in_(job_urls)
+            ).all()
+            
+            # Filter to only alive jobs (no check or last check was 200)
+            alive_job_urls = []
+            for job_url, last_status in jobs_with_status:
+                if last_status is None or last_status == 200:
                     alive_job_urls.append(job_url)
     
     total_urls = len(alive_job_urls)
