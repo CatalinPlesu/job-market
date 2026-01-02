@@ -3506,10 +3506,232 @@ const AnalysisPage = {
             ])
         ]),
         
-        // Database Help Section
-        m('details', { class: 'collapse collapse-arrow bg-base-200 mb-6' }, [
-            m('summary', { class: 'collapse-title font-bold text-lg' }, '📖 Database Structure & Query Help'),
-            m('div', { class: 'collapse-content' }, [
+        // Main Layout: Sidebar + Content
+        m('div', { class: 'flex flex-col lg:flex-row gap-6' }, [
+            // Left Sidebar - Predefined & Saved Analyses
+            m('div', { class: 'lg:w-80 flex-shrink-0' }, [
+                // Predefined Analyses
+                m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
+                    m('div', { class: 'card-body p-4' }, [
+                        m('h2', { class: 'card-title text-lg mb-2' }, 'Predefined Analyses'),
+                        m('div', { class: 'overflow-y-auto max-h-96' }, [
+                            m('div', { class: 'space-y-1' },
+                                PredefinedAnalyses.map(analysis => 
+                                    m('div', { 
+                                        class: 'p-2 hover:bg-base-200 rounded cursor-pointer',
+                                        onclick: () => {
+                                            CustomAnalysisState.currentQuery = { ...analysis };
+                                            CustomAnalysisState.executeQuery(analysis.sql);
+                                        }
+                                    }, [
+                                        m('div', { class: 'font-medium text-sm' }, analysis.name),
+                                        m('div', { class: 'flex gap-1 mt-1' }, [
+                                            m('span', { class: 'badge badge-outline badge-xs' }, analysis.chartType),
+                                            m('span', { class: 'badge badge-secondary badge-xs' }, analysis.category)
+                                        ])
+                                    ])
+                                )
+                            )
+                        ])
+                    ])
+                ]),
+                
+                // Saved Queries
+                CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                    m('div', { class: 'card-body p-4' }, [
+                        m('h2', { class: 'card-title text-lg mb-2' }, 'Saved Queries'),
+                        m('div', { class: 'overflow-y-auto max-h-96' }, [
+                            m('div', { class: 'space-y-1' },
+                                CustomAnalysisState.savedQueries.map(query => 
+                                    m('div', { 
+                                        class: 'p-2 hover:bg-base-200 rounded'
+                                    }, [
+                                        m('div', { class: 'font-medium text-sm' }, query.name),
+                                        m('div', { class: 'text-xs opacity-70 mt-1' }, query.description),
+                                        m('div', { class: 'flex gap-1 mt-2' }, [
+                                            m('button', {
+                                                class: 'btn btn-xs btn-ghost',
+                                                onclick: () => {
+                                                    CustomAnalysisState.currentQuery = { ...query };
+                                                    CustomAnalysisState.executeQuery(query.sql);
+                                                }
+                                            }, 'Load'),
+                                            m('button', {
+                                                class: 'btn btn-xs btn-ghost text-error',
+                                                onclick: () => {
+                                                    if (confirm(`Delete query "${query.name}"?`)) {
+                                                        CustomAnalysisState.deleteQuery(query.id);
+                                                        m.redraw();
+                                                    }
+                                                }
+                                            }, 'Delete')
+                                        ])
+                                    ])
+                                )
+                            )
+                        ])
+                    ])
+                ])
+            ]),
+            
+            // Main Content Area
+            m('div', { class: 'flex-1' }, [
+                // Query Results (Plot First!)
+                CustomAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
+                    m('div', { class: 'card-body' }, [
+                        m('h2', { class: 'card-title' }, 'Results'),
+                        
+                        CustomAnalysisState.queryResult.success ? [
+                            // Success message
+                            m('div', { class: 'alert alert-success mb-4' }, [
+                                m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
+                                    m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' })
+                                ]),
+                                m('span', CustomAnalysisState.queryResult.savedMessage || 
+                                    `Query executed successfully. ${CustomAnalysisState.queryResult.rowCount} rows returned.`)
+                            ]),
+                            
+                            // Chart visualization (MOVED TO TOP)
+                            CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('div', { class: 'mb-6' }, [
+                                m('h3', { class: 'text-lg font-bold mb-2' }, 'Visualization'),
+                                m('div', { class: 'chart-container' }, [
+                                    m('canvas', {
+                                        oncreate: (vnode) => {
+                                            AnalysisPage.renderChart(
+                                                vnode, 
+                                                CustomAnalysisState.queryResult.data, 
+                                                CustomAnalysisState.currentQuery.chartType,
+                                                CustomAnalysisState.currentQuery.chartConfig,
+                                                CustomAnalysisState.currentQuery.labelColumn,
+                                                CustomAnalysisState.currentQuery.valueColumns
+                                            );
+                                        },
+                                        onupdate: (vnode) => {
+                                            AnalysisPage.renderChart(
+                                                vnode, 
+                                                CustomAnalysisState.queryResult.data, 
+                                                CustomAnalysisState.currentQuery.chartType,
+                                                CustomAnalysisState.currentQuery.chartConfig,
+                                                CustomAnalysisState.currentQuery.labelColumn,
+                                                CustomAnalysisState.currentQuery.valueColumns
+                                            );
+                                        }
+                                    })
+                                ])
+                            ]),
+                            
+                            // Statistical Analysis
+                            CustomAnalysisState.queryResult.statistics && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4', open: true }, [
+                                m('summary', { class: 'collapse-title font-medium' }, '📊 Statistical Analysis'),
+                                m('div', { class: 'collapse-content' }, [
+                                    Object.entries(CustomAnalysisState.queryResult.statistics).map(([column, stats]) => 
+                                        m('div', { class: 'mb-4' }, [
+                                            m('h4', { class: 'font-bold text-sm mb-2' }, `Column: ${column}`),
+                                            m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2' }, [
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, 'Count'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.count)
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, 'Mean'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.mean.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, 'Median'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.median.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, 'Mode'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.mode.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, 'Std Dev'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.stdDev.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, 'Min - Max'),
+                                                    m('div', { class: 'stat-value text-sm' }, `${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}`)
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, '25th %ile'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.p25.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, '75th %ile'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.p75.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, '90th %ile'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.p90.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, '95th %ile'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.p95.toFixed(2))
+                                                ]),
+                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                                    m('div', { class: 'stat-title text-xs' }, '99th %ile'),
+                                                    m('div', { class: 'stat-value text-sm' }, stats.p99.toFixed(2))
+                                                ])
+                                            ])
+                                        ])
+                                    )
+                                ])
+                            ]),
+                            
+                            // Query SQL Display
+                            CustomAnalysisState.currentQuery.sql && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4' }, [
+                                m('summary', { class: 'collapse-title font-medium' }, '📝 SQL Query'),
+                                m('div', { class: 'collapse-content' }, [
+                                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, CustomAnalysisState.currentQuery.sql)
+                                ])
+                            ]),
+                            
+                            // Data table
+                            CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
+                                m('summary', { class: 'collapse-title font-medium' }, 'View Data Table'),
+                                m('div', { class: 'collapse-content' }, [
+                                    m('div', { class: 'overflow-x-auto' }, [
+                                        m('table', { class: 'table table-zebra table-sm' }, [
+                                            m('thead', [
+                                                m('tr', 
+                                                    Object.keys(CustomAnalysisState.queryResult.data[0] || {}).map(key => 
+                                                        m('th', key)
+                                                    )
+                                                )
+                                            ]),
+                                            m('tbody',
+                                                CustomAnalysisState.queryResult.data.slice(0, 100).map(row => 
+                                                    m('tr',
+                                                        Object.values(row).map(val => 
+                                                            m('td', val)
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        ])
+                                    ]),
+                                    CustomAnalysisState.queryResult.data.length > 100 && 
+                                        m('div', { class: 'text-sm opacity-70 mt-2' }, 
+                                            `Showing first 100 rows of ${CustomAnalysisState.queryResult.data.length}`
+                                        )
+                                ])
+                            ])
+                        ] : [
+                            // Error message
+                            m('div', { class: 'alert alert-error' }, [
+                                m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
+                                    m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z' })
+                                ]),
+                                m('span', CustomAnalysisState.queryResult.error)
+                            ])
+                        ]
+                    ])
+                ]),
+                
+                // Database Help Section (Collapsible)
+                m('details', { class: 'collapse collapse-arrow bg-base-200 mb-6' }, [
+                    m('summary', { class: 'collapse-title font-bold text-lg' }, '📖 Database Structure & Query Help'),
+                    m('div', { class: 'collapse-content' }, [
                 m('div', { class: 'prose max-w-none' }, [
                     m('h3', 'Main Tables'),
                     m('ul', [
@@ -3574,50 +3796,9 @@ LIMIT 20`),
                 ])
             ])
         ]),
-        
-        // Predefined Analyses
-        m('div', { class: 'mb-8' }, [
-            m('h2', { class: 'text-2xl font-bold mb-4' }, 'Predefined Analyses'),
-            m('div', { class: 'overflow-x-auto' }, [
-                m('table', { class: 'table table-sm' }, [
-                    m('thead', [
-                        m('tr', [
-                            m('th', 'Name'),
-                            m('th', 'Description'),
-                            m('th', 'Chart Type'),
-                            m('th', 'Category'),
-                            m('th', 'Actions')
-                        ])
-                    ]),
-                    m('tbody',
-                        PredefinedAnalyses.map(analysis => 
-                            m('tr', { class: 'hover' }, [
-                                m('td', { class: 'font-medium' }, analysis.name),
-                                m('td', { class: 'text-sm' }, analysis.description),
-                                m('td', m('span', { class: 'badge badge-outline badge-sm' }, analysis.chartType)),
-                                m('td', m('span', { class: 'badge badge-secondary badge-sm' }, analysis.category)),
-                                m('td', [
-                                    m('button', {
-                                        class: 'btn btn-xs btn-primary',
-                                        onclick: () => {
-                                            CustomAnalysisState.currentQuery = { ...analysis };
-                                            CustomAnalysisState.executeQuery(analysis.sql);
-                                            // Scroll to results
-                                            setTimeout(() => {
-                                                document.getElementById('query-builder')?.scrollIntoView({ behavior: 'smooth' });
-                                            }, 100);
-                                        }
-                                    }, 'Run')
-                                ])
-                            ])
-                        )
-                    )
-                ])
-            ])
-        ]),
-        
-        // Custom Query Builder
-        m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
+                
+                // Custom Query Builder
+                m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
             m('div', { class: 'card-body' }, [
                 m('div', { class: 'flex justify-between items-center mb-4' }, [
                     m('h2', { class: 'card-title' }, 'Custom Query Builder'),
@@ -3845,198 +4026,7 @@ LIMIT 20`),
                     }, 'Save Query')
                 ])
             ])
-        ]),
-        
-        // Query Results
-        CustomAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
-            m('div', { class: 'card-body' }, [
-                m('h2', { class: 'card-title' }, 'Results'),
-                
-                CustomAnalysisState.queryResult.success ? [
-                    // Success message
-                    m('div', { class: 'alert alert-success mb-4' }, [
-                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
-                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' })
-                        ]),
-                        m('span', CustomAnalysisState.queryResult.savedMessage || 
-                            `Query executed successfully. ${CustomAnalysisState.queryResult.rowCount} rows returned.`)
-                    ]),
-                    
-                    // Chart visualization
-                    CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('div', { class: 'mb-6' }, [
-                        m('h3', { class: 'text-lg font-bold mb-2' }, 'Visualization'),
-                        m('div', { class: 'chart-container' }, [
-                            m('canvas', {
-                                oncreate: (vnode) => {
-                                    AnalysisPage.renderChart(
-                                        vnode, 
-                                        CustomAnalysisState.queryResult.data, 
-                                        CustomAnalysisState.currentQuery.chartType,
-                                        CustomAnalysisState.currentQuery.chartConfig,
-                                        CustomAnalysisState.currentQuery.labelColumn,
-                                        CustomAnalysisState.currentQuery.valueColumns
-                                    );
-                                },
-                                onupdate: (vnode) => {
-                                    AnalysisPage.renderChart(
-                                        vnode, 
-                                        CustomAnalysisState.queryResult.data, 
-                                        CustomAnalysisState.currentQuery.chartType,
-                                        CustomAnalysisState.currentQuery.chartConfig,
-                                        CustomAnalysisState.currentQuery.labelColumn,
-                                        CustomAnalysisState.currentQuery.valueColumns
-                                    );
-                                }
-                            })
-                        ])
-                    ]),
-                    
-                    // Statistical Analysis
-                    CustomAnalysisState.queryResult.statistics && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4', open: true }, [
-                        m('summary', { class: 'collapse-title font-medium' }, '📊 Statistical Analysis'),
-                        m('div', { class: 'collapse-content' }, [
-                            Object.entries(CustomAnalysisState.queryResult.statistics).map(([column, stats]) => 
-                                m('div', { class: 'mb-4' }, [
-                                    m('h4', { class: 'font-bold text-sm mb-2' }, `Column: ${column}`),
-                                    m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2' }, [
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, 'Count'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.count)
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, 'Mean'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.mean.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, 'Median'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.median.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, 'Mode'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.mode.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, 'Std Dev'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.stdDev.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, 'Min - Max'),
-                                            m('div', { class: 'stat-value text-sm' }, `${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}`)
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, '25th %ile'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.p25.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, '75th %ile'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.p75.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, '90th %ile'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.p90.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, '95th %ile'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.p95.toFixed(2))
-                                        ]),
-                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                            m('div', { class: 'stat-title text-xs' }, '99th %ile'),
-                                            m('div', { class: 'stat-value text-sm' }, stats.p99.toFixed(2))
-                                        ])
-                                    ])
-                                ])
-                            )
-                        ])
-                    ]),
-                    
-                    // Data table
-                    CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
-                        m('summary', { class: 'collapse-title font-medium' }, 'View Data Table'),
-                        m('div', { class: 'collapse-content' }, [
-                            m('div', { class: 'overflow-x-auto' }, [
-                                m('table', { class: 'table table-zebra table-sm' }, [
-                                    m('thead', [
-                                        m('tr', 
-                                            Object.keys(CustomAnalysisState.queryResult.data[0] || {}).map(key => 
-                                                m('th', key)
-                                            )
-                                        )
-                                    ]),
-                                    m('tbody',
-                                        CustomAnalysisState.queryResult.data.slice(0, 100).map(row => 
-                                            m('tr',
-                                                Object.values(row).map(val => 
-                                                    m('td', val)
-                                                )
-                                            )
-                                        )
-                                    )
-                                ])
-                            ]),
-                            CustomAnalysisState.queryResult.data.length > 100 && 
-                                m('div', { class: 'text-sm opacity-70 mt-2' }, 
-                                    `Showing first 100 rows of ${CustomAnalysisState.queryResult.data.length}`
-                                )
-                        ])
-                    ])
-                ] : [
-                    // Error message
-                    m('div', { class: 'alert alert-error' }, [
-                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
-                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z' })
-                        ]),
-                        m('span', CustomAnalysisState.queryResult.error)
-                    ])
-                ]
-            ])
-        ]),
-        
-        // Saved Queries
-        CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h2', { class: 'card-title' }, 'Saved Queries'),
-                m('div', { class: 'overflow-x-auto' }, [
-                    m('table', { class: 'table table-sm' }, [
-                        m('thead', [
-                            m('tr', [
-                                m('th', 'Name'),
-                                m('th', 'Description'),
-                                m('th', 'Chart Type'),
-                                m('th', 'Actions')
-                            ])
-                        ]),
-                        m('tbody',
-                            CustomAnalysisState.savedQueries.map(query => 
-                                m('tr', { class: 'hover' }, [
-                                    m('td', { class: 'font-medium' }, query.name),
-                                    m('td', { class: 'text-sm' }, query.description),
-                                    m('td', m('span', { class: 'badge badge-outline badge-sm' }, query.chartType)),
-                                    m('td', [
-                                        m('div', { class: 'flex gap-2' }, [
-                                            m('button', {
-                                                class: 'btn btn-xs btn-ghost',
-                                                onclick: () => {
-                                                    CustomAnalysisState.currentQuery = { ...query };
-                                                    CustomAnalysisState.executeQuery(query.sql);
-                                                    document.getElementById('query-builder')?.scrollIntoView({ behavior: 'smooth' });
-                                                }
-                                            }, 'Load'),
-                                            m('button', {
-                                                class: 'btn btn-xs btn-ghost text-error',
-                                                onclick: () => {
-                                                    if (confirm(`Delete query "${query.name}"?`)) {
-                                                        CustomAnalysisState.deleteQuery(query.id);
-                                                        m.redraw();
-                                                    }
-                                                }
-                                            }, 'Delete')
-                                        ])
-                                    ])
-                                ])
-                            )
-                        )
-                    ])
-                ])
+        ])
             ])
         ])
     ])
