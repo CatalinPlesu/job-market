@@ -245,7 +245,8 @@ Begin JSON object:"""
             site=job.site,
             job_title=job.job_title,
             company_name=job.company_name,
-            job_description=job.job_description
+            job_description=job.job_description,
+            llm_model=Config.llm_model
         )
         
         # Handle foreign keys
