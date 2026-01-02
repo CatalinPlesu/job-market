@@ -1515,14 +1515,22 @@ const FilterPanel = {
                 m('h3', { class: 'font-bold text-lg' }, 'Filters'),
                 m('button', { 
                     class: 'btn btn-xs btn-ghost',
-                    onclick: () => {
+                    onclick: async () => {
                         // Clear all filters - both numeric and categorical
                         Object.keys(state.filters).forEach(key => {
                             state.filters[key] = null;
                         });
                         state.search = '';
                         JobsPage.displayPage = 1;
+                        
+                        // Clear filter counts cache
+                        FilterPanel.filterCounts = {};
+                        
+                        // Update URL
                         URLState.update();
+                        
+                        // Reload jobs with no filters
+                        await JobsPage.loadJobs();
                         m.redraw();
                     }
                 }, 'Clear All')
