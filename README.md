@@ -8,7 +8,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - 🤖 **LLM Processing**: Structured data extraction from raw job postings
 - 📊 **Analytics**: Market insights and salary analysis
 - 🌐 **Web Interface**: Interactive SPA for browsing jobs and analytics
-- 💾 **Data Export**: JSON API generation for static hosting
+- 💾 **Database Copy**: Copy SQLite databases to frontend/api directory
 - 🔄 **Automation**: Scheduled scraping with intelligent optimization
 
 ## Quick Links
@@ -105,11 +105,18 @@ Process raw job descriptions with LLM:
 - Parse structured JSON response
 - Store normalized data in `data.db` with proper relationships
 
-### 8. Process Data
-Additional data processing and normalization tasks (placeholder - not yet implemented)
+### 8. Process Data (Generate Analysis)
+Generate statistical analyses from job market data:
+- Configure analysis parameters (output directory, time granularity, sample sizes)
+- Generate temporal and static analysis reports
+- Creates JSON files for frontend consumption in the analysis directory
 
-### 9. Generate HTML Page
-Create static HTML report with job listings and statistics (placeholder - not yet implemented)
+### 9. Copy Database Files to Frontend API
+Copy both SQLite database files to frontend/api directory:
+- Automatically copies scrape.db and data.db to frontend/api
+- Creates frontend/api directory if it doesn't exist
+- Useful for making databases accessible to the frontend
+- Shows file sizes during copy operation
 
 ### 10. Database Rollback
 Restore databases from previous backups:
@@ -133,7 +140,7 @@ Restore databases from previous backups:
 - **UI:** DaisyUI + Tailwind CSS (via CDN)
 - **Charts:** Chart.js (via CDN)
 - **Routing:** Client-side hash routing
-- **Architecture:** Static SPA with JSON API
+- **Architecture:** Static SPA with SQLite database access
 
 ## Current Features
 
@@ -149,12 +156,10 @@ Restore databases from previous backups:
 - **Database backups**: Automatic backups with retention policy
 - **Comprehensive data model**: 50+ normalized tables with proper relationships
 - **Scraping reports**: Daily JSON/text reports with per-site and aggregated statistics
-- **JSON API Generation**: Export paginated job data as JSON for static hosting (GitHub Pages)
-  - Generates paginated job listings (page-1.json, page-2.json, etc.)
-  - Creates comprehensive index.json with metadata for ALL 50+ filterable fields
-  - Includes per-page item counts for efficient filtering
-  - Sanitizes sensitive data (removes contact information)
-  - Command: `python -m json_generator --output pages/api`
+- **Database Copy**: Copy SQLite database files to frontend/api directory via menu
+  - Automatically copies both scrape.db and data.db to frontend/api
+  - Creates destination directory if needed
+  - Shows file sizes during copy operation
 - **Interactive Web Interface**: Modern SPA for job browsing and analytics
   - Extra slim job listings (Hacker News style)
   - Client-side filtering on multiple fields with hierarchical filtering
@@ -163,7 +168,6 @@ Restore databases from previous backups:
   - Dark/light theme toggle
   - Mobile responsive design
   - See [frontend/README.md](frontend/README.md) for details
-  - See [json_generator/README.md](json_generator/README.md) for details
 
 ## Planned Features
 
