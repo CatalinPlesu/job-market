@@ -105,11 +105,18 @@ Process raw job descriptions with LLM:
 - Parse structured JSON response
 - Store normalized data in `data.db` with proper relationships
 
-### 8. Process Data
-Additional data processing and normalization tasks (placeholder - not yet implemented)
+### 8. Process Data (Generate Analysis)
+Generate statistical analyses from job market data:
+- Configure analysis parameters (output directory, time granularity, sample sizes)
+- Generate temporal and static analysis reports
+- Creates JSON files for frontend consumption in the analysis directory
 
-### 9. Generate HTML Page
-Create static HTML report with job listings and statistics (placeholder - not yet implemented)
+### 9. Copy Database Files
+Copy SQLite database files to a specified location:
+- Select which database to copy (scrape.db, data.db, or both)
+- Specify destination directory
+- Useful for creating backups or sharing data
+- Shows file sizes during copy operation
 
 ### 10. Database Rollback
 Restore databases from previous backups:
@@ -154,7 +161,11 @@ Restore databases from previous backups:
   - Creates comprehensive index.json with metadata for ALL 50+ filterable fields
   - Includes per-page item counts for efficient filtering
   - Sanitizes sensitive data (removes contact information)
-  - Command: `python -m json_generator --output pages/api`
+  - Command-line tool: `python -m json_generator --output pages/api`
+  - See [json_generator/README.md](json_generator/README.md) for details
+- **Database Copy**: Copy SQLite database files to a specified location via menu
+  - Supports copying scrape.db, data.db, or both databases
+  - Shows file sizes and allows custom destination directory
 - **Interactive Web Interface**: Modern SPA for job browsing and analytics
   - Extra slim job listings (Hacker News style)
   - Client-side filtering on multiple fields with hierarchical filtering
