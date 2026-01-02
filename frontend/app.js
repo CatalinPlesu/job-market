@@ -2798,11 +2798,14 @@ const CustomAnalysisState = {
         name: '',
         description: '',
         sql: '',
-        chartType: 'bar'
+        chartType: 'bar',
+        chartConfig: null,  // Custom chart configuration
+        dataAdapter: null   // JS function to transform data
     },
     queryResult: null,
     chartInstance: null,
     showHelp: false,
+    showStatistics: true,  // Enable statistical computations
     
     // Load saved queries from localStorage
     loadSavedQueries: () => {
@@ -2845,11 +2848,26 @@ const CustomAnalysisState = {
     executeQuery: async (sql) => {
         try {
             await DatabaseManager.init();
-            const results = DatabaseManager.queryObjects(sql);
+            let results = DatabaseManager.queryObjects(sql);
+            
+            // Apply data adapter if provided
+            if (CustomAnalysisState.currentQuery.dataAdapter) {
+                try {
+                    const adapterFn = new Function('data', CustomAnalysisState.currentQuery.dataAdapter);
+                    results = adapterFn(results);
+                } catch (e) {
+                    console.error('Data adapter error:', e);
+                }
+            }
+            
+            // Calculate statistics for numeric columns
+            const statistics = CustomAnalysisState.showStatistics ? CustomAnalysisState.calculateStatistics(results) : null;
+            
             CustomAnalysisState.queryResult = {
                 success: true,
                 data: results,
-                rowCount: results.length
+                rowCount: results.length,
+                statistics: statistics
             };
         } catch (error) {
             CustomAnalysisState.queryResult = {
@@ -2858,6 +2876,74 @@ const CustomAnalysisState = {
             };
         }
         m.redraw();
+    },
+    
+    // Calculate statistics for numeric columns
+    calculateStatistics: (data) => {
+        if (!data || data.length === 0) return null;
+        
+        const stats = {};
+        const firstRow = data[0];
+        
+        // Find numeric columns
+        Object.keys(firstRow).forEach(key => {
+            const values = data.map(row => row[key]).filter(v => typeof v === 'number' && !isNaN(v));
+            
+            if (values.length > 0) {
+                const sorted = [...values].sort((a, b) => a - b);
+                const sum = values.reduce((a, b) => a + b, 0);
+                const mean = sum / values.length;
+                
+                // Median
+                const mid = Math.floor(sorted.length / 2);
+                const median = sorted.length % 2 === 0 
+                    ? (sorted[mid - 1] + sorted[mid]) / 2 
+                    : sorted[mid];
+                
+                // Mode (most frequent value)
+                const frequency = {};
+                let maxFreq = 0;
+                let mode = null;
+                values.forEach(v => {
+                    frequency[v] = (frequency[v] || 0) + 1;
+                    if (frequency[v] > maxFreq) {
+                        maxFreq = frequency[v];
+                        mode = v;
+                    }
+                });
+                
+                // Standard deviation
+                const variance = values.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / values.length;
+                const stdDev = Math.sqrt(variance);
+                
+                // Percentiles
+                const percentile = (p) => {
+                    const index = (p / 100) * (sorted.length - 1);
+                    const lower = Math.floor(index);
+                    const upper = Math.ceil(index);
+                    const weight = index - lower;
+                    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+                };
+                
+                stats[key] = {
+                    count: values.length,
+                    min: sorted[0],
+                    max: sorted[sorted.length - 1],
+                    mean: mean,
+                    median: median,
+                    mode: mode,
+                    stdDev: stdDev,
+                    p25: percentile(25),
+                    p50: median,
+                    p75: percentile(75),
+                    p90: percentile(90),
+                    p95: percentile(95),
+                    p99: percentile(99)
+                };
+            }
+        });
+        
+        return Object.keys(stats).length > 0 ? stats : null;
     }
 };
 
@@ -3126,6 +3212,67 @@ LIMIT 15`,
     }
 ];
 
+// AI Prompt Template for Query Writing
+const AI_PROMPT_TEMPLATE = `I need help writing an SQL query for job market analysis.
+
+DATABASE STRUCTURE:
+- Main table: job_details (id, posting_date, job_title, company_name, min_salary, max_salary, experience_years, etc.)
+- Lookup tables: titles, companies, cities, regions, countries, job_functions, seniority_levels, industries, departments, employment_types, contract_types, work_schedules, remote_work_options, company_sizes, education_levels
+- Many-to-many: hard_skills, soft_skills, benefits, certifications (via junction tables like job_details_hard_skills)
+
+QUERY REQUIREMENTS:
+[Describe what you want to analyze]
+
+EXAMPLE PATTERNS:
+1. Top items with counts:
+   SELECT hs.name, COUNT(DISTINCT jd.id) as count
+   FROM hard_skills hs
+   JOIN job_details_hard_skills jhs ON hs.id = jhs.hard_skills_id
+   JOIN job_details jd ON jhs.job_details_id = jd.id
+   GROUP BY hs.name ORDER BY count DESC LIMIT 20
+
+2. Salary statistics:
+   SELECT sl.name, AVG(jd.min_salary) as avg_min, AVG(jd.max_salary) as avg_max
+   FROM job_details jd
+   JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+   WHERE jd.min_salary IS NOT NULL
+   GROUP BY sl.name
+
+3. Time series:
+   SELECT DATE(posting_date) as date, COUNT(*) as count
+   FROM job_details
+   WHERE posting_date >= date('now', '-90 days')
+   GROUP BY DATE(posting_date)
+
+VISUALIZATION SETUP:
+- Chart Type: [bar/line/doughnut/pie/scatter/bubble/radar/polarArea]
+- Data Adapter (optional JS function to transform results):
+  return data.map(row => ({ label: row.name, value: row.count }));
+
+- Custom Chart Config (optional JSON for full Chart.js control):
+  {
+    "type": "bar",
+    "data": {
+      "labels": ["labels from query"],
+      "datasets": [{
+        "label": "Dataset Label",
+        "data": [values],
+        "backgroundColor": "rgba(99, 102, 241, 0.7)"
+      }]
+    },
+    "options": {
+      "scales": {
+        "y": { "beginAtZero": true }
+      }
+    }
+  }
+
+Please provide:
+1. SQL query
+2. Recommended chart type
+3. Optional data adapter function
+4. Optional custom chart config`;
+
 // Analysis Page - Custom Query Builder
 const AnalysisPage = {
     oninit: () => {
@@ -3138,7 +3285,7 @@ const AnalysisPage = {
         });
     },
     
-    renderChart: (vnode, data, chartType) => {
+    renderChart: (vnode, data, chartType, customConfig = null) => {
         if (!data || data.length === 0) return null;
         
         const canvas = vnode.dom;
@@ -3149,51 +3296,66 @@ const AnalysisPage = {
             CustomAnalysisState.chartInstance.destroy();
         }
         
-        // Prepare data for chart
-        const labels = data.map((row, idx) => {
-            // Try to find a label column (first non-numeric column)
-            const keys = Object.keys(row);
-            const labelKey = keys.find(k => typeof row[k] === 'string') || keys[0];
-            return row[labelKey];
-        });
-        
-        const values = data.map((row, idx) => {
-            // Try to find a numeric column for values
-            const keys = Object.keys(row);
-            const valueKey = keys.find(k => typeof row[k] === 'number' && k !== 'id') || keys[1];
-            return row[valueKey] || 0;
-        });
-        
-        let config = {
-            type: chartType,
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Count',
-                    data: values,
-                    backgroundColor: chartType === 'line' ? 'rgba(99, 102, 241, 0.2)' : 
-                                     ChartHelpers.generateColors(values.length),
-                    borderColor: 'rgba(99, 102, 241, 1)',
-                    borderWidth: 2,
-                    fill: chartType === 'line',
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: chartType === 'doughnut' || chartType === 'pie'
-                    }
-                },
-                scales: chartType !== 'doughnut' && chartType !== 'pie' ? {
-                    y: {
-                        beginAtZero: true
-                    }
-                } : undefined
+        // Use custom config if provided, otherwise auto-generate
+        let config;
+        if (customConfig) {
+            try {
+                config = typeof customConfig === 'string' 
+                    ? JSON.parse(customConfig) 
+                    : customConfig;
+            } catch (e) {
+                console.error('Invalid chart config:', e);
+                config = null;
             }
-        };
+        }
+        
+        if (!config) {
+            // Auto-generate config from data
+            const labels = data.map((row, idx) => {
+                // Try to find a label column (first non-numeric column)
+                const keys = Object.keys(row);
+                const labelKey = keys.find(k => typeof row[k] === 'string') || keys[0];
+                return row[labelKey];
+            });
+            
+            const values = data.map((row, idx) => {
+                // Try to find a numeric column for values
+                const keys = Object.keys(row);
+                const valueKey = keys.find(k => typeof row[k] === 'number' && k !== 'id') || keys[1];
+                return row[valueKey] || 0;
+            });
+            
+            config = {
+                type: chartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Count',
+                        data: values,
+                        backgroundColor: chartType === 'line' || chartType === 'radar' ? 'rgba(99, 102, 241, 0.2)' : 
+                                         ChartHelpers.generateColors(values.length),
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 2,
+                        fill: chartType === 'line' || chartType === 'radar',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: ['doughnut', 'pie', 'polarArea'].includes(chartType)
+                        }
+                    },
+                    scales: !['doughnut', 'pie', 'polarArea', 'radar'].includes(chartType) ? {
+                        y: {
+                            beginAtZero: true
+                        }
+                    } : undefined
+                }
+            };
+        }
         
         CustomAnalysisState.chartInstance = new Chart(canvas, config);
     },
@@ -3315,7 +3477,20 @@ LIMIT 20`),
         // Custom Query Builder
         m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
             m('div', { class: 'card-body' }, [
-                m('h2', { class: 'card-title' }, 'Custom Query Builder'),
+                m('div', { class: 'flex justify-between items-center mb-4' }, [
+                    m('h2', { class: 'card-title' }, 'Custom Query Builder'),
+                    m('button', {
+                        class: 'btn btn-sm btn-outline',
+                        onclick: () => {
+                            navigator.clipboard.writeText(AI_PROMPT_TEMPLATE);
+                            // Show temporary success message
+                            const btn = event.target;
+                            const originalText = btn.textContent;
+                            btn.textContent = '✓ Copied!';
+                            setTimeout(() => { btn.textContent = originalText; }, 2000);
+                        }
+                    }, '📋 Copy AI Prompt')
+                ]),
                 
                 // Query Name
                 m('div', { class: 'form-control' }, [
@@ -3371,12 +3546,78 @@ LIMIT 20`),
                         m('option', { value: 'bar' }, 'Bar Chart'),
                         m('option', { value: 'line' }, 'Line Chart'),
                         m('option', { value: 'doughnut' }, 'Doughnut Chart'),
-                        m('option', { value: 'pie' }, 'Pie Chart')
+                        m('option', { value: 'pie' }, 'Pie Chart'),
+                        m('option', { value: 'scatter' }, 'Scatter Plot'),
+                        m('option', { value: 'bubble' }, 'Bubble Chart'),
+                        m('option', { value: 'radar' }, 'Radar Chart'),
+                        m('option', { value: 'polarArea' }, 'Polar Area Chart')
+                    ])
+                ]),
+                
+                // Advanced Configuration (Collapsible)
+                m('details', { class: 'collapse collapse-arrow bg-base-200 mt-4' }, [
+                    m('summary', { class: 'collapse-title font-medium' }, '⚙️ Advanced Configuration'),
+                    m('div', { class: 'collapse-content' }, [
+                        // Data Adapter Function
+                        m('div', { class: 'form-control mt-2' }, [
+                            m('label', { class: 'label' }, [
+                                m('span', { class: 'label-text' }, 'Data Adapter (JS Function)'),
+                                m('span', { class: 'label-text-alt' }, 'Transform data before charting')
+                            ]),
+                            m('textarea', {
+                                class: 'textarea textarea-bordered font-mono text-xs h-20',
+                                placeholder: 'return data.map(row => ({ label: row.name, value: row.count }));',
+                                value: CustomAnalysisState.currentQuery.dataAdapter || '',
+                                oninput: (e) => {
+                                    CustomAnalysisState.currentQuery.dataAdapter = e.target.value;
+                                }
+                            }),
+                            m('div', { class: 'label' }, [
+                                m('span', { class: 'label-text-alt text-xs' }, 'Function receives "data" parameter with query results')
+                            ])
+                        ]),
+                        
+                        // Custom Chart Config
+                        m('div', { class: 'form-control mt-2' }, [
+                            m('label', { class: 'label' }, [
+                                m('span', { class: 'label-text' }, 'Custom Chart Config (JSON)'),
+                                m('span', { class: 'label-text-alt' }, 'Full Chart.js configuration')
+                            ]),
+                            m('textarea', {
+                                class: 'textarea textarea-bordered font-mono text-xs h-24',
+                                placeholder: '{"type": "bar", "data": {...}, "options": {...}}',
+                                value: CustomAnalysisState.currentQuery.chartConfig || '',
+                                oninput: (e) => {
+                                    CustomAnalysisState.currentQuery.chartConfig = e.target.value;
+                                }
+                            }),
+                            m('div', { class: 'label' }, [
+                                m('span', { class: 'label-text-alt text-xs' }, 'Overrides auto-generated config. See Chart.js docs for options.')
+                            ])
+                        ]),
+                        
+                        // Statistics Toggle
+                        m('div', { class: 'form-control mt-2' }, [
+                            m('label', { class: 'label cursor-pointer' }, [
+                                m('span', { class: 'label-text' }, 'Show Statistical Analysis'),
+                                m('input', {
+                                    type: 'checkbox',
+                                    class: 'toggle toggle-primary',
+                                    checked: CustomAnalysisState.showStatistics,
+                                    onchange: (e) => {
+                                        CustomAnalysisState.showStatistics = e.target.checked;
+                                    }
+                                })
+                            ]),
+                            m('div', { class: 'label' }, [
+                                m('span', { class: 'label-text-alt text-xs' }, 'Compute mean, median, mode, std dev, percentiles for numeric columns')
+                            ])
+                        ])
                     ])
                 ]),
                 
                 // Action Buttons
-                m('div', { class: 'card-actions justify-end gap-2' }, [
+                m('div', { class: 'card-actions justify-end gap-2 mt-4' }, [
                     m('button', {
                         class: 'btn btn-primary',
                         onclick: () => {
@@ -3434,12 +3675,80 @@ LIMIT 20`),
                         m('div', { class: 'chart-container' }, [
                             m('canvas', {
                                 oncreate: (vnode) => {
-                                    AnalysisPage.renderChart(vnode, CustomAnalysisState.queryResult.data, CustomAnalysisState.currentQuery.chartType);
+                                    AnalysisPage.renderChart(
+                                        vnode, 
+                                        CustomAnalysisState.queryResult.data, 
+                                        CustomAnalysisState.currentQuery.chartType,
+                                        CustomAnalysisState.currentQuery.chartConfig
+                                    );
                                 },
                                 onupdate: (vnode) => {
-                                    AnalysisPage.renderChart(vnode, CustomAnalysisState.queryResult.data, CustomAnalysisState.currentQuery.chartType);
+                                    AnalysisPage.renderChart(
+                                        vnode, 
+                                        CustomAnalysisState.queryResult.data, 
+                                        CustomAnalysisState.currentQuery.chartType,
+                                        CustomAnalysisState.currentQuery.chartConfig
+                                    );
                                 }
                             })
+                        ])
+                    ]),
+                    
+                    // Statistical Analysis
+                    CustomAnalysisState.queryResult.statistics && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4', open: true }, [
+                        m('summary', { class: 'collapse-title font-medium' }, '📊 Statistical Analysis'),
+                        m('div', { class: 'collapse-content' }, [
+                            Object.entries(CustomAnalysisState.queryResult.statistics).map(([column, stats]) => 
+                                m('div', { class: 'mb-4' }, [
+                                    m('h4', { class: 'font-bold text-sm mb-2' }, `Column: ${column}`),
+                                    m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2' }, [
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, 'Count'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.count)
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, 'Mean'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.mean.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, 'Median'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.median.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, 'Mode'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.mode.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, 'Std Dev'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.stdDev.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, 'Min - Max'),
+                                            m('div', { class: 'stat-value text-sm' }, `${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}`)
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, '25th %ile'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.p25.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, '75th %ile'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.p75.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, '90th %ile'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.p90.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, '95th %ile'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.p95.toFixed(2))
+                                        ]),
+                                        m('div', { class: 'stat bg-base-300 rounded p-2' }, [
+                                            m('div', { class: 'stat-title text-xs' }, '99th %ile'),
+                                            m('div', { class: 'stat-value text-sm' }, stats.p99.toFixed(2))
+                                        ])
+                                    ])
+                                ])
+                            )
                         ])
                     ]),
                     
