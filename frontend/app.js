@@ -1,6 +1,14 @@
 // API Configuration
 const API_BASE = '/api';
 
+// Constants for multi-select fields (many-to-many relationships)
+const MULTI_SELECT_FIELDS = [
+    'hard_skills', 'soft_skills', 'certifications', 'licenses_required',
+    'benefits', 'work_environment', 'professional_development', 
+    'work_life_balance', 'physical_requirements', 'work_conditions', 
+    'special_requirements'
+];
+
 // Database Management
 const DatabaseManager = {
     db: null,
@@ -107,14 +115,6 @@ const URLState = {
             search: params.get('q') || ''
         };
         
-        // List of multi-select fields (many-to-many relationships)
-        const multiSelectFields = [
-            'hard_skills', 'soft_skills', 'certifications', 'licenses_required',
-            'benefits', 'work_environment', 'professional_development', 
-            'work_life_balance', 'physical_requirements', 'work_conditions', 
-            'special_requirements'
-        ];
-        
         // Parse all filter parameters
         for (const [key, value] of params.entries()) {
             if (['page', 'limit', 'sort', 'q'].includes(key)) continue;
@@ -122,7 +122,7 @@ const URLState = {
                 // Convert numeric values for range filters
                 if (['salaryMin', 'salaryMax', 'experienceMin', 'experienceMax'].includes(key)) {
                     state.filters[key] = value === 'null' ? null : parseInt(value);
-                } else if (multiSelectFields.includes(key)) {
+                } else if (MULTI_SELECT_FIELDS.includes(key)) {
                     // Handle multi-select fields - support comma-separated values
                     state.filters[key] = value.split(',').map(v => v.trim()).filter(v => v);
                 } else {
@@ -333,13 +333,13 @@ const dbApi = {
             params.push(filters.country);
         }
         
-        // Many-to-many filters (multi-select with OR logic)
+        // Many-to-many filters (multi-select with AND logic)
         // Helper function to build many-to-many conditions
+        // Jobs must have ALL selected items (not just one)
         const addM2MFilter = (filterKey, tableName, columnName = 'name') => {
             const filterValue = filters[filterKey];
             if (filterValue && filterValue.length > 0) {
-                // For multi-select, we use IN clause
-                // But we need to ensure job has ALL selected items (AND logic across selections)
+                // Ensure job has ALL selected items (AND logic across selections)
                 const placeholders = filterValue.map(() => '?').join(',');
                 conditions.push(`jd.id IN (
                     SELECT jm.job_details_id 
@@ -1932,13 +1932,7 @@ const FilterPanel = {
                             const availableOptions = options.filter(opt => opt.count > 0);
                             
                             // Determine if this is a multi-select field (many-to-many)
-                            const multiSelectFields = [
-                                'hard_skills', 'soft_skills', 'certifications', 'licenses_required',
-                                'benefits', 'work_environment', 'professional_development', 
-                                'work_life_balance', 'physical_requirements', 'work_conditions', 
-                                'special_requirements'
-                            ];
-                            const isMultiSelect = multiSelectFields.includes(field.key);
+                            const isMultiSelect = MULTI_SELECT_FIELDS.includes(field.key);
                             
                             // Initialize filter value as array for multi-select fields
                             if (isMultiSelect && !Array.isArray(state.filters[field.key])) {
@@ -1956,7 +1950,7 @@ const FilterPanel = {
                                     m('select', { 
                                         class: `select select-bordered select-sm w-full ${state.filters[field.key] && state.filters[field.key].length > 0 ? 'select-info' : ''}`,
                                         multiple: true,
-                                        size: Math.min(5, availableOptions.length + 1),
+                                        size: Math.min(5, Math.max(3, availableOptions.length)),
                                         onchange: (e) => {
                                             const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
                                             state.filters[field.key] = selectedOptions.length > 0 ? selectedOptions : [];
