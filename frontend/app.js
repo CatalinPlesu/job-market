@@ -2800,7 +2800,9 @@ const CustomAnalysisState = {
         sql: '',
         chartType: 'bar',
         chartConfig: null,  // Custom chart configuration
-        dataAdapter: null   // JS function to transform data
+        dataAdapter: null,  // JS function to transform data
+        labelColumn: null,  // Column to use for labels (auto-detect if null)
+        valueColumns: []    // Columns to use for values (auto-detect if empty)
     },
     queryResult: null,
     chartInstance: null,
@@ -3244,8 +3246,29 @@ EXAMPLE PATTERNS:
    WHERE posting_date >= date('now', '-90 days')
    GROUP BY DATE(posting_date)
 
+4. Multi-column analysis (for comparing metrics):
+   SELECT i.name as industry, 
+          AVG(jd.min_salary) as avg_min_salary,
+          AVG(jd.max_salary) as avg_max_salary,
+          COUNT(*) as job_count
+   FROM job_details jd
+   JOIN industries i ON jd.industry_id = i.id
+   WHERE jd.min_salary IS NOT NULL
+   GROUP BY i.name
+
 VISUALIZATION SETUP:
-- Chart Type: [bar/line/doughnut/pie/scatter/bubble/radar/polarArea]
+- Chart Types: bar, line, doughnut, pie, scatter, bubble, radar, polarArea, boxplot
+- Box Plot: Use 'boxplot' for pure statistical visualization showing quartiles, median, outliers
+  * Ideal for salary distributions, experience requirements, etc.
+  * Query should return numeric columns to visualize
+
+COLUMN SELECTION:
+- After running query, you can select which columns to plot
+- Label Column: Used for X-axis (auto-detects first string column)
+- Value Column(s): Used for Y-axis (auto-detects numeric columns)
+- Multiple value columns create multi-series charts
+- Box plots automatically use all numeric columns for statistical comparison
+
 - Data Adapter (optional JS function to transform results):
   return data.map(row => ({ label: row.name, value: row.count }));
 
@@ -3268,10 +3291,11 @@ VISUALIZATION SETUP:
   }
 
 Please provide:
-1. SQL query
+1. SQL query (use descriptive column names)
 2. Recommended chart type
-3. Optional data adapter function
-4. Optional custom chart config`;
+3. Optional: which columns to use for labels/values
+4. Optional data adapter function
+5. Optional custom chart config`;
 
 // Analysis Page - Custom Query Builder
 const AnalysisPage = {
@@ -3285,7 +3309,7 @@ const AnalysisPage = {
         });
     },
     
-    renderChart: (vnode, data, chartType, customConfig = null) => {
+    renderChart: (vnode, data, chartType, customConfig = null, labelColumn = null, valueColumns = []) => {
         if (!data || data.length === 0) return null;
         
         const canvas = vnode.dom;
@@ -3310,51 +3334,119 @@ const AnalysisPage = {
         }
         
         if (!config) {
-            // Auto-generate config from data
-            const labels = data.map((row, idx) => {
-                // Try to find a label column (first non-numeric column)
-                const keys = Object.keys(row);
-                const labelKey = keys.find(k => typeof row[k] === 'string') || keys[0];
-                return row[labelKey];
-            });
+            const keys = Object.keys(data[0] || {});
             
-            const values = data.map((row, idx) => {
-                // Try to find a numeric column for values
-                const keys = Object.keys(row);
-                const valueKey = keys.find(k => typeof row[k] === 'number' && k !== 'id') || keys[1];
-                return row[valueKey] || 0;
-            });
+            // Determine label column
+            let labelKey = labelColumn;
+            if (!labelKey) {
+                // Auto-detect: first non-numeric column, or first column
+                labelKey = keys.find(k => typeof data[0][k] === 'string') || keys[0];
+            }
             
-            config = {
-                type: chartType,
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Count',
-                        data: values,
-                        backgroundColor: chartType === 'line' || chartType === 'radar' ? 'rgba(99, 102, 241, 0.2)' : 
-                                         ChartHelpers.generateColors(values.length),
-                        borderColor: 'rgba(99, 102, 241, 1)',
-                        borderWidth: 2,
-                        fill: chartType === 'line' || chartType === 'radar',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: ['doughnut', 'pie', 'polarArea'].includes(chartType)
-                        }
-                    },
-                    scales: !['doughnut', 'pie', 'polarArea', 'radar'].includes(chartType) ? {
-                        y: {
-                            beginAtZero: true
-                        }
-                    } : undefined
+            // Determine value columns
+            let valueKeys = valueColumns.length > 0 ? valueColumns : null;
+            if (!valueKeys) {
+                // Auto-detect: all numeric columns except 'id'
+                valueKeys = keys.filter(k => {
+                    const val = data[0][k];
+                    return typeof val === 'number' && k !== 'id' && k !== labelKey;
+                });
+                // If no numeric columns found, use second column
+                if (valueKeys.length === 0) {
+                    valueKeys = [keys[1] || keys[0]];
                 }
-            };
+            }
+            
+            // Handle box plot (requires special data structure)
+            if (chartType === 'boxplot') {
+                const datasets = valueKeys.map((valueKey, idx) => {
+                    const values = data.map(row => row[valueKey]).filter(v => typeof v === 'number' && !isNaN(v));
+                    const sorted = [...values].sort((a, b) => a - b);
+                    
+                    const q1Index = Math.floor(sorted.length * 0.25);
+                    const q2Index = Math.floor(sorted.length * 0.5);
+                    const q3Index = Math.floor(sorted.length * 0.75);
+                    
+                    const q1 = sorted[q1Index];
+                    const q2 = sorted[q2Index];
+                    const q3 = sorted[q3Index];
+                    const min = sorted[0];
+                    const max = sorted[sorted.length - 1];
+                    
+                    return {
+                        label: valueKey,
+                        data: [{
+                            x: valueKey,
+                            min: min,
+                            q1: q1,
+                            median: q2,
+                            q3: q3,
+                            max: max,
+                            outliers: []
+                        }],
+                        backgroundColor: ChartHelpers.generateColors(valueKeys.length)[idx]
+                    };
+                });
+                
+                config = {
+                    type: 'boxplot',
+                    data: {
+                        labels: valueKeys,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: valueKeys.length > 1
+                            }
+                        }
+                    }
+                };
+            } else {
+                // Standard charts
+                const labels = data.map(row => row[labelKey]);
+                
+                const datasets = valueKeys.map((valueKey, idx) => {
+                    const values = data.map(row => row[valueKey] || 0);
+                    const colors = ChartHelpers.generateColors(valueKeys.length);
+                    
+                    return {
+                        label: valueKey,
+                        data: values,
+                        backgroundColor: ['line', 'radar'].includes(chartType) 
+                            ? colors[idx].replace('0.7', '0.2')
+                            : (valueKeys.length === 1 ? ChartHelpers.generateColors(values.length) : colors[idx]),
+                        borderColor: colors[idx].replace('0.7', '1'),
+                        borderWidth: 2,
+                        fill: ['line', 'radar'].includes(chartType),
+                        tension: 0.4
+                    };
+                });
+                
+                config = {
+                    type: chartType,
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: ['doughnut', 'pie', 'polarArea'].includes(chartType) || valueKeys.length > 1
+                            }
+                        },
+                        scales: !['doughnut', 'pie', 'polarArea', 'radar'].includes(chartType) ? {
+                            y: {
+                                beginAtZero: true
+                            }
+                        } : undefined
+                    }
+                };
+            }
         }
         
         CustomAnalysisState.chartInstance = new Chart(canvas, config);
@@ -3550,9 +3642,60 @@ LIMIT 20`),
                         m('option', { value: 'scatter' }, 'Scatter Plot'),
                         m('option', { value: 'bubble' }, 'Bubble Chart'),
                         m('option', { value: 'radar' }, 'Radar Chart'),
-                        m('option', { value: 'polarArea' }, 'Polar Area Chart')
+                        m('option', { value: 'polarArea' }, 'Polar Area Chart'),
+                        m('option', { value: 'boxplot' }, 'Box & Whisker Plot (Statistical)')
                     ])
                 ]),
+                
+                // Column Selection (appears after query execution)
+                CustomAnalysisState.queryResult && CustomAnalysisState.queryResult.data && CustomAnalysisState.queryResult.data.length > 0 && 
+                    m('div', { class: 'form-control' }, [
+                        m('label', { class: 'label' }, [
+                            m('span', { class: 'label-text' }, 'Column Selection'),
+                            m('span', { class: 'label-text-alt' }, 'Choose which columns to plot')
+                        ]),
+                        m('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-2' }, [
+                            // Label Column Selector
+                            m('div', { class: 'form-control' }, [
+                                m('label', { class: 'label' }, m('span', { class: 'label-text text-xs' }, 'Label Column (X-axis)')),
+                                m('select', {
+                                    class: 'select select-bordered select-sm',
+                                    value: CustomAnalysisState.currentQuery.labelColumn || '',
+                                    onchange: (e) => {
+                                        CustomAnalysisState.currentQuery.labelColumn = e.target.value || null;
+                                        m.redraw();
+                                    }
+                                }, [
+                                    m('option', { value: '' }, 'Auto-detect'),
+                                    ...Object.keys(CustomAnalysisState.queryResult.data[0]).map(col => 
+                                        m('option', { value: col }, col)
+                                    )
+                                ])
+                            ]),
+                            // Value Columns Selector
+                            m('div', { class: 'form-control' }, [
+                                m('label', { class: 'label' }, m('span', { class: 'label-text text-xs' }, 'Value Column(s) (Y-axis)')),
+                                m('select', {
+                                    class: 'select select-bordered select-sm',
+                                    multiple: true,
+                                    size: 3,
+                                    value: CustomAnalysisState.currentQuery.valueColumns,
+                                    onchange: (e) => {
+                                        const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                                        CustomAnalysisState.currentQuery.valueColumns = selected;
+                                        m.redraw();
+                                    }
+                                }, 
+                                    Object.keys(CustomAnalysisState.queryResult.data[0]).map(col => 
+                                        m('option', { value: col }, col)
+                                    )
+                                ),
+                                m('div', { class: 'label' }, [
+                                    m('span', { class: 'label-text-alt text-xs' }, 'Hold Ctrl/Cmd to select multiple. Leave empty for auto-detect.')
+                                ])
+                            ])
+                        ])
+                    ]),
                 
                 // Advanced Configuration (Collapsible)
                 m('details', { class: 'collapse collapse-arrow bg-base-200 mt-4' }, [
@@ -3679,7 +3822,9 @@ LIMIT 20`),
                                         vnode, 
                                         CustomAnalysisState.queryResult.data, 
                                         CustomAnalysisState.currentQuery.chartType,
-                                        CustomAnalysisState.currentQuery.chartConfig
+                                        CustomAnalysisState.currentQuery.chartConfig,
+                                        CustomAnalysisState.currentQuery.labelColumn,
+                                        CustomAnalysisState.currentQuery.valueColumns
                                     );
                                 },
                                 onupdate: (vnode) => {
@@ -3687,7 +3832,9 @@ LIMIT 20`),
                                         vnode, 
                                         CustomAnalysisState.queryResult.data, 
                                         CustomAnalysisState.currentQuery.chartType,
-                                        CustomAnalysisState.currentQuery.chartConfig
+                                        CustomAnalysisState.currentQuery.chartConfig,
+                                        CustomAnalysisState.currentQuery.labelColumn,
+                                        CustomAnalysisState.currentQuery.valueColumns
                                     );
                                 }
                             })
