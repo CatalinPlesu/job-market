@@ -1,8 +1,9 @@
 // API Configuration
 const API_BASE = '/api';
 
-// Constants for multi-select fields (many-to-many relationships)
+// Constants for multi-select fields (many-to-many relationships and one-to-many like languages)
 const MULTI_SELECT_FIELDS = [
+    'languages',  // One-to-many (job can require multiple languages)
     'hard_skills', 'soft_skills', 'certifications', 'licenses_required',
     'benefits', 'work_environment', 'professional_development', 
     'work_life_balance', 'physical_requirements', 'work_conditions', 
@@ -353,6 +354,27 @@ const dbApi = {
             }
         };
         
+        // Helper function for one-to-many relationships (like languages)
+        const addOneToManyFilter = (filterKey, tableName, columnName = 'language', foreignKey = 'job_detail_id') => {
+            const filterValue = filters[filterKey];
+            if (filterValue && filterValue.length > 0) {
+                // Ensure job has ALL selected items (AND logic across selections)
+                const placeholders = filterValue.map(() => '?').join(',');
+                conditions.push(`jd.id IN (
+                    SELECT t.${foreignKey}
+                    FROM ${tableName} t
+                    WHERE t.${columnName} IN (${placeholders})
+                    GROUP BY t.${foreignKey}
+                    HAVING COUNT(DISTINCT t.${columnName}) = ${filterValue.length}
+                )`);
+                params.push(...filterValue);
+            }
+        };
+        
+        // One-to-many filters
+        addOneToManyFilter('languages', 'job_languages', 'language', 'job_detail_id');
+        
+        // Many-to-many filters
         addM2MFilter('hard_skills', 'hard_skills');
         addM2MFilter('soft_skills', 'soft_skills');
         addM2MFilter('certifications', 'certifications');
@@ -716,6 +738,19 @@ const dbApi = {
             return DatabaseManager.queryObjects(query);
         };
         
+        // Helper function to get one-to-many values (like languages)
+        const getOneToManyValues = (table, column, foreignKey = 'job_detail_id') => {
+            const query = `
+                SELECT t.${column} as name, COUNT(DISTINCT jd.id) as count
+                FROM job_details jd
+                JOIN ${table} t ON jd.id = t.${foreignKey}
+                WHERE t.${column} IS NOT NULL
+                GROUP BY t.${column}
+                ORDER BY count DESC, t.${column} ASC
+            `;
+            return DatabaseManager.queryObjects(query);
+        };
+        
         // Get metadata for each filterable field
         try {
             // Single-select fields (many-to-one)
@@ -738,6 +773,9 @@ const dbApi = {
             metadata.country = getDistinctValues('countries', 'name', 'Country');
             metadata.company_name = getDistinctValues('companies', 'name', 'Company');
             metadata.company_size = getDistinctValues('company_sizes', 'name', 'Company Size');
+            
+            // One-to-many fields (like languages)
+            metadata.languages = getOneToManyValues('job_languages', 'language');
             
             // Multi-select fields (many-to-many)
             metadata.hard_skills = getM2MValues('hard_skills', 'name');
@@ -808,10 +846,16 @@ const dbApi = {
             'special_requirements': { table: 'special_requirements', column: 'description' }
         };
         
+        // Map for one-to-many fields like languages
+        const oneToManyFieldMap = {
+            'languages': { table: 'job_languages', column: 'language', foreignKey: 'job_detail_id' }
+        };
+        
         const tableInfo = fieldToTableMap[fieldKey];
         const m2mInfo = m2mFieldMap[fieldKey];
+        const oneToManyInfo = oneToManyFieldMap[fieldKey];
         
-        if (!tableInfo && !m2mInfo) {
+        if (!tableInfo && !m2mInfo && !oneToManyInfo) {
             console.error(`No table mapping found for field: ${fieldKey}`);
             return [];
         }
@@ -821,6 +865,40 @@ const dbApi = {
         delete filtersWithoutCurrent[fieldKey];
         
         const { whereClause, params } = this.buildWhereClause(filtersWithoutCurrent, '');
+        
+        // Handle one-to-many fields (like languages)
+        if (oneToManyInfo) {
+            const query = `
+                SELECT t.${oneToManyInfo.column} as name, COUNT(DISTINCT jd.id) as count
+                FROM job_details jd
+                LEFT JOIN titles ti ON jd.title_id = ti.id
+                LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                LEFT JOIN companies c ON jd.company_name_id = c.id
+                LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                LEFT JOIN cities ci ON jd.city_id = ci.id
+                LEFT JOIN regions reg ON jd.region_id = reg.id
+                LEFT JOIN countries cou ON jd.country_id = cou.id
+                LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                LEFT JOIN departments d ON jd.department_id = d.id
+                LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                LEFT JOIN industries ind ON jd.industry_id = ind.id
+                LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                JOIN ${oneToManyInfo.table} t ON jd.id = t.${oneToManyInfo.foreignKey}
+                ${whereClause}
+                GROUP BY t.${oneToManyInfo.column}
+                HAVING t.${oneToManyInfo.column} IS NOT NULL
+                ORDER BY count DESC, t.${oneToManyInfo.column} ASC
+            `;
+            
+            return DatabaseManager.queryObjects(query, params);
+        }
         
         // Handle many-to-many fields differently
         if (m2mInfo) {
@@ -1534,6 +1612,11 @@ const FilterPanel = {
                 { key: 'special_requirements', table: 'special_requirements', column: 'description', label: 'Special Requirements' }
             ];
             
+            // One-to-many fields (like languages)
+            const oneToManyFields = [
+                { key: 'languages', table: 'job_languages', column: 'language', foreignKey: 'job_detail_id', label: 'Languages' }
+            ];
+            
             // Search across all single-select filterable fields with counts
             for (const fieldInfo of filterableFields) {
                 // Build WHERE clause for current active filters (excluding this field)
@@ -1620,6 +1703,60 @@ const FilterPanel = {
                     LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
                     JOIN job_details_${fieldInfo.table} jm ON jd.id = jm.job_details_id
                     JOIN ${fieldInfo.table} t ON jm.${fieldInfo.table}_id = t.id
+                    ${whereClause}
+                    ${whereClause ? 'AND' : 'WHERE'} LOWER(t.${fieldInfo.column}) LIKE ?
+                    GROUP BY t.${fieldInfo.column}
+                    HAVING count > 0
+                    ORDER BY count DESC, t.${fieldInfo.column}
+                    LIMIT 3
+                `;
+                
+                const results = DatabaseManager.queryObjects(query, [...params, `%${searchTerm}%`]);
+                
+                results.forEach(row => {
+                    suggestions.push({
+                        value: row.value,
+                        count: row.count,
+                        field: fieldInfo.key,
+                        fieldName: fieldInfo.label,
+                        fieldDisplay: fieldInfo.label,
+                        isMultiSelect: true  // Mark as multi-select field
+                    });
+                });
+            }
+            
+            // Search across one-to-many fields (like languages)
+            for (const fieldInfo of oneToManyFields) {
+                // Build WHERE clause for current active filters (excluding this field)
+                const filtersWithoutCurrent = { ...state.filters };
+                delete filtersWithoutCurrent[fieldInfo.key];
+                
+                const { whereClause, params } = dbApi.buildWhereClause(filtersWithoutCurrent, '');
+                
+                // Query for one-to-many relationships
+                const query = `
+                    SELECT t.${fieldInfo.column} as value, COUNT(DISTINCT jd.id) as count
+                    FROM job_details jd
+                    LEFT JOIN titles ti ON jd.title_id = ti.id
+                    LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                    LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                    LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                    LEFT JOIN companies c ON jd.company_name_id = c.id
+                    LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                    LEFT JOIN cities ci ON jd.city_id = ci.id
+                    LEFT JOIN regions reg ON jd.region_id = reg.id
+                    LEFT JOIN countries cou ON jd.country_id = cou.id
+                    LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                    LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                    LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                    LEFT JOIN departments d ON jd.department_id = d.id
+                    LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                    LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                    LEFT JOIN industries ind ON jd.industry_id = ind.id
+                    LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                    LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                    LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                    JOIN ${fieldInfo.table} t ON jd.id = t.${fieldInfo.foreignKey}
                     ${whereClause}
                     ${whereClause ? 'AND' : 'WHERE'} LOWER(t.${fieldInfo.column}) LIKE ?
                     GROUP BY t.${fieldInfo.column}
