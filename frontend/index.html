@@ -33,7 +33,35 @@
 <body>
     <div id="app"></div>
     
-    <!-- Main application script -->
-    <script src="app.js"></script>
+    <!-- Load modular JavaScript files in order -->
+    <!-- Core configuration and utilities -->
+    <script src="js/config.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/dbApi.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    
+    <!-- Components -->
+    <script src="js/components/Header.js"></script>
+    <script src="js/components/Footer.js"></script>
+    <script src="js/components/Loading.js"></script>
+    <script src="js/components/JobListItem.js"></script>
+    <script src="js/components/FilterPanel.js"></script>
+    
+    <!-- Pages -->
+    <script src="js/pages/HomePage.js"></script>
+    <script src="js/pages/JobsPage.js"></script>
+    <script src="js/pages/JobDetailPage.js"></script>
+    <script src="js/pages/AnalysisDetailPage.js"></script>
+    
+    <!-- Analysis -->
+    <script src="js/analysis/ChartHelpers.js"></script>
+    <script src="js/analysis/CustomAnalysisState.js"></script>
+    <script src="js/analysis/PredefinedAnalyses.js"></script>
+    <script src="js/analysis/AnalysisPage.js"></script>
+    
+    <!-- Main application entry point -->
+    <script src="js/main.js"></script>
 </body>
 </html>
