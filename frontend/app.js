@@ -1,12 +1,99 @@
 // API Configuration
 const API_BASE = '/api';
 
+// URL State Management Utilities
+const URLState = {
+    // Parse query parameters from URL
+    parse: () => {
+        const params = new URLSearchParams(window.location.search);
+        const state = {
+            filters: {},
+            page: parseInt(params.get('page')) || 1,
+            itemsPerPage: parseInt(params.get('limit')) || 20,
+            sort: params.get('sort') || 'date_desc',
+            search: params.get('q') || ''
+        };
+        
+        // Parse all filter parameters
+        for (const [key, value] of params.entries()) {
+            if (['page', 'limit', 'sort', 'q'].includes(key)) continue;
+            if (value && value !== '') {
+                // Convert numeric values for range filters
+                if (['salaryMin', 'salaryMax', 'experienceMin', 'experienceMax'].includes(key)) {
+                    state.filters[key] = value === 'null' ? null : parseInt(value);
+                } else {
+                    state.filters[key] = value;
+                }
+            }
+        }
+        
+        return state;
+    },
+    
+    // Update URL with current state
+    update: (newState) => {
+        const url = new URL(window.location);
+        
+        // Update filters
+        Object.keys(state.filters).forEach(key => {
+            const value = state.filters[key];
+            if (value !== null && value !== undefined && value !== '') {
+                url.searchParams.set(key, value);
+            } else {
+                url.searchParams.delete(key);
+            }
+        });
+        
+        // Update search
+        if (state.search && state.search.trim()) {
+            url.searchParams.set('q', state.search.trim());
+        } else {
+            url.searchParams.delete('q');
+        }
+        
+        // Update pagination and sorting
+        if (JobsPage.displayPage !== 1) {
+            url.searchParams.set('page', JobsPage.displayPage);
+        } else {
+            url.searchParams.delete('page');
+        }
+        
+        if (state.itemsPerPage !== 20) {
+            url.searchParams.set('limit', state.itemsPerPage);
+        } else {
+            url.searchParams.delete('limit');
+        }
+        
+        if (state.sort !== 'date_desc') {
+            url.searchParams.set('sort', state.sort);
+        } else {
+            url.searchParams.delete('sort');
+        }
+        
+        // Update browser URL without triggering route change
+        window.history.replaceState({}, '', url.toString());
+    },
+    
+    // Initialize state from URL
+    initialize: () => {
+        const urlState = URLState.parse();
+        
+        // Return URL state for later application
+        return urlState;
+    }
+};
+
 // API Client
 const api = {
     getJobsIndex: () => m.request({ url: `${API_BASE}/jobs/index.json` }),
     getJobsPage: (page) => m.request({ url: `${API_BASE}/jobs/page-${page}.json` }),
     getAnalysisIndex: () => m.request({ url: `${API_BASE}/analysis/index.json` }),
     getAnalysis: (filename) => m.request({ url: `${API_BASE}/analysis/${filename}` })
+};
+
+// Helper to check if filters are active
+const hasActiveFilters = (filters) => {
+    return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
 };
 
 // State Management
@@ -28,17 +115,25 @@ const state = {
     selectedAnalysis: null,
     selectedAnalysisData: null,
     itemsPerPage: 20, // User-configurable items per page for display
-    availablePageSizes: [10, 20, 50, 100]
+    availablePageSizes: [10, 20, 50, 100],
+    sort: 'date_desc', // Default sorting: newest first
+    search: '', // Global search term
+    sortOptions: [
+        { value: 'date_desc', label: 'Newest First', field: 'posting_date', order: 'desc' },
+        { value: 'date_asc', label: 'Oldest First', field: 'posting_date', order: 'asc' },
+        { value: 'salary_desc', label: 'Highest Salary', field: 'salary', order: 'desc' },
+        { value: 'salary_asc', label: 'Lowest Salary', field: 'salary', order: 'asc' },
+        { value: 'title_asc', label: 'Job Title A-Z', field: 'title', order: 'asc' },
+        { value: 'title_desc', label: 'Job Title Z-A', field: 'title', order: 'desc' },
+        { value: 'company_asc', label: 'Company A-Z', field: 'company', order: 'asc' },
+        { value: 'company_desc', label: 'Company Z-A', field: 'company', order: 'desc' }
+    ]
 };
 
 // Configuration constants
 const DEFAULT_JOBS_PER_API_PAGE = 100;
 
 // Utility Functions
-// Helper to check if filters are active
-const hasActiveFilters = (filters) => {
-    return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
-};
 
 // Map filter keys to metadata keys
 const filterKeyToMetadataKey = {
@@ -88,6 +183,66 @@ const getActiveFilterMetadata = (filters, jobsIndex) => {
     // When multiple filters are active, we can't use single-filter metadata counts
     return activeFilterCount === 1 ? firstFilterMetadata : null;
 };
+
+// Sort Functions
+const sortJobs = (jobs, sortBy) => {
+    const sortOption = state.sortOptions.find(opt => opt.value === sortBy) || state.sortOptions[0];
+    const { field, order } = sortOption;
+    
+    return jobs.slice().sort((a, b) => {
+        let aVal, bVal;
+        
+        // Handle different field types
+        switch (field) {
+            case 'salary':
+                // Compare by min salary in MDL, jobs without salary data go to end
+                if (hasValidSalary(a)) {
+                    aVal = a.salary?.min_mdl || a.salary?.min;
+                } else {
+                    aVal = null; // Let the null handling logic put these at the end
+                }
+                
+                if (hasValidSalary(b)) {
+                    bVal = b.salary?.min_mdl || b.salary?.min;
+                } else {
+                    bVal = null; // Let the null handling logic put these at the end
+                }
+                break;
+            case 'title':
+                aVal = (a.title || '').toLowerCase();
+                bVal = (b.title || '').toLowerCase();
+                break;
+            case 'company':
+                aVal = (a.company || '').toLowerCase();
+                bVal = (b.company || '').toLowerCase();
+                break;
+            case 'posting_date':
+                aVal = new Date(a.posting_date || '1970-01-01');
+                bVal = new Date(b.posting_date || '1970-01-01');
+                break;
+            default:
+                aVal = (a[field] || '').toLowerCase();
+                bVal = (b[field] || '').toLowerCase();
+        }
+        
+        // Handle null/undefined values
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return order === 'asc' ? 1 : -1;
+        if (bVal == null) return order === 'asc' ? -1 : 1;
+        
+        // Compare values
+        let comparison = 0;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            comparison = aVal - bVal;
+        } else {
+            comparison = aVal.toString().localeCompare(bVal.toString());
+        }
+        
+        return order === 'asc' ? comparison : -comparison;
+    });
+};
+
+// Enhanced filter matching with search functionality
 
 const formatSalary = (salary) => {
     if (!salary) return 'Not specified';
@@ -244,6 +399,11 @@ const JobListItem = {
     }
 };
 
+// Helper function to check if a job has valid salary data
+const hasValidSalary = (job) => {
+    return (job.salary?.min_mdl || job.salary?.min) && (job.salary?.max_mdl || job.salary?.max);
+};
+
 // Helper function to get field value from a job object
 const getJobFieldValue = (job, fieldKey) => {
     switch (fieldKey) {
@@ -397,13 +557,15 @@ const matchesFilters = (job, filters) => {
             
             // Numeric Filters
             case 'salaryMin':
+                // Filter out jobs without salary specified
+                if (!hasValidSalary(job)) return false;
                 const jobMinSalary = job.salary?.min_mdl || job.salary?.min;
-                if (!jobMinSalary) return false;
                 if (jobMinSalary < value) return false;
                 break;
             case 'salaryMax':
+                // Filter out jobs without salary specified
+                if (!hasValidSalary(job)) return false;
                 const jobMaxSalary = job.salary?.max_mdl || job.salary?.max;
-                if (!jobMaxSalary) return false;
                 if (jobMaxSalary > value) return false;
                 break;
             case 'experienceMin':
@@ -560,9 +722,177 @@ const FilterPanel = {
                 }
             }
             
+            // Update URL with new filter state
+            URLState.update();
+            
             // Trigger auto-load after filter change
             setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
             m.redraw();
+        };
+        
+        // Function to get available filter suggestions
+        const getFilterSuggestions = () => {
+            if (!state.search || state.search.trim() === '') return [];
+            
+            const searchTerm = state.search.toLowerCase().trim();
+            const suggestions = [];
+            
+            // Collect all available values from all filter fields
+            filterFields.forEach(field => {
+                // Get available options for this field
+                const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
+                const currentFieldIndex = hierarchyLevels.indexOf(field.key);
+                
+                let filterForOptions;
+                if (currentFieldIndex !== -1) {
+                    filterForOptions = {};
+                    for (let i = 0; i < currentFieldIndex; i++) {
+                        const parentKey = hierarchyLevels[i];
+                        if (state.filters[parentKey]) {
+                            filterForOptions[parentKey] = state.filters[parentKey];
+                        }
+                    }
+                } else {
+                    filterForOptions = { ...state.filters };
+                    delete filterForOptions[field.key];
+                }
+                
+                const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
+                
+                const availableValuesSet = new Set();
+                baseFilteredJobs.forEach(job => {
+                    const value = getJobFieldValue(job, field.key);
+                    if (value !== null && value !== undefined && value !== '') {
+                        if (Array.isArray(value)) {
+                            value.forEach(v => availableValuesSet.add(v));
+                        } else {
+                            availableValuesSet.add(value);
+                        }
+                    }
+                });
+                
+                // Check if any values match the search term
+                const matchingValues = Array.from(availableValuesSet)
+                    .filter(value => value.toLowerCase().includes(searchTerm))
+                    .slice(0, 5); // Limit to 5 suggestions
+                
+                matchingValues.forEach(value => {
+                    suggestions.push({
+                        value: value,
+                        field: field.key,
+                        fieldName: field.label,
+                        fieldDisplay: field.display || field.label
+                    });
+                });
+            });
+            
+            // Sort suggestions by relevance (exact match first, then starts with, then contains)
+            suggestions.sort((a, b) => {
+                const aLower = a.value.toLowerCase();
+                const bLower = b.value.toLowerCase();
+                const searchLower = searchTerm.toLowerCase();
+                
+                // Exact match
+                if (aLower === searchLower && bLower !== searchLower) return -1;
+                if (bLower === searchLower && aLower !== searchLower) return 1;
+                
+                // Starts with
+                if (aLower.startsWith(searchLower) && !bLower.startsWith(searchLower)) return -1;
+                if (bLower.startsWith(searchLower) && !aLower.startsWith(searchLower)) return 1;
+                
+                // Contains (alphabetical for ties)
+                if (aLower.includes(searchLower) && bLower.includes(searchLower)) {
+                    return a.value.localeCompare(b.value);
+                }
+                
+                return 0;
+            });
+            
+            return suggestions.slice(0, 10); // Limit total suggestions
+        };
+        
+        // Function to apply search as filter
+        const applySearchAsFilter = (suggestion = null) => {
+            if (!state.search || state.search.trim() === '') return;
+            
+            let searchTerm = state.search.toLowerCase().trim();
+            let applied = false;
+            
+            // If suggestion provided, use it
+            if (suggestion) {
+                state.filters[suggestion.field] = suggestion.value;
+                state.search = ''; // Clear search input
+                applied = true;
+            } else {
+                // Try to find matching filter values
+                filterFields.forEach(field => {
+                    if (applied) return; // Stop if already applied
+                    
+                    // Get available options for this field
+                    const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
+                    const currentFieldIndex = hierarchyLevels.indexOf(field.key);
+                    
+                    let filterForOptions;
+                    if (currentFieldIndex !== -1) {
+                        filterForOptions = {};
+                        for (let i = 0; i < currentFieldIndex; i++) {
+                            const parentKey = hierarchyLevels[i];
+                            if (state.filters[parentKey]) {
+                                filterForOptions[parentKey] = state.filters[parentKey];
+                            }
+                        }
+                    } else {
+                        filterForOptions = { ...state.filters };
+                        delete filterForOptions[field.key];
+                    }
+                    
+                    const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
+                    
+                    const availableValuesSet = new Set();
+                    baseFilteredJobs.forEach(job => {
+                        const value = getJobFieldValue(job, field.key);
+                        if (value !== null && value !== undefined && value !== '') {
+                            if (Array.isArray(value)) {
+                                value.forEach(v => availableValuesSet.add(v));
+                            } else {
+                                availableValuesSet.add(value);
+                            }
+                        }
+                    });
+                    
+                    // Check for exact match first
+                    const exactMatch = Array.from(availableValuesSet).find(value => 
+                        value.toLowerCase() === searchTerm
+                    );
+                    
+                    if (exactMatch) {
+                        state.filters[field.key] = exactMatch;
+                        state.search = ''; // Clear search input
+                        applied = true;
+                        return;
+                    }
+                    
+                    // Check for starts with match
+                    const startsMatch = Array.from(availableValuesSet).find(value => 
+                        value.toLowerCase().startsWith(searchTerm)
+                    );
+                    
+                    if (startsMatch) {
+                        state.filters[field.key] = startsMatch;
+                        state.search = ''; // Clear search input
+                        applied = true;
+                        return;
+                    }
+                });
+            }
+            
+            if (applied) {
+                handleFilterChange();
+                m.redraw();
+            } else {
+                // If no filter match found, keep as general search
+                handleFilterChange();
+            }
         };
         
         return m('div', { class: 'bg-base-200 p-4' }, [
@@ -575,10 +905,120 @@ const FilterPanel = {
                         Object.keys(state.filters).forEach(key => {
                             state.filters[key] = null;
                         });
-                        handleFilterChange();
+                        state.search = '';
+                        JobsPage.displayPage = 1;
+                        URLState.update();
+                        m.redraw();
                     }
                 }, 'Clear All')
             ]),
+            
+            // Apply Filter (Search) Field
+            m('div', { class: 'form-control mb-6 relative' }, [
+                m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Apply Filter')),
+                m('div', { class: 'flex gap-2' }, [
+                    m('div', { class: 'relative flex-1' }, [
+                        m('input', { 
+                            type: 'text',
+                            class: `input input-bordered input-sm w-full ${state.search ? 'input-info' : ''}`,
+                            placeholder: 'Type to search/filter by title, company, skills, location...',
+                            value: state.search || '',
+                            oninput: (e) => {
+                                state.search = e.target.value;
+                                m.redraw(); // Trigger redraw to show/hide suggestions
+                            },
+                            onkeypress: (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    applySearchAsFilter();
+                                }
+                            },
+                            onfocus: (e) => {
+                                // Show hint text
+                                if (!state.search) {
+                                    e.target.placeholder = 'Type and press Enter to apply as filter...';
+                                }
+                            },
+                            onblur: (e) => {
+                                e.target.placeholder = 'Type to search/filter by title, company, skills, location...';
+                            }
+                        }),
+                        // Suggestions dropdown
+                        (() => {
+                            const suggestions = getFilterSuggestions();
+                            if (suggestions.length === 0 || !state.search) return null;
+                            
+                            return m('div', { 
+                                class: 'absolute top-full left-0 right-0 bg-base-100 border border-base-300 rounded-box shadow-lg z-50 max-h-60 overflow-y-auto',
+                                style: 'margin-top: 2px;'
+                            }, [
+                                suggestions.map(suggestion => 
+                                    m('button', {
+                                        class: 'w-full text-left px-4 py-2 hover:bg-base-200 text-sm',
+                                        onclick: (e) => {
+                                            e.preventDefault();
+                                            applySearchAsFilter(suggestion);
+                                        },
+                                        title: `Apply "${suggestion.value}" to ${suggestion.fieldDisplay}`
+                                    }, [
+                                        m('div', { class: 'font-medium text-base-content' }, suggestion.value),
+                                        m('div', { class: 'text-xs opacity-70' }, `Apply to: ${suggestion.fieldDisplay}`)
+                                    ])
+                                )
+                            ]);
+                        })()
+                    ]),
+                    m('button', { 
+                        class: 'btn btn-sm btn-primary',
+                        onclick: applySearchAsFilter
+                    }, 'Apply')
+                ]),
+                m('div', { class: 'text-xs opacity-70 mt-1' }, [
+                    'Tip: Type a value and press Enter to apply it as a filter, or click Apply. ',
+                    m('span', { class: 'font-medium' }, 'Examples:'),
+                    ' "Developer", "Chisinau", "Java", "Senior"'
+                ])
+            ]),
+            
+            m('div', { class: 'divider' }),
+            
+            // Items Per Page Selector
+            m('div', { class: 'form-control mb-6' }, [
+                m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Items Per Page')),
+                m('div', { class: 'flex gap-2' }, [
+                    state.availablePageSizes.map(size =>
+                        m('button', {
+                            class: `btn btn-sm ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'}`,
+                            onclick: () => {
+                                state.itemsPerPage = size;
+                                JobsPage.displayPage = 1;
+                                URLState.update();
+                                m.redraw();
+                            }
+                        }, size)
+                    )
+                ]),
+                m('div', { class: 'text-xs opacity-70 mt-2' }, `Showing ${state.itemsPerPage} jobs per page`)
+            ]),
+            
+            // Sort Controls
+            m('div', { class: 'form-control mb-6' }, [
+                m('label', { class: 'label' }, m('span', { class: 'label-text font-semibold' }, 'Sort By')),
+                m('div', { class: 'grid grid-cols-2 gap-2' }, [
+                    state.sortOptions.map(option =>
+                        m('button', {
+                            class: `btn btn-sm ${state.sort === option.value ? 'btn-primary' : 'btn-ghost'} w-full`,
+                            onclick: () => {
+                                state.sort = option.value;
+                                URLState.update();
+                                m.redraw();
+                            }
+                        }, option.label)
+                    )
+                ])
+            ]),
+            
+            m('div', { class: 'divider' }),
             
             // Salary Range Filter
             m('div', { class: 'form-control mb-6' }, [
@@ -591,7 +1031,47 @@ const FilterPanel = {
                         value: state.filters.salaryMin || '',
                         oninput: (e) => {
                             state.filters.salaryMin = e.target.value ? parseInt(e.target.value) : null;
-                            handleFilterChange();
+                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+                            if (filterMetadata && filterMetadata.pages) {
+                                // Load pages for current page
+                                const pagesToLoad = new Set();
+                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
+                                const endItem = startItem + state.itemsPerPage;
+                                let itemsAccumulated = 0;
+                                
+                                for (const pageInfo of filterMetadata.pages) {
+                                    if (itemsAccumulated < endItem) {
+                                        pagesToLoad.add(pageInfo.page);
+                                        itemsAccumulated += pageInfo.count;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                if (pagesToLoad.size > 0) {
+                                    const promises = [];
+                                    for (const page of pagesToLoad) {
+                                        if (!state.loadedPages.has(page)) {
+                                            promises.push(JobsPage.loadPage(page));
+                                        }
+                                    }
+                                    if (promises.length > 0) {
+                                        Promise.all(promises).then(() => {
+                                            URLState.update();
+                                            m.redraw();
+                                        });
+                                    } else {
+                                        URLState.update();
+                                        m.redraw();
+                                    }
+                                } else {
+                                    URLState.update();
+                                    m.redraw();
+                                }
+                            } else {
+                                URLState.update();
+                                m.redraw();
+                            }
                         }
                     }),
                     m('input', { 
@@ -601,7 +1081,47 @@ const FilterPanel = {
                         value: state.filters.salaryMax || '',
                         oninput: (e) => {
                             state.filters.salaryMax = e.target.value ? parseInt(e.target.value) : null;
-                            handleFilterChange();
+                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+                            if (filterMetadata && filterMetadata.pages) {
+                                // Load pages for current page
+                                const pagesToLoad = new Set();
+                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
+                                const endItem = startItem + state.itemsPerPage;
+                                let itemsAccumulated = 0;
+                                
+                                for (const pageInfo of filterMetadata.pages) {
+                                    if (itemsAccumulated < endItem) {
+                                        pagesToLoad.add(pageInfo.page);
+                                        itemsAccumulated += pageInfo.count;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                if (pagesToLoad.size > 0) {
+                                    const promises = [];
+                                    for (const page of pagesToLoad) {
+                                        if (!state.loadedPages.has(page)) {
+                                            promises.push(JobsPage.loadPage(page));
+                                        }
+                                    }
+                                    if (promises.length > 0) {
+                                        Promise.all(promises).then(() => {
+                                            URLState.update();
+                                            m.redraw();
+                                        });
+                                    } else {
+                                        URLState.update();
+                                        m.redraw();
+                                    }
+                                } else {
+                                    URLState.update();
+                                    m.redraw();
+                                }
+                            } else {
+                                URLState.update();
+                                m.redraw();
+                            }
                         }
                     }),
                     (state.filters.salaryMin || state.filters.salaryMax) && m('div', { class: 'text-xs opacity-70' }, 
@@ -622,7 +1142,47 @@ const FilterPanel = {
                         value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
                         oninput: (e) => {
                             state.filters.experienceMin = e.target.value ? parseInt(e.target.value) : null;
-                            handleFilterChange();
+                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+                            if (filterMetadata && filterMetadata.pages) {
+                                // Load pages for current page
+                                const pagesToLoad = new Set();
+                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
+                                const endItem = startItem + state.itemsPerPage;
+                                let itemsAccumulated = 0;
+                                
+                                for (const pageInfo of filterMetadata.pages) {
+                                    if (itemsAccumulated < endItem) {
+                                        pagesToLoad.add(pageInfo.page);
+                                        itemsAccumulated += pageInfo.count;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                if (pagesToLoad.size > 0) {
+                                    const promises = [];
+                                    for (const page of pagesToLoad) {
+                                        if (!state.loadedPages.has(page)) {
+                                            promises.push(JobsPage.loadPage(page));
+                                        }
+                                    }
+                                    if (promises.length > 0) {
+                                        Promise.all(promises).then(() => {
+                                            URLState.update();
+                                            m.redraw();
+                                        });
+                                    } else {
+                                        URLState.update();
+                                        m.redraw();
+                                    }
+                                } else {
+                                    URLState.update();
+                                    m.redraw();
+                                }
+                            } else {
+                                URLState.update();
+                                m.redraw();
+                            }
                         }
                     }),
                     m('input', { 
@@ -633,7 +1193,47 @@ const FilterPanel = {
                         value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
                         oninput: (e) => {
                             state.filters.experienceMax = e.target.value ? parseInt(e.target.value) : null;
-                            handleFilterChange();
+                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
+                            if (filterMetadata && filterMetadata.pages) {
+                                // Load pages for current page
+                                const pagesToLoad = new Set();
+                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
+                                const endItem = startItem + state.itemsPerPage;
+                                let itemsAccumulated = 0;
+                                
+                                for (const pageInfo of filterMetadata.pages) {
+                                    if (itemsAccumulated < endItem) {
+                                        pagesToLoad.add(pageInfo.page);
+                                        itemsAccumulated += pageInfo.count;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                
+                                if (pagesToLoad.size > 0) {
+                                    const promises = [];
+                                    for (const page of pagesToLoad) {
+                                        if (!state.loadedPages.has(page)) {
+                                            promises.push(JobsPage.loadPage(page));
+                                        }
+                                    }
+                                    if (promises.length > 0) {
+                                        Promise.all(promises).then(() => {
+                                            URLState.update();
+                                            m.redraw();
+                                        });
+                                    } else {
+                                        URLState.update();
+                                        m.redraw();
+                                    }
+                                } else {
+                                    URLState.update();
+                                    m.redraw();
+                                }
+                            } else {
+                                URLState.update();
+                                m.redraw();
+                            }
                         }
                     }),
                     (state.filters.experienceMin !== null || state.filters.experienceMax !== null) && 
@@ -841,6 +1441,18 @@ const JobsPage = {
     },
     
     oninit: async () => {
+        // Initialize URL state before loading data
+        const urlState = URLState.initialize();
+        
+        // Apply URL state to our state objects
+        if (urlState) {
+            Object.assign(state.filters, urlState.filters);
+            JobsPage.displayPage = urlState.page;
+            state.itemsPerPage = urlState.itemsPerPage;
+            state.sort = urlState.sort;
+            state.search = urlState.search;
+        }
+        
         // Load index and first page only
         state.loading = true;
         try {
@@ -872,19 +1484,44 @@ const JobsPage = {
     getDisplayedJobs: () => {
         const isFiltered = hasActiveFilters(state.filters);
         
+        // Apply search filter if present
+        let jobsToDisplay = state.allLoadedJobs;
+        if (state.search && state.search.trim()) {
+            const searchTerm = state.search.toLowerCase().trim();
+            jobsToDisplay = jobsToDisplay.filter(job => {
+                const searchableText = [
+                    job.title || '',
+                    job.company || '',
+                    job.location?.city || '',
+                    job.job_function || '',
+                    job.industry || '',
+                    job.seniority_level || '',
+                    ...(job.requirements?.hard_skills || []),
+                    ...(job.requirements?.soft_skills || []),
+                    ...(job.requirements?.languages || [])
+                ].join(' ').toLowerCase();
+                return searchableText.includes(searchTerm);
+            });
+        }
+        
+        // Apply other filters
         if (isFiltered) {
             // When filtering, use metadata to get the total count immediately
             const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
             const totalFromMetadata = filterMetadata ? filterMetadata.count : 0;
             
             // Filter loaded jobs for display
-            const filtered = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
+            const filtered = jobsToDisplay.filter(job => matchesFilters(job, state.filters));
+            
+            // Apply sorting
+            const sortedFiltered = sortJobs(filtered, state.sort);
+            
             const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
             const end = start + state.itemsPerPage;
-            const effectiveTotal = totalFromMetadata > 0 ? totalFromMetadata : filtered.length;
+            const effectiveTotal = totalFromMetadata > 0 ? totalFromMetadata : sortedFiltered.length;
             
             return {
-                jobs: filtered.slice(start, end),
+                jobs: sortedFiltered.slice(start, end),
                 total: effectiveTotal,
                 totalPages: Math.ceil(effectiveTotal / state.itemsPerPage),
                 isFiltered: true
@@ -894,7 +1531,10 @@ const JobsPage = {
             const totalJobsFromMetadata = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
             const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
             const end = start + state.itemsPerPage;
-            const displayJobs = state.allLoadedJobs.slice(start, end);
+            
+            // Apply sorting to all jobs
+            const sortedJobs = sortJobs(jobsToDisplay, state.sort);
+            const displayJobs = sortedJobs.slice(start, end);
             
             return {
                 jobs: displayJobs,
@@ -908,6 +1548,9 @@ const JobsPage = {
     navigateToPage: async (pageNumber) => {
         JobsPage.displayPage = pageNumber;
         window.scrollTo(0, 0);
+        
+        // Update URL with new page number
+        URLState.update();
         
         const isFiltered = hasActiveFilters(state.filters);
         
@@ -1063,34 +1706,9 @@ const JobsPage = {
             // Main Content Area
             m('div', { class: 'flex-1 overflow-y-auto min-h-0' }, [
                 m('div', { class: 'container mx-auto px-4 py-8' }, [
-                    m('h1', { class: 'text-3xl font-bold mb-6' }, 'Browse Jobs'),
-                    
-                    // Page size selector and status
-                    state.jobsIndex && m('div', { class: 'flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4' }, [
-                        m('div', { class: 'text-sm flex items-center gap-2' }, [
-                            m('span', 'Items per page:'),
-                            state.availablePageSizes.map(size =>
-                                m('button', {
-                                    class: `btn btn-xs ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'}`,
-                                    onclick: () => {
-                                        state.itemsPerPage = size;
-                                        JobsPage.displayPage = 1;
-                                        m.redraw();
-                                    }
-                                }, size)
-                            )
-                        ]),
-                        m('div', { class: 'text-sm opacity-70' }, [
-                            isFiltered ? 
-                                `Showing ${jobs.length} of ${total} filtered jobs` :
-                                `Showing ${jobs.length} of ${total.toLocaleString()} total jobs`
-                        ])
-                    ]),
-                    
-                    // Top pagination
-                    state.jobsIndex && JobsPage.renderPagination(totalPages),
-                    
                     state.loading ? m(Loading) : [
+                        JobsPage.renderPagination(totalPages),
+                        
                         m('div', { class: 'bg-base-100 rounded-lg shadow my-4' }, [
                             jobs.length > 0 ? 
                                 jobs.map((job, idx) => m(JobListItem, { 

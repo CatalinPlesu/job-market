@@ -138,6 +138,53 @@ frontend/
 └── README.md           - This file
 ```
 
+## Recent Improvements
+
+### 🚀 URL Parameters for Filters and Sorting
+
+The frontend now supports comprehensive URL parameter management for enhanced user experience:
+
+**Key Features:**
+- ✅ **URL State Management**: Complete synchronization between application state and URL parameters
+- ✅ **Filter Persistence**: All 50+ filters are preserved in URL for shareable searches
+- ✅ **Sorting Integration**: 8 different sort options with URL parameter support
+- ✅ **Global Search**: Real-time search with URL parameter integration
+- ✅ **Pagination**: Page numbers and items per page preserved in URL
+- ✅ **Bookmarkable States**: Save complex filter combinations as browser bookmarks
+- ✅ **Shareable URLs**: Share exact search criteria with colleagues and candidates
+
+**Supported URL Parameters:**
+- `?page=N` - Current page number
+- `?limit=N` - Items per page (10, 20, 50, 100)
+- `?sort=VALUE` - Sorting option (8 types available)
+- `?q=TERM` - Global search term
+- `?FIELD=VALUE` - Any filter field (e.g., `?city=Chisinau`, `?salaryMin=15000`)
+
+**Example URLs:**
+```
+# Filtered jobs with sorting
+/jobs?page=2&limit=20&sort=salary_desc&city=Chisinau&salaryMin=15000
+
+# Search with pagination
+/jobs?page=1&q=developer&employment_type=Full-time
+
+# Complex filtering
+/jobs?industry=IT&seniority_level=Senior&remote_work=Yes&page=3
+```
+
+**Enhanced UI Elements:**
+- Sort controls with 8 different sorting options
+- Prominent search box with real-time filtering
+- Clear filters button for easy reset
+- Improved pagination with URL synchronization
+
+**Benefits:**
+- Users can share links that preserve their exact search criteria
+- Browser back/forward buttons work correctly
+- Page refreshes preserve filter state
+- No lost search context
+- Professional, modern web application experience
+
 ## Success Criteria
 
 - [x] Extra slim job listings (Hacker News style)
@@ -150,6 +197,8 @@ frontend/
 - [x] Parsed/raw tabs functional
 - [x] Works in modern browsers
 - [x] Advanced filters (collapsible/expandable)
+- [x] URL parameter support for filters and sorting
+- [x] Global search with URL integration
 - [ ] All 50+ fields filterable (12 fields implemented, extensible)
 - [ ] Charts render correctly (to be added when data available)
 
