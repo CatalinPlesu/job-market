@@ -1690,7 +1690,7 @@ const FilterPanel = {
                                 }, [
                                     m('option', { value: '' }, 'All'),
                                     ...metadata.map(item => 
-                                        m('option', { value: item.name }, `${item.name} (${item.count})`)
+                                        m('option', { value: item.name }, item.name)
                                     )
                                 ])
                             ]);
