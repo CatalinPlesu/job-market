@@ -421,41 +421,6 @@ Begin JSON object:"""
                             ))
                 
                 data_session.commit()
-                
-                # Sync job_checks from scrape.db to data.db
-                try:
-                    from src.scrape_database import JobCheck as ScrapeJobCheck
-                    from src.data_database import JobCheck as DataJobCheck
-                    
-                    # Get all job_checks from scrape.db for this job
-                    scrape_checks = scrape_session.query(ScrapeJobCheck).filter(
-                        ScrapeJobCheck.job_id == job.id
-                    ).all()
-                    
-                    if scrape_checks:
-                        # Get existing checks to avoid duplicates
-                        existing_checks = data_session.query(DataJobCheck).filter(
-                            DataJobCheck.job_detail_id == detail.id
-                        ).all()
-                        existing_check_keys = {(check.check_date, check.http_status) for check in existing_checks}
-                        
-                        # Only add checks that don't already exist
-                        for scrape_check in scrape_checks:
-                            check_key = (scrape_check.check_date, scrape_check.http_status)
-                            if check_key not in existing_check_keys:
-                                data_check = DataJobCheck(
-                                    job_detail_id=detail.id,
-                                    check_date=scrape_check.check_date,
-                                    http_status=scrape_check.http_status
-                                )
-                                data_session.add(data_check)
-                        
-                        data_session.commit()
-                except Exception as check_error:
-                    # Don't fail the job if check syncing fails
-                    # Just rollback the checks, not the job detail (already committed above)
-                    data_session.rollback()
-                
                 return job_id, True, "Success", None, job.site
                 
         except SQLAlchemyError as e:
@@ -833,26 +798,43 @@ def structure_data_with_llm():
         if len(error_log) > 20:
             print(f"... and {len(error_log) - 20} more")
     
-    # Phase 2: Sync job_checks for all existing entries
+    # Phase 2: Sync job_checks for all alive jobs
     print("\n" + "="*80)
     print("SYNCING JOB_CHECKS FROM SCRAPE.DB TO DATA.DB")
     print("="*80)
     
-    # Get all job URLs from data.db
-    with DataSession() as data_session:
+    # Get all job URLs from data.db and check if they're alive in scrape.db
+    with ScrapeSession() as scrape_session, DataSession() as data_session:
+        # Get all job URLs from data.db
         job_urls = [url[0] for url in data_session.query(JobDetail.job_url).all()]
+        
+        # For each job URL, check if it's still alive in scrape.db
+        alive_job_urls = []
+        for job_url in job_urls:
+            scrape_job = scrape_session.query(ScrapeJob).filter(ScrapeJob.job_url == job_url).first()
+            if scrape_job:
+                # Get the last check with HTTP status
+                from src.scrape_database import JobCheck as ScrapeJobCheck
+                last_check = scrape_session.query(ScrapeJobCheck).filter(
+                    ScrapeJobCheck.job_id == scrape_job.id,
+                    ScrapeJobCheck.http_status.isnot(None)
+                ).order_by(ScrapeJobCheck.check_date.desc()).first()
+                
+                # If no check exists or last check was 200, consider it alive
+                if not last_check or last_check.http_status == 200:
+                    alive_job_urls.append(job_url)
     
-    total_urls = len(job_urls)
+    total_urls = len(alive_job_urls)
     if total_urls == 0:
-        print("No job details found in data.db to sync checks for.")
+        print("No alive jobs found to sync checks for.")
     else:
-        print(f"Syncing job_checks for {total_urls} jobs...")
+        print(f"Found {total_urls} alive jobs to sync checks for...")
         
         synced_count = 0
         checks_synced_total = 0
         failed_sync = 0
         
-        for i, job_url in enumerate(job_urls, 1):
+        for i, job_url in enumerate(alive_job_urls, 1):
             success, message, checks_count = sync_job_checks(job_url, ScrapeSession, DataSession)
             
             if success:
@@ -868,7 +850,7 @@ def structure_data_with_llm():
                       f"{checks_synced_total} checks synced")
         
         print(f"\n✓ Job checks sync completed!")
-        print(f"  Total jobs: {total_urls}")
+        print(f"  Total alive jobs: {total_urls}")
         print(f"  Successfully synced: {synced_count}")
         print(f"  Failed: {failed_sync}")
         print(f"  Total checks synced: {checks_synced_total}")
