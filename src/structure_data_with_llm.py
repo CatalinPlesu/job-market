@@ -805,7 +805,6 @@ def structure_data_with_llm():
     
     from src.scrape_database import JobCheck as ScrapeJobCheck
     from sqlalchemy import func, and_
-    from sqlalchemy.orm import aliased
     
     # Get all job URLs from data.db and check if they're alive in scrape.db
     with ScrapeSession() as scrape_session, DataSession() as data_session:
