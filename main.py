@@ -12,14 +12,6 @@ from datetime import datetime
 from pathlib import Path
 import shutil
 
-# Analysis engine imports - kept for reference but not used in menu
-try:
-    from analysis_engine.generator import AnalysisGenerator
-    from analysis_engine.config import AnalysisConfig
-    ANALYSIS_ENGINE_AVAILABLE = True
-except ImportError:
-    ANALYSIS_ENGINE_AVAILABLE = False
-
 
 # Menu Item Classes
 class ScrapeJobsListItem:
