@@ -1156,6 +1156,10 @@ const getAvailableOptions = (jobs, filterKey) => {
 // Filter Component with Hierarchical Filtering (Left Sidebar)
 const FilterPanel = {
     showAdvanced: false,
+    salaryMinTimer: null,
+    salaryMaxTimer: null,
+    experienceMinTimer: null,
+    experienceMaxTimer: null,
     view: () => {
         if (!state.jobsIndex) return null;
         
@@ -1523,47 +1527,12 @@ const FilterPanel = {
                         value: state.filters.salaryMin || '',
                         oninput: (e) => {
                             state.filters.salaryMin = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.salaryMinTimer);
+                            FilterPanel.salaryMinTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     m('input', { 
@@ -1573,47 +1542,12 @@ const FilterPanel = {
                         value: state.filters.salaryMax || '',
                         oninput: (e) => {
                             state.filters.salaryMax = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.salaryMaxTimer);
+                            FilterPanel.salaryMaxTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     (state.filters.salaryMin || state.filters.salaryMax) && m('div', { class: 'text-xs opacity-70' }, 
@@ -1634,47 +1568,12 @@ const FilterPanel = {
                         value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
                         oninput: (e) => {
                             state.filters.experienceMin = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.experienceMinTimer);
+                            FilterPanel.experienceMinTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     m('input', { 
@@ -1685,47 +1584,12 @@ const FilterPanel = {
                         value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
                         oninput: (e) => {
                             state.filters.experienceMax = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.experienceMaxTimer);
+                            FilterPanel.experienceMaxTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     (state.filters.experienceMin !== null || state.filters.experienceMax !== null) && 
