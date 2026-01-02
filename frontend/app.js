@@ -107,6 +107,14 @@ const URLState = {
             search: params.get('q') || ''
         };
         
+        // List of multi-select fields (many-to-many relationships)
+        const multiSelectFields = [
+            'hard_skills', 'soft_skills', 'certifications', 'licenses_required',
+            'benefits', 'work_environment', 'professional_development', 
+            'work_life_balance', 'physical_requirements', 'work_conditions', 
+            'special_requirements'
+        ];
+        
         // Parse all filter parameters
         for (const [key, value] of params.entries()) {
             if (['page', 'limit', 'sort', 'q'].includes(key)) continue;
@@ -114,6 +122,9 @@ const URLState = {
                 // Convert numeric values for range filters
                 if (['salaryMin', 'salaryMax', 'experienceMin', 'experienceMax'].includes(key)) {
                     state.filters[key] = value === 'null' ? null : parseInt(value);
+                } else if (multiSelectFields.includes(key)) {
+                    // Handle multi-select fields - support comma-separated values
+                    state.filters[key] = value.split(',').map(v => v.trim()).filter(v => v);
                 } else {
                     state.filters[key] = value;
                 }
@@ -130,7 +141,10 @@ const URLState = {
         // Update filters
         Object.keys(state.filters).forEach(key => {
             const value = state.filters[key];
-            if (value !== null && value !== undefined && value !== '') {
+            if (Array.isArray(value) && value.length > 0) {
+                // Join array values with comma for URL
+                url.searchParams.set(key, value.join(','));
+            } else if (value !== null && value !== undefined && value !== '' && !Array.isArray(value)) {
                 url.searchParams.set(key, value);
             } else {
                 url.searchParams.delete(key);
@@ -276,6 +290,80 @@ const dbApi = {
             conditions.push('cs.name = ?');
             params.push(filters.company_size);
         }
+        
+        // Title filter
+        if (filters.title) {
+            conditions.push('t.name = ?');
+            params.push(filters.title);
+        }
+        
+        // Job family filter
+        if (filters.job_family) {
+            conditions.push('jf2.name = ?');
+            params.push(filters.job_family);
+        }
+        
+        // Work schedule filter
+        if (filters.work_schedule) {
+            conditions.push('ws.name = ?');
+            params.push(filters.work_schedule);
+        }
+        
+        // Shift details filter
+        if (filters.shift_details) {
+            conditions.push('sd.name = ?');
+            params.push(filters.shift_details);
+        }
+        
+        // Travel requirements filter
+        if (filters.travel_required) {
+            conditions.push('tr.name = ?');
+            params.push(filters.travel_required);
+        }
+        
+        // Region filter
+        if (filters.region) {
+            conditions.push('reg.name = ?');
+            params.push(filters.region);
+        }
+        
+        // Country filter
+        if (filters.country) {
+            conditions.push('cou.name = ?');
+            params.push(filters.country);
+        }
+        
+        // Many-to-many filters (multi-select with OR logic)
+        // Helper function to build many-to-many conditions
+        const addM2MFilter = (filterKey, tableName, columnName = 'name') => {
+            const filterValue = filters[filterKey];
+            if (filterValue && filterValue.length > 0) {
+                // For multi-select, we use IN clause
+                // But we need to ensure job has ALL selected items (AND logic across selections)
+                const placeholders = filterValue.map(() => '?').join(',');
+                conditions.push(`jd.id IN (
+                    SELECT jm.job_details_id 
+                    FROM job_details_${tableName} jm
+                    JOIN ${tableName} mt ON jm.${tableName}_id = mt.id
+                    WHERE mt.${columnName} IN (${placeholders})
+                    GROUP BY jm.job_details_id
+                    HAVING COUNT(DISTINCT mt.${columnName}) = ${filterValue.length}
+                )`);
+                params.push(...filterValue);
+            }
+        };
+        
+        addM2MFilter('hard_skills', 'hard_skills');
+        addM2MFilter('soft_skills', 'soft_skills');
+        addM2MFilter('certifications', 'certifications');
+        addM2MFilter('licenses_required', 'licenses');
+        addM2MFilter('benefits', 'benefits', 'description');
+        addM2MFilter('work_environment', 'work_environment', 'description');
+        addM2MFilter('professional_development', 'professional_development', 'description');
+        addM2MFilter('work_life_balance', 'work_life_balance', 'description');
+        addM2MFilter('physical_requirements', 'physical_requirements', 'description');
+        addM2MFilter('work_conditions', 'work_conditions', 'description');
+        addM2MFilter('special_requirements', 'special_requirements', 'description');
         
         // Salary range filters
         if (filters.salaryMin !== null && filters.salaryMin !== undefined) {
@@ -574,17 +662,24 @@ const dbApi = {
         
         // Map table names to their foreign key column names in job_details
         const tableToForeignKey = {
+            'titles': 'title_id',
             'job_functions': 'job_function_id',
             'seniority_levels': 'seniority_level_id',
-            'cities': 'city_id',
-            'remote_work_options': 'remote_work_id',
             'industries': 'industry_id',
-            'companies': 'company_name_id',
-            'employment_types': 'employment_type_id',
-            'contract_types': 'contract_type_id',
             'departments': 'department_id',
+            'job_families': 'job_family_id',
             'specializations': 'specialization_id',
             'education_levels': 'required_education_id',
+            'employment_types': 'employment_type_id',
+            'contract_types': 'contract_type_id',
+            'work_schedules': 'work_schedule_id',
+            'shift_details': 'shift_details_id',
+            'remote_work_options': 'remote_work_id',
+            'travel_requirements': 'travel_required_id',
+            'cities': 'city_id',
+            'regions': 'region_id',
+            'countries': 'country_id',
+            'companies': 'company_name_id',
             'company_sizes': 'company_size_id'
         };
         
@@ -607,20 +702,55 @@ const dbApi = {
             return DatabaseManager.queryObjects(query);
         };
         
+        // Helper function to get many-to-many values with counts
+        const getM2MValues = (table, column) => {
+            const query = `
+                SELECT t.${column} as name, COUNT(DISTINCT jd.id) as count
+                FROM job_details jd
+                JOIN job_details_${table} jm ON jd.id = jm.job_details_id
+                JOIN ${table} t ON jm.${table}_id = t.id
+                WHERE t.${column} IS NOT NULL
+                GROUP BY t.${column}
+                ORDER BY count DESC, t.${column} ASC
+            `;
+            return DatabaseManager.queryObjects(query);
+        };
+        
         // Get metadata for each filterable field
         try {
+            // Single-select fields (many-to-one)
+            metadata.title = getDistinctValues('titles', 'name', 'Title');
             metadata.job_function = getDistinctValues('job_functions', 'name', 'Job Function');
             metadata.seniority_level = getDistinctValues('seniority_levels', 'name', 'Seniority');
-            metadata.location = getDistinctValues('cities', 'name', 'City');
-            metadata.remote_work = getDistinctValues('remote_work_options', 'name', 'Remote Work');
             metadata.industry = getDistinctValues('industries', 'name', 'Industry');
-            metadata.company_name = getDistinctValues('companies', 'name', 'Company');
-            metadata.employment_type = getDistinctValues('employment_types', 'name', 'Employment Type');
-            metadata.contract_type = getDistinctValues('contract_types', 'name', 'Contract Type');
             metadata.department = getDistinctValues('departments', 'name', 'Department');
+            metadata.job_family = getDistinctValues('job_families', 'name', 'Job Family');
             metadata.specialization = getDistinctValues('specializations', 'name', 'Specialization');
             metadata.education_level = getDistinctValues('education_levels', 'name', 'Education');
+            metadata.employment_type = getDistinctValues('employment_types', 'name', 'Employment Type');
+            metadata.contract_type = getDistinctValues('contract_types', 'name', 'Contract Type');
+            metadata.work_schedule = getDistinctValues('work_schedules', 'name', 'Work Schedule');
+            metadata.shift_details = getDistinctValues('shift_details', 'name', 'Shift Details');
+            metadata.remote_work = getDistinctValues('remote_work_options', 'name', 'Remote Work');
+            metadata.travel_required = getDistinctValues('travel_requirements', 'name', 'Travel Required');
+            metadata.location = getDistinctValues('cities', 'name', 'City');
+            metadata.region = getDistinctValues('regions', 'name', 'Region');
+            metadata.country = getDistinctValues('countries', 'name', 'Country');
+            metadata.company_name = getDistinctValues('companies', 'name', 'Company');
             metadata.company_size = getDistinctValues('company_sizes', 'name', 'Company Size');
+            
+            // Multi-select fields (many-to-many)
+            metadata.hard_skills = getM2MValues('hard_skills', 'name');
+            metadata.soft_skills = getM2MValues('soft_skills', 'name');
+            metadata.certifications = getM2MValues('certifications', 'name');
+            metadata.licenses_required = getM2MValues('licenses', 'name');
+            metadata.benefits = getM2MValues('benefits', 'description');
+            metadata.work_environment = getM2MValues('work_environment', 'description');
+            metadata.professional_development = getM2MValues('professional_development', 'description');
+            metadata.work_life_balance = getM2MValues('work_life_balance', 'description');
+            metadata.physical_requirements = getM2MValues('physical_requirements', 'description');
+            metadata.work_conditions = getM2MValues('work_conditions', 'description');
+            metadata.special_requirements = getM2MValues('special_requirements', 'description');
         } catch (error) {
             console.error('Error getting metadata:', error);
         }
@@ -640,24 +770,48 @@ const dbApi = {
     async getFilteredCounts(fieldKey, activeFilters = {}) {
         await DatabaseManager.init();
         
-        // Map field keys to table info
+        // Map field keys to table info for single-select (many-to-one) fields
         const fieldToTableMap = {
+            'title': { table: 'titles', foreignKey: 'title_id', column: 'name' },
             'job_function': { table: 'job_functions', foreignKey: 'job_function_id', column: 'name' },
             'seniority_level': { table: 'seniority_levels', foreignKey: 'seniority_level_id', column: 'name' },
-            'city': { table: 'cities', foreignKey: 'city_id', column: 'name' },
-            'remote_work': { table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name' },
             'industry': { table: 'industries', foreignKey: 'industry_id', column: 'name' },
-            'company': { table: 'companies', foreignKey: 'company_name_id', column: 'name' },
-            'employment_type': { table: 'employment_types', foreignKey: 'employment_type_id', column: 'name' },
-            'contract_type': { table: 'contract_types', foreignKey: 'contract_type_id', column: 'name' },
             'department': { table: 'departments', foreignKey: 'department_id', column: 'name' },
+            'job_family': { table: 'job_families', foreignKey: 'job_family_id', column: 'name' },
             'specialization': { table: 'specializations', foreignKey: 'specialization_id', column: 'name' },
             'education_level': { table: 'education_levels', foreignKey: 'required_education_id', column: 'name' },
+            'employment_type': { table: 'employment_types', foreignKey: 'employment_type_id', column: 'name' },
+            'contract_type': { table: 'contract_types', foreignKey: 'contract_type_id', column: 'name' },
+            'work_schedule': { table: 'work_schedules', foreignKey: 'work_schedule_id', column: 'name' },
+            'shift_details': { table: 'shift_details', foreignKey: 'shift_details_id', column: 'name' },
+            'remote_work': { table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name' },
+            'travel_required': { table: 'travel_requirements', foreignKey: 'travel_required_id', column: 'name' },
+            'city': { table: 'cities', foreignKey: 'city_id', column: 'name' },
+            'region': { table: 'regions', foreignKey: 'region_id', column: 'name' },
+            'country': { table: 'countries', foreignKey: 'country_id', column: 'name' },
+            'company': { table: 'companies', foreignKey: 'company_name_id', column: 'name' },
             'company_size': { table: 'company_sizes', foreignKey: 'company_size_id', column: 'name' }
         };
         
+        // Map for many-to-many fields
+        const m2mFieldMap = {
+            'hard_skills': { table: 'hard_skills', column: 'name' },
+            'soft_skills': { table: 'soft_skills', column: 'name' },
+            'certifications': { table: 'certifications', column: 'name' },
+            'licenses_required': { table: 'licenses', column: 'name' },
+            'benefits': { table: 'benefits', column: 'description' },
+            'work_environment': { table: 'work_environment', column: 'description' },
+            'professional_development': { table: 'professional_development', column: 'description' },
+            'work_life_balance': { table: 'work_life_balance', column: 'description' },
+            'physical_requirements': { table: 'physical_requirements', column: 'description' },
+            'work_conditions': { table: 'work_conditions', column: 'description' },
+            'special_requirements': { table: 'special_requirements', column: 'description' }
+        };
+        
         const tableInfo = fieldToTableMap[fieldKey];
-        if (!tableInfo) {
+        const m2mInfo = m2mFieldMap[fieldKey];
+        
+        if (!tableInfo && !m2mInfo) {
             console.error(`No table mapping found for field: ${fieldKey}`);
             return [];
         }
@@ -667,6 +821,41 @@ const dbApi = {
         delete filtersWithoutCurrent[fieldKey];
         
         const { whereClause, params } = this.buildWhereClause(filtersWithoutCurrent, '');
+        
+        // Handle many-to-many fields differently
+        if (m2mInfo) {
+            const query = `
+                SELECT t.${m2mInfo.column} as name, COUNT(DISTINCT jd.id) as count
+                FROM job_details jd
+                LEFT JOIN titles ti ON jd.title_id = ti.id
+                LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                LEFT JOIN companies c ON jd.company_name_id = c.id
+                LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                LEFT JOIN cities ci ON jd.city_id = ci.id
+                LEFT JOIN regions reg ON jd.region_id = reg.id
+                LEFT JOIN countries cou ON jd.country_id = cou.id
+                LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                LEFT JOIN departments d ON jd.department_id = d.id
+                LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                LEFT JOIN industries ind ON jd.industry_id = ind.id
+                LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                JOIN job_details_${m2mInfo.table} jm ON jd.id = jm.job_details_id
+                JOIN ${m2mInfo.table} t ON jm.${m2mInfo.table}_id = t.id
+                ${whereClause}
+                GROUP BY t.${m2mInfo.column}
+                HAVING t.${m2mInfo.column} IS NOT NULL
+                ORDER BY count DESC, t.${m2mInfo.column} ASC
+            `;
+            
+            return DatabaseManager.queryObjects(query, params);
+        }
         
         // Query to get counts for this field with current filters applied
         const query = `
@@ -679,12 +868,18 @@ const dbApi = {
             LEFT JOIN companies c ON jd.company_name_id = c.id
             LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
             LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN regions reg ON jd.region_id = reg.id
+            LEFT JOIN countries cou ON jd.country_id = cou.id
             LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
             LEFT JOIN employment_types et ON jd.employment_type_id = et.id
             LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
             LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
             LEFT JOIN education_levels el ON jd.required_education_id = el.id
             LEFT JOIN industries ind ON jd.industry_id = ind.id
+            LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+            LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+            LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
             LEFT JOIN ${tableInfo.table} t ON jd.${tableInfo.foreignKey} = t.id
             ${whereClause}
             GROUP BY t.${tableInfo.column}
@@ -698,7 +893,13 @@ const dbApi = {
 
 // Helper to check if filters are active
 const hasActiveFilters = (filters) => {
-    return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
+    return Object.keys(filters).some(k => {
+        const val = filters[k];
+        if (Array.isArray(val)) {
+            return val.length > 0;
+        }
+        return val !== null && val !== undefined && val !== '';
+    });
 };
 
 // State Management
@@ -1730,29 +1931,69 @@ const FilterPanel = {
                             // Filter out options with 0 count
                             const availableOptions = options.filter(opt => opt.count > 0);
                             
+                            // Determine if this is a multi-select field (many-to-many)
+                            const multiSelectFields = [
+                                'hard_skills', 'soft_skills', 'certifications', 'licenses_required',
+                                'benefits', 'work_environment', 'professional_development', 
+                                'work_life_balance', 'physical_requirements', 'work_conditions', 
+                                'special_requirements'
+                            ];
+                            const isMultiSelect = multiSelectFields.includes(field.key);
+                            
+                            // Initialize filter value as array for multi-select fields
+                            if (isMultiSelect && !Array.isArray(state.filters[field.key])) {
+                                state.filters[field.key] = state.filters[field.key] ? [state.filters[field.key]] : [];
+                            }
+                            
                             return m('div', { class: 'form-control' }, [
                                 m('label', { class: 'label py-1' }, [
-                                    m('span', { class: 'label-text text-sm' }, field.label)
+                                    m('span', { class: 'label-text text-sm' }, field.label),
+                                    isMultiSelect && state.filters[field.key] && state.filters[field.key].length > 0 && 
+                                        m('span', { class: 'badge badge-info badge-sm ml-2' }, state.filters[field.key].length)
                                 ]),
-                                m('select', { 
-                                    class: `select select-bordered select-sm w-full ${state.filters[field.key] ? 'select-info' : ''}`,
-                                    value: state.filters[field.key] || '',
-                                    onchange: (e) => {
-                                        if (e.target.value) {
-                                            state.filters[field.key] = e.target.value;
-                                        } else {
-                                            state.filters[field.key] = null;
+                                isMultiSelect ? 
+                                    // Multi-select for many-to-many fields
+                                    m('select', { 
+                                        class: `select select-bordered select-sm w-full ${state.filters[field.key] && state.filters[field.key].length > 0 ? 'select-info' : ''}`,
+                                        multiple: true,
+                                        size: Math.min(5, availableOptions.length + 1),
+                                        onchange: (e) => {
+                                            const selectedOptions = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                                            state.filters[field.key] = selectedOptions.length > 0 ? selectedOptions : [];
+                                            // Clear cached counts so they refresh
+                                            FilterPanel.filterCounts = {};
+                                            handleFilterChange();
                                         }
-                                        // Clear cached counts so they refresh
-                                        FilterPanel.filterCounts = {};
-                                        handleFilterChange();
-                                    }
-                                }, [
-                                    m('option', { value: '' }, 'All'),
-                                    ...availableOptions.map(item => 
-                                        m('option', { value: item.name }, `${item.name} (${item.count})`)
-                                    )
-                                ])
+                                    }, [
+                                        ...availableOptions.map(item => {
+                                            const isSelected = state.filters[field.key] && state.filters[field.key].includes(item.name);
+                                            return m('option', { 
+                                                value: item.name,
+                                                selected: isSelected
+                                            }, `${item.name} (${item.count})`);
+                                        })
+                                    ])
+                                    :
+                                    // Single-select for many-to-one fields
+                                    m('select', { 
+                                        class: `select select-bordered select-sm w-full ${state.filters[field.key] ? 'select-info' : ''}`,
+                                        value: state.filters[field.key] || '',
+                                        onchange: (e) => {
+                                            if (e.target.value) {
+                                                state.filters[field.key] = e.target.value;
+                                            } else {
+                                                state.filters[field.key] = null;
+                                            }
+                                            // Clear cached counts so they refresh
+                                            FilterPanel.filterCounts = {};
+                                            handleFilterChange();
+                                        }
+                                    }, [
+                                        m('option', { value: '' }, 'All'),
+                                        ...availableOptions.map(item => 
+                                            m('option', { value: item.name }, `${item.name} (${item.count})`)
+                                        )
+                                    ])
                             ]);
                         })
                     ])
