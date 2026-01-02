@@ -3421,9 +3421,13 @@ const AnalysisPage = {
                         borderColor: colors[idx].replace('0.7', '1'),
                         borderWidth: 2,
                         fill: ['line', 'radar'].includes(chartType),
-                        tension: 0.4
+                        tension: 0,  // Changed to 0 to prevent curve interpolation
+                        spanGaps: false  // Don't connect points with gaps
                     };
                 });
+                
+                // Determine if X-axis data is categorical (strings) or numeric
+                const isXAxisCategorical = typeof labels[0] === 'string';
                 
                 config = {
                     type: chartType,
@@ -3437,11 +3441,48 @@ const AnalysisPage = {
                         plugins: {
                             legend: {
                                 display: ['doughnut', 'pie', 'polarArea'].includes(chartType) || valueKeys.length > 1
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
                             }
                         },
                         scales: !['doughnut', 'pie', 'polarArea', 'radar'].includes(chartType) ? {
+                            x: {
+                                type: isXAxisCategorical ? 'category' : 'linear',
+                                ticks: {
+                                    // For categorical data, show all labels
+                                    // For numeric data, only show integer values if data is discrete
+                                    callback: function(value, index, ticks) {
+                                        if (isXAxisCategorical) {
+                                            return labels[index];
+                                        }
+                                        // For numeric x-axis, only show values that exist in data
+                                        const label = labels[index];
+                                        return label !== undefined ? label : '';
+                                    },
+                                    autoSkip: true,
+                                    maxRotation: 45,
+                                    minRotation: 0
+                                }
+                            },
                             y: {
-                                beginAtZero: true
+                                beginAtZero: true,
+                                ticks: {
+                                    // Only show integer ticks if all values are integers
+                                    callback: function(value) {
+                                        // Check if all data values are integers
+                                        const allIntegers = datasets.every(ds => 
+                                            ds.data.every(v => Number.isInteger(v) || v === 0)
+                                        );
+                                        if (allIntegers && Number.isInteger(value)) {
+                                            return value;
+                                        } else if (!allIntegers) {
+                                            return value;
+                                        }
+                                        return null;
+                                    }
+                                }
                             }
                         } : undefined
                     }
