@@ -166,6 +166,7 @@ class JobDetail(DataBase):
     # Metadata
     posting_date = Column(Date)
     original_language = Column(String(10))
+    llm_model = Column(String(200))
     processed_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships (One-to-One via Foreign Keys)
