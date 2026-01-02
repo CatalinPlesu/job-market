@@ -268,7 +268,15 @@ class CopyDatabaseItem:
         return True
     
     def _copy_db(self, source, destination):
-        """Helper method to copy a database file."""
+        """Helper method to copy a database file.
+        
+        Args:
+            source (str/Path): Path to source database file
+            destination (str/Path): Path to destination file
+            
+        Raises:
+            OSError: If copy operation fails
+        """
         source_path = Path(source)
         
         if not source_path.exists():
@@ -278,8 +286,8 @@ class CopyDatabaseItem:
         print(f"Copying {source_path.name}...")
         shutil.copy2(source_path, destination)
         
-        # Show file size
-        size_mb = destination.stat().st_size / (1024 * 1024)
+        # Show file size (use source to avoid potential issues if destination is inaccessible)
+        size_mb = source_path.stat().st_size / (1024 * 1024)
         print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
 
 
