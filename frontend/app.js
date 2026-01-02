@@ -634,6 +634,65 @@ const dbApi = {
             total_jobs: totalJobs,
             metadata: metadata
         };
+    },
+    
+    // Get filter counts based on currently active filters
+    async getFilteredCounts(fieldKey, activeFilters = {}) {
+        await DatabaseManager.init();
+        
+        // Map field keys to table info
+        const fieldToTableMap = {
+            'job_function': { table: 'job_functions', foreignKey: 'job_function_id', column: 'name' },
+            'seniority_level': { table: 'seniority_levels', foreignKey: 'seniority_level_id', column: 'name' },
+            'city': { table: 'cities', foreignKey: 'city_id', column: 'name' },
+            'remote_work': { table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name' },
+            'industry': { table: 'industries', foreignKey: 'industry_id', column: 'name' },
+            'company': { table: 'companies', foreignKey: 'company_name_id', column: 'name' },
+            'employment_type': { table: 'employment_types', foreignKey: 'employment_type_id', column: 'name' },
+            'contract_type': { table: 'contract_types', foreignKey: 'contract_type_id', column: 'name' },
+            'department': { table: 'departments', foreignKey: 'department_id', column: 'name' },
+            'specialization': { table: 'specializations', foreignKey: 'specialization_id', column: 'name' },
+            'education_level': { table: 'education_levels', foreignKey: 'required_education_id', column: 'name' },
+            'company_size': { table: 'company_sizes', foreignKey: 'company_size_id', column: 'name' }
+        };
+        
+        const tableInfo = fieldToTableMap[fieldKey];
+        if (!tableInfo) {
+            console.error(`No table mapping found for field: ${fieldKey}`);
+            return [];
+        }
+        
+        // Build WHERE clause excluding the current field
+        const filtersWithoutCurrent = { ...activeFilters };
+        delete filtersWithoutCurrent[fieldKey];
+        
+        const { whereClause, params } = this.buildWhereClause(filtersWithoutCurrent, '');
+        
+        // Query to get counts for this field with current filters applied
+        const query = `
+            SELECT t.${tableInfo.column} as name, COUNT(*) as count
+            FROM job_details jd
+            LEFT JOIN titles ti ON jd.title_id = ti.id
+            LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+            LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+            LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+            LEFT JOIN companies c ON jd.company_name_id = c.id
+            LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+            LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+            LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+            LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+            LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN education_levels el ON jd.required_education_id = el.id
+            LEFT JOIN industries ind ON jd.industry_id = ind.id
+            LEFT JOIN ${tableInfo.table} t ON jd.${tableInfo.foreignKey} = t.id
+            ${whereClause}
+            GROUP BY t.${tableInfo.column}
+            HAVING t.${tableInfo.column} IS NOT NULL
+            ORDER BY count DESC, t.${tableInfo.column} ASC
+        `;
+        
+        return DatabaseManager.queryObjects(query, params);
     }
 };
 
@@ -1206,6 +1265,20 @@ const FilterPanel = {
     salaryMaxTimer: null,
     experienceMinTimer: null,
     experienceMaxTimer: null,
+    filterCounts: {}, // Store dynamic filter counts
+    
+    // Async function to get counts for a specific field
+    async getCountsForField(fieldKey) {
+        try {
+            const counts = await dbApi.getFilteredCounts(fieldKey, state.filters);
+            FilterPanel.filterCounts[fieldKey] = counts;
+            m.redraw();
+        } catch (error) {
+            console.error(`Error getting counts for ${fieldKey}:`, error);
+            FilterPanel.filterCounts[fieldKey] = [];
+        }
+    },
+    
     view: () => {
         if (!state.jobsIndex) return null;
         
@@ -1668,9 +1741,22 @@ const FilterPanel = {
                     m('div', { class: 'space-y-2' }, [
                         m('div', { class: 'text-xs font-semibold opacity-60 uppercase tracking-wide' }, section),
                         ...fields.map(field => {
-                            // Get metadata for this field
+                            // Get metadata or dynamic counts for this field
                             const metadataKey = getMetadataKey(field.key);
-                            const metadata = state.jobsIndex.metadata[metadataKey] || [];
+                            
+                            // Use dynamic counts if available, otherwise fall back to static metadata
+                            let options = [];
+                            if (FilterPanel.filterCounts[field.key]) {
+                                options = FilterPanel.filterCounts[field.key];
+                            } else {
+                                // Use static metadata as initial fallback
+                                options = state.jobsIndex.metadata[metadataKey] || [];
+                                // Trigger async fetch of dynamic counts
+                                FilterPanel.getCountsForField(field.key);
+                            }
+                            
+                            // Filter out options with 0 count
+                            const availableOptions = options.filter(opt => opt.count > 0);
                             
                             return m('div', { class: 'form-control' }, [
                                 m('label', { class: 'label py-1' }, [
@@ -1685,12 +1771,14 @@ const FilterPanel = {
                                         } else {
                                             state.filters[field.key] = null;
                                         }
+                                        // Clear cached counts so they refresh
+                                        FilterPanel.filterCounts = {};
                                         handleFilterChange();
                                     }
                                 }, [
                                     m('option', { value: '' }, 'All'),
-                                    ...metadata.map(item => 
-                                        m('option', { value: item.name }, item.name)
+                                    ...availableOptions.map(item => 
+                                        m('option', { value: item.name }, `${item.name} (${item.count})`)
                                     )
                                 ])
                             ]);
