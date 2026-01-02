@@ -208,34 +208,19 @@ class ProcessDataItem:
 
 class CopyDatabaseItem:
     def get_item_description(self):
-        return "Copy Database Files"
+        return "Copy Database Files to Frontend API"
     
     def execute(self):
         print("\n" + "="*80)
         print("DATABASE COPY")
         print("="*80)
-        print("\nCopy SQLite database files to a specified location.")
+        print("\nThis will copy both database files to frontend/api:")
+        print("  • scrape.db (raw scraped data)")
+        print("  • data.db (processed data)")
         print()
         
-        # Show available databases
-        print("Available databases:")
-        print("  1. scrape.db (raw scraped data)")
-        print("  2. data.db (processed data)")
-        print("  3. Both databases")
-        print("  0. Cancel")
-        print()
-        
-        db_choice = input("Select database to copy: ").strip()
-        
-        if db_choice == "0":
-            print("\nCancelled.")
-            return True
-        
-        # Get destination directory
-        dest_dir = input("\nEnter destination directory (default: ./db_copy): ").strip()
-        if not dest_dir:
-            dest_dir = "./db_copy"
-        
+        # Fixed destination directory
+        dest_dir = "frontend/api"
         dest_path = Path(dest_dir)
         
         # Create destination directory if it doesn't exist
@@ -245,20 +230,18 @@ class CopyDatabaseItem:
             print(f"\n✗ Error creating destination directory: {e}")
             return True
         
-        # Copy database(s)
+        print(f"Copying databases to {dest_dir}...")
+        print()
+        
+        # Copy both databases
         try:
-            if db_choice == "1":
-                self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
-            elif db_choice == "2":
-                self._copy_db(Config.data_db_path, dest_path / "data.db")
-            elif db_choice == "3":
-                self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
-                self._copy_db(Config.data_db_path, dest_path / "data.db")
-            else:
-                print("\n✗ Invalid choice.")
-                return True
+            self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
+            self._copy_db(Config.data_db_path, dest_path / "data.db")
             
-            print(f"\n✓ Database file(s) copied successfully to {dest_path}/")
+            print()
+            print(f"✓ Database files copied successfully to {dest_path}/")
+            print(f"  - {dest_path}/scrape.db")
+            print(f"  - {dest_path}/data.db")
         
         except Exception as e:
             print(f"\n✗ Error: {e}")
