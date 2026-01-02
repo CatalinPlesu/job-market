@@ -2069,9 +2069,6 @@ const FilterPanel = {
                                                             e.preventDefault();
                                                             // Remove this item from selection
                                                             state.filters[field.key] = state.filters[field.key].filter(v => v !== selectedValue);
-                                                            if (state.filters[field.key].length === 0) {
-                                                                state.filters[field.key] = [];
-                                                            }
                                                             // Clear cached counts so they refresh
                                                             FilterPanel.filterCounts = {};
                                                             handleFilterChange();
