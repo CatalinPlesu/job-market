@@ -3381,7 +3381,12 @@ LIMIT 20`),
                         class: 'btn btn-primary',
                         onclick: () => {
                             if (!CustomAnalysisState.currentQuery.sql) {
-                                alert('Please enter a SQL query');
+                                // Will show error in query result section
+                                CustomAnalysisState.queryResult = {
+                                    success: false,
+                                    error: 'Please enter a SQL query'
+                                };
+                                m.redraw();
                                 return;
                             }
                             CustomAnalysisState.executeQuery(CustomAnalysisState.currentQuery.sql);
@@ -3393,7 +3398,14 @@ LIMIT 20`),
                         onclick: () => {
                             if (CustomAnalysisState.currentQuery.name && CustomAnalysisState.currentQuery.sql) {
                                 CustomAnalysisState.addQuery(CustomAnalysisState.currentQuery);
-                                alert('Query saved successfully!');
+                                // Show success message using alert component
+                                CustomAnalysisState.queryResult = {
+                                    success: true,
+                                    data: [],
+                                    rowCount: 0,
+                                    savedMessage: 'Query saved successfully!'
+                                };
+                                m.redraw();
                             }
                         }
                     }, 'Save Query')
@@ -3412,11 +3424,12 @@ LIMIT 20`),
                         m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
                             m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' })
                         ]),
-                        m('span', `Query executed successfully. ${CustomAnalysisState.queryResult.rowCount} rows returned.`)
+                        m('span', CustomAnalysisState.queryResult.savedMessage || 
+                            `Query executed successfully. ${CustomAnalysisState.queryResult.rowCount} rows returned.`)
                     ]),
                     
                     // Chart visualization
-                    CustomAnalysisState.queryResult.data.length > 0 && m('div', { class: 'mb-6' }, [
+                    CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('div', { class: 'mb-6' }, [
                         m('h3', { class: 'text-lg font-bold mb-2' }, 'Visualization'),
                         m('div', { class: 'chart-container' }, [
                             m('canvas', {
@@ -3431,14 +3444,14 @@ LIMIT 20`),
                     ]),
                     
                     // Data table
-                    CustomAnalysisState.queryResult.data.length > 0 && m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
+                    CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
                         m('summary', { class: 'collapse-title font-medium' }, 'View Data Table'),
                         m('div', { class: 'collapse-content' }, [
                             m('div', { class: 'overflow-x-auto' }, [
                                 m('table', { class: 'table table-zebra table-sm' }, [
                                     m('thead', [
                                         m('tr', 
-                                            Object.keys(CustomAnalysisState.queryResult.data[0]).map(key => 
+                                            Object.keys(CustomAnalysisState.queryResult.data[0] || {}).map(key => 
                                                 m('th', key)
                                             )
                                         )
