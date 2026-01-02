@@ -255,6 +255,18 @@ class ContactPhone(DataBase):
     phone = Column(String(50), nullable=False)
 
 
+class JobCheck(DataBase):
+    """Track when jobs were checked and their status (synced from scrape.db)"""
+    __tablename__ = 'job_checks'
+    
+    id = Column(Integer, primary_key=True)
+    job_detail_id = Column(Integer, ForeignKey('job_details.id'), nullable=False, index=True)
+    check_date = Column(Date, nullable=False)
+    http_status = Column(Integer)
+    
+    job_detail = relationship("JobDetail", backref="checks", lazy='select')
+
+
 def get_data_db():
     """Get data database session"""
     db = DataSessionLocal()
