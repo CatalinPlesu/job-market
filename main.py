@@ -10,6 +10,7 @@ from src.database_backup import DatabaseBackup
 from config.settings import Config
 from datetime import datetime
 from pathlib import Path
+import shutil
 
 # Analysis engine imports
 try:
@@ -205,53 +206,59 @@ class ProcessDataItem:
         return True
 
 
-class GenerateJsonApiItem:
+class CopyDatabaseItem:
     def get_item_description(self):
-        return "Generate JSON API for GitHub Pages"
+        return "Copy Database Files"
     
     def execute(self):
         print("\n" + "="*80)
-        print("JSON API GENERATION")
+        print("DATABASE COPY")
         print("="*80)
-        print("\nThis will generate paginated JSON files for GitHub Pages:")
-        print("  • index.json with metadata for all 50+ filterable fields")
-        print("  • page-N.json files with job listings (100 jobs per page)")
-        print("  • Sanitizes contact information (emails, phones, person names)")
+        print("\nCopy SQLite database files to a specified location.")
         print()
         
-        output_dir = input("Enter output directory (default: frontend/api): ").strip()
-        if not output_dir:
-            output_dir = "frontend/api"
-        
-        print(f"\nGenerating JSON API to {output_dir}...")
+        # Show available databases
+        print("Available databases:")
+        print("  1. scrape.db (raw scraped data)")
+        print("  2. data.db (processed data)")
+        print("  3. Both databases")
+        print("  0. Cancel")
         print()
         
+        db_choice = input("Select database to copy: ").strip()
+        
+        if db_choice == "0":
+            print("\nCancelled.")
+            return True
+        
+        # Get destination directory
+        dest_dir = input("\nEnter destination directory (default: ./db_copy): ").strip()
+        if not dest_dir:
+            dest_dir = "./db_copy"
+        
+        dest_path = Path(dest_dir)
+        
+        # Create destination directory if it doesn't exist
         try:
-            from json_generator.db_connector import DatabaseConnector
-            from json_generator.jobs_generator import JobsGenerator
+            dest_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"\n✗ Error creating destination directory: {e}")
+            return True
+        
+        # Copy database(s)
+        try:
+            if db_choice == "1":
+                self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
+            elif db_choice == "2":
+                self._copy_db(Config.data_db_path, dest_path / "data.db")
+            elif db_choice == "3":
+                self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
+                self._copy_db(Config.data_db_path, dest_path / "data.db")
+            else:
+                print("\n✗ Invalid choice.")
+                return True
             
-            # Load jobs from database
-            with DatabaseConnector() as db:
-                jobs_count = db.get_jobs_count()
-                print(f"Found {jobs_count} jobs in database")
-                
-                if jobs_count == 0:
-                    print("\n⚠ No jobs found in database. Nothing to generate.")
-                    return True
-                
-                print("Loading jobs with relationships...")
-                jobs = db.get_all_jobs()
-                print(f"✓ Loaded {len(jobs)} jobs")
-            
-            # Generate JSON files
-            print()
-            generator = JobsGenerator(output_dir=output_dir)
-            generator.generate(jobs)
-            
-            print()
-            print(f"✓ JSON API generated successfully to {output_dir}/")
-            print(f"  - {output_dir}/jobs/index.json")
-            print(f"  - {output_dir}/jobs/page-*.json")
+            print(f"\n✓ Database file(s) copied successfully to {dest_path}/")
         
         except Exception as e:
             print(f"\n✗ Error: {e}")
@@ -259,6 +266,21 @@ class GenerateJsonApiItem:
             traceback.print_exc()
         
         return True
+    
+    def _copy_db(self, source, destination):
+        """Helper method to copy a database file."""
+        source_path = Path(source)
+        
+        if not source_path.exists():
+            print(f"\n⚠ Warning: {source_path.name} not found at {source_path}")
+            return
+        
+        print(f"Copying {source_path.name}...")
+        shutil.copy2(source_path, destination)
+        
+        # Show file size
+        size_mb = destination.stat().st_size / (1024 * 1024)
+        print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
 
 
 class DatabaseRollbackItem:
@@ -405,7 +427,7 @@ def run():
     menu.register_item(RecheckAllJobsItem())
     menu.register_item(StructureDataItem())
     menu.register_item(ProcessDataItem())
-    menu.register_item(GenerateJsonApiItem())
+    menu.register_item(CopyDatabaseItem())
     menu.register_item(DatabaseRollbackItem())
     
     # Run the menu
