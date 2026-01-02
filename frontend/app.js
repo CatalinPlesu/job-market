@@ -1294,37 +1294,62 @@ const FilterPanel = {
             
             await DatabaseManager.init();
             
-            // Map of filterable fields to their table and column info
+            // Map of filterable fields to their table and foreign key info
             const filterableFields = [
-                { key: 'job_function', table: 'job_functions', column: 'name', label: 'Job Function' },
-                { key: 'seniority_level', table: 'seniority_levels', column: 'name', label: 'Seniority Level' },
-                { key: 'industry', table: 'industries', column: 'name', label: 'Industry' },
-                { key: 'department', table: 'departments', column: 'name', label: 'Department' },
-                { key: 'specialization', table: 'specializations', column: 'name', label: 'Specialization' },
-                { key: 'city', table: 'cities', column: 'name', label: 'City' },
-                { key: 'company', table: 'companies', column: 'name', label: 'Company' },
-                { key: 'employment_type', table: 'employment_types', column: 'name', label: 'Employment Type' },
-                { key: 'contract_type', table: 'contract_types', column: 'name', label: 'Contract Type' },
-                { key: 'remote_work', table: 'remote_work_options', column: 'name', label: 'Remote Work' },
-                { key: 'education_level', table: 'education_levels', column: 'name', label: 'Education Level' },
-                { key: 'company_size', table: 'company_sizes', column: 'name', label: 'Company Size' }
+                { key: 'job_function', table: 'job_functions', foreignKey: 'job_function_id', column: 'name', label: 'Job Function' },
+                { key: 'seniority_level', table: 'seniority_levels', foreignKey: 'seniority_level_id', column: 'name', label: 'Seniority Level' },
+                { key: 'industry', table: 'industries', foreignKey: 'industry_id', column: 'name', label: 'Industry' },
+                { key: 'department', table: 'departments', foreignKey: 'department_id', column: 'name', label: 'Department' },
+                { key: 'specialization', table: 'specializations', foreignKey: 'specialization_id', column: 'name', label: 'Specialization' },
+                { key: 'city', table: 'cities', foreignKey: 'city_id', column: 'name', label: 'City' },
+                { key: 'company', table: 'companies', foreignKey: 'company_name_id', column: 'name', label: 'Company' },
+                { key: 'employment_type', table: 'employment_types', foreignKey: 'employment_type_id', column: 'name', label: 'Employment Type' },
+                { key: 'contract_type', table: 'contract_types', foreignKey: 'contract_type_id', column: 'name', label: 'Contract Type' },
+                { key: 'remote_work', table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name', label: 'Remote Work' },
+                { key: 'education_level', table: 'education_levels', foreignKey: 'required_education_id', column: 'name', label: 'Education Level' },
+                { key: 'company_size', table: 'company_sizes', foreignKey: 'company_size_id', column: 'name', label: 'Company Size' }
             ];
             
-            // Search across all filterable fields
+            // Search across all filterable fields with counts
             for (const fieldInfo of filterableFields) {
+                // Build WHERE clause for current active filters (excluding this field)
+                const filtersWithoutCurrent = { ...state.filters };
+                delete filtersWithoutCurrent[fieldInfo.key];
+                
+                const { whereClause, params } = dbApi.buildWhereClause(filtersWithoutCurrent, '');
+                
+                // Query with JOIN to count actual jobs
                 const query = `
-                    SELECT DISTINCT ${fieldInfo.column} as value
-                    FROM ${fieldInfo.table}
-                    WHERE LOWER(${fieldInfo.column}) LIKE ?
-                    ORDER BY ${fieldInfo.column}
+                    SELECT t.${fieldInfo.column} as value, COUNT(DISTINCT jd.id) as count
+                    FROM job_details jd
+                    LEFT JOIN titles ti ON jd.title_id = ti.id
+                    LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                    LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                    LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                    LEFT JOIN companies c ON jd.company_name_id = c.id
+                    LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                    LEFT JOIN cities ci ON jd.city_id = ci.id
+                    LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                    LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                    LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                    LEFT JOIN departments d ON jd.department_id = d.id
+                    LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                    LEFT JOIN industries ind ON jd.industry_id = ind.id
+                    LEFT JOIN ${fieldInfo.table} t ON jd.${fieldInfo.foreignKey} = t.id
+                    ${whereClause}
+                    ${whereClause ? 'AND' : 'WHERE'} LOWER(t.${fieldInfo.column}) LIKE ?
+                    GROUP BY t.${fieldInfo.column}
+                    HAVING count > 0
+                    ORDER BY count DESC, t.${fieldInfo.column}
                     LIMIT 3
                 `;
                 
-                const results = DatabaseManager.queryObjects(query, [`%${searchTerm}%`]);
+                const results = DatabaseManager.queryObjects(query, [...params, `%${searchTerm}%`]);
                 
                 results.forEach(row => {
                     suggestions.push({
                         value: row.value,
+                        count: row.count,
                         field: fieldInfo.key,
                         fieldName: fieldInfo.label,
                         fieldDisplay: fieldInfo.label
@@ -1332,7 +1357,7 @@ const FilterPanel = {
                 });
             }
             
-            // Sort suggestions by relevance
+            // Sort suggestions by relevance (exact match, then starts with, then by count)
             suggestions.sort((a, b) => {
                 const aLower = a.value.toLowerCase();
                 const bLower = b.value.toLowerCase();
@@ -1346,8 +1371,8 @@ const FilterPanel = {
                 if (aLower.startsWith(searchLower) && !bLower.startsWith(searchLower)) return -1;
                 if (bLower.startsWith(searchLower) && !aLower.startsWith(searchLower)) return 1;
                 
-                // Contains (alphabetical for ties)
-                return a.value.localeCompare(b.value);
+                // Sort by count (higher counts first)
+                return b.count - a.count;
             });
             
             FilterPanel.suggestions = suggestions.slice(0, 10);
@@ -1523,8 +1548,13 @@ const FilterPanel = {
                                         },
                                         title: `Apply "${suggestion.value}" to ${suggestion.fieldDisplay}`
                                     }, [
-                                        m('div', { class: 'font-medium text-base-content' }, suggestion.value),
-                                        m('div', { class: 'text-xs opacity-70' }, `Apply to: ${suggestion.fieldDisplay}`)
+                                        m('div', { class: 'flex justify-between items-center' }, [
+                                            m('div', [
+                                                m('div', { class: 'font-medium text-base-content' }, suggestion.value),
+                                                m('div', { class: 'text-xs opacity-70' }, `Apply to: ${suggestion.fieldDisplay}`)
+                                            ]),
+                                            m('div', { class: 'badge badge-sm badge-info' }, suggestion.count)
+                                        ])
                                     ])
                                 )
                             ]);
