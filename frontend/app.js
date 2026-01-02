@@ -1496,22 +1496,45 @@ const FilterPanel = {
             await DatabaseManager.init();
             
             // Map of filterable fields to their table and foreign key info
+            // Single-select fields (many-to-one relationships)
             const filterableFields = [
+                { key: 'title', table: 'titles', foreignKey: 'title_id', column: 'name', label: 'Job Title' },
                 { key: 'job_function', table: 'job_functions', foreignKey: 'job_function_id', column: 'name', label: 'Job Function' },
                 { key: 'seniority_level', table: 'seniority_levels', foreignKey: 'seniority_level_id', column: 'name', label: 'Seniority Level' },
                 { key: 'industry', table: 'industries', foreignKey: 'industry_id', column: 'name', label: 'Industry' },
                 { key: 'department', table: 'departments', foreignKey: 'department_id', column: 'name', label: 'Department' },
+                { key: 'job_family', table: 'job_families', foreignKey: 'job_family_id', column: 'name', label: 'Job Family' },
                 { key: 'specialization', table: 'specializations', foreignKey: 'specialization_id', column: 'name', label: 'Specialization' },
-                { key: 'city', table: 'cities', foreignKey: 'city_id', column: 'name', label: 'City' },
-                { key: 'company', table: 'companies', foreignKey: 'company_name_id', column: 'name', label: 'Company' },
+                { key: 'education_level', table: 'education_levels', foreignKey: 'required_education_id', column: 'name', label: 'Education Level' },
                 { key: 'employment_type', table: 'employment_types', foreignKey: 'employment_type_id', column: 'name', label: 'Employment Type' },
                 { key: 'contract_type', table: 'contract_types', foreignKey: 'contract_type_id', column: 'name', label: 'Contract Type' },
+                { key: 'work_schedule', table: 'work_schedules', foreignKey: 'work_schedule_id', column: 'name', label: 'Work Schedule' },
+                { key: 'shift_details', table: 'shift_details', foreignKey: 'shift_details_id', column: 'name', label: 'Shift Details' },
                 { key: 'remote_work', table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name', label: 'Remote Work' },
-                { key: 'education_level', table: 'education_levels', foreignKey: 'required_education_id', column: 'name', label: 'Education Level' },
+                { key: 'travel_required', table: 'travel_requirements', foreignKey: 'travel_required_id', column: 'name', label: 'Travel Required' },
+                { key: 'city', table: 'cities', foreignKey: 'city_id', column: 'name', label: 'City' },
+                { key: 'region', table: 'regions', foreignKey: 'region_id', column: 'name', label: 'Region' },
+                { key: 'country', table: 'countries', foreignKey: 'country_id', column: 'name', label: 'Country' },
+                { key: 'company', table: 'companies', foreignKey: 'company_name_id', column: 'name', label: 'Company' },
                 { key: 'company_size', table: 'company_sizes', foreignKey: 'company_size_id', column: 'name', label: 'Company Size' }
             ];
             
-            // Search across all filterable fields with counts
+            // Many-to-many fields (multi-select)
+            const m2mFields = [
+                { key: 'hard_skills', table: 'hard_skills', column: 'name', label: 'Hard Skills' },
+                { key: 'soft_skills', table: 'soft_skills', column: 'name', label: 'Soft Skills' },
+                { key: 'certifications', table: 'certifications', column: 'name', label: 'Certifications' },
+                { key: 'licenses_required', table: 'licenses', column: 'name', label: 'Licenses' },
+                { key: 'benefits', table: 'benefits', column: 'description', label: 'Benefits' },
+                { key: 'work_environment', table: 'work_environment', column: 'description', label: 'Work Environment' },
+                { key: 'professional_development', table: 'professional_development', column: 'description', label: 'Professional Development' },
+                { key: 'work_life_balance', table: 'work_life_balance', column: 'description', label: 'Work-Life Balance' },
+                { key: 'physical_requirements', table: 'physical_requirements', column: 'description', label: 'Physical Requirements' },
+                { key: 'work_conditions', table: 'work_conditions', column: 'description', label: 'Work Conditions' },
+                { key: 'special_requirements', table: 'special_requirements', column: 'description', label: 'Special Requirements' }
+            ];
+            
+            // Search across all single-select filterable fields with counts
             for (const fieldInfo of filterableFields) {
                 // Build WHERE clause for current active filters (excluding this field)
                 const filtersWithoutCurrent = { ...state.filters };
@@ -1530,12 +1553,18 @@ const FilterPanel = {
                     LEFT JOIN companies c ON jd.company_name_id = c.id
                     LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
                     LEFT JOIN cities ci ON jd.city_id = ci.id
+                    LEFT JOIN regions reg ON jd.region_id = reg.id
+                    LEFT JOIN countries cou ON jd.country_id = cou.id
                     LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
                     LEFT JOIN employment_types et ON jd.employment_type_id = et.id
                     LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
                     LEFT JOIN departments d ON jd.department_id = d.id
+                    LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
                     LEFT JOIN education_levels el ON jd.required_education_id = el.id
                     LEFT JOIN industries ind ON jd.industry_id = ind.id
+                    LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                    LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                    LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
                     LEFT JOIN ${fieldInfo.table} t ON jd.${fieldInfo.foreignKey} = t.id
                     ${whereClause}
                     ${whereClause ? 'AND' : 'WHERE'} LOWER(t.${fieldInfo.column}) LIKE ?
@@ -1554,6 +1583,61 @@ const FilterPanel = {
                         field: fieldInfo.key,
                         fieldName: fieldInfo.label,
                         fieldDisplay: fieldInfo.label
+                    });
+                });
+            }
+            
+            // Search across many-to-many fields
+            for (const fieldInfo of m2mFields) {
+                // Build WHERE clause for current active filters (excluding this field)
+                const filtersWithoutCurrent = { ...state.filters };
+                delete filtersWithoutCurrent[fieldInfo.key];
+                
+                const { whereClause, params } = dbApi.buildWhereClause(filtersWithoutCurrent, '');
+                
+                // Query for many-to-many relationships
+                const query = `
+                    SELECT t.${fieldInfo.column} as value, COUNT(DISTINCT jd.id) as count
+                    FROM job_details jd
+                    LEFT JOIN titles ti ON jd.title_id = ti.id
+                    LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                    LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                    LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                    LEFT JOIN companies c ON jd.company_name_id = c.id
+                    LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                    LEFT JOIN cities ci ON jd.city_id = ci.id
+                    LEFT JOIN regions reg ON jd.region_id = reg.id
+                    LEFT JOIN countries cou ON jd.country_id = cou.id
+                    LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                    LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                    LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                    LEFT JOIN departments d ON jd.department_id = d.id
+                    LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                    LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                    LEFT JOIN industries ind ON jd.industry_id = ind.id
+                    LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                    LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                    LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                    JOIN job_details_${fieldInfo.table} jm ON jd.id = jm.job_details_id
+                    JOIN ${fieldInfo.table} t ON jm.${fieldInfo.table}_id = t.id
+                    ${whereClause}
+                    ${whereClause ? 'AND' : 'WHERE'} LOWER(t.${fieldInfo.column}) LIKE ?
+                    GROUP BY t.${fieldInfo.column}
+                    HAVING count > 0
+                    ORDER BY count DESC, t.${fieldInfo.column}
+                    LIMIT 3
+                `;
+                
+                const results = DatabaseManager.queryObjects(query, [...params, `%${searchTerm}%`]);
+                
+                results.forEach(row => {
+                    suggestions.push({
+                        value: row.value,
+                        count: row.count,
+                        field: fieldInfo.key,
+                        fieldName: fieldInfo.label,
+                        fieldDisplay: fieldInfo.label,
+                        isMultiSelect: true  // Mark as multi-select field
                     });
                 });
             }
@@ -1656,7 +1740,23 @@ const FilterPanel = {
             
             // If suggestion provided, use it
             if (suggestion) {
-                state.filters[suggestion.field] = suggestion.value;
+                // Handle multi-select fields differently
+                if (suggestion.isMultiSelect) {
+                    // For multi-select fields, add to array if not already present
+                    if (!state.filters[suggestion.field]) {
+                        state.filters[suggestion.field] = [];
+                    }
+                    if (!Array.isArray(state.filters[suggestion.field])) {
+                        state.filters[suggestion.field] = [state.filters[suggestion.field]];
+                    }
+                    // Add value if not already in the array
+                    if (!state.filters[suggestion.field].includes(suggestion.value)) {
+                        state.filters[suggestion.field].push(suggestion.value);
+                    }
+                } else {
+                    // For single-select fields, replace value
+                    state.filters[suggestion.field] = suggestion.value;
+                }
                 state.search = ''; // Clear search input
                 
                 // Clear filter counts cache
@@ -1747,12 +1847,21 @@ const FilterPanel = {
                                             e.preventDefault();
                                             applySearchAsFilter(suggestion);
                                         },
-                                        title: `Apply "${suggestion.value}" to ${suggestion.fieldDisplay}`
+                                        title: suggestion.isMultiSelect 
+                                            ? `Add "${suggestion.value}" to ${suggestion.fieldDisplay} (multi-select)`
+                                            : `Apply "${suggestion.value}" to ${suggestion.fieldDisplay}`
                                     }, [
                                         m('div', { class: 'flex justify-between items-center' }, [
                                             m('div', [
-                                                m('div', { class: 'font-medium text-base-content' }, suggestion.value),
-                                                m('div', { class: 'text-xs opacity-70' }, `Apply to: ${suggestion.fieldDisplay}`)
+                                                m('div', { class: 'font-medium text-base-content' }, [
+                                                    suggestion.value,
+                                                    suggestion.isMultiSelect && m('span', { class: 'ml-2 text-xs opacity-60' }, '(+)')
+                                                ]),
+                                                m('div', { class: 'text-xs opacity-70' }, 
+                                                    suggestion.isMultiSelect 
+                                                        ? `Add to: ${suggestion.fieldDisplay}` 
+                                                        : `Apply to: ${suggestion.fieldDisplay}`
+                                                )
                                             ]),
                                             m('div', { class: 'badge badge-sm badge-info' }, suggestion.count)
                                         ])
