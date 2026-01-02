@@ -432,22 +432,29 @@ Begin JSON object:"""
                         ScrapeJobCheck.job_id == job.id
                     ).all()
                     
-                    # Sync each check to data.db
-                    for scrape_check in scrape_checks:
-                        data_check = DataJobCheck(
-                            job_detail_id=detail.id,
-                            check_date=scrape_check.check_date,
-                            http_status=scrape_check.http_status
-                        )
-                        data_session.add(data_check)
-                    
                     if scrape_checks:
+                        # Get existing checks to avoid duplicates
+                        existing_checks = data_session.query(DataJobCheck).filter(
+                            DataJobCheck.job_detail_id == detail.id
+                        ).all()
+                        existing_check_keys = {(check.check_date, check.http_status) for check in existing_checks}
+                        
+                        # Only add checks that don't already exist
+                        for scrape_check in scrape_checks:
+                            check_key = (scrape_check.check_date, scrape_check.http_status)
+                            if check_key not in existing_check_keys:
+                                data_check = DataJobCheck(
+                                    job_detail_id=detail.id,
+                                    check_date=scrape_check.check_date,
+                                    http_status=scrape_check.http_status
+                                )
+                                data_session.add(data_check)
+                        
                         data_session.commit()
                 except Exception as check_error:
-                    # Don't fail the job if check syncing fails, just log it
+                    # Don't fail the job if check syncing fails
+                    # Just rollback the checks, not the job detail (already committed above)
                     data_session.rollback()
-                    # Re-commit the job detail without checks
-                    data_session.commit()
                 
                 return job_id, True, "Success", None, job.site
                 
