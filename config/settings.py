@@ -120,13 +120,13 @@ Return **only** valid JSON that follows this schema:
 
 ```json
 {
-  "title": "string (TRANSLATE; MINIMZE)",
-  "job_function": "string|null",
-  "seniority_level": "entry|junior|mid|senior|lead|manager|director|executive|null",
-  "industry": "string|null",
-  "department": "string|null",
-  "job_family": "string|null",
-  "specialization": "string|null",
+  "title": "string (REQUIRED - TRANSLATE; MINIMIZE)",
+  "job_function": "string (REQUIRED)",
+  "seniority_level": "entry|junior|mid|senior|lead|manager|director|executive (REQUIRED)",
+  "industry": "string (REQUIRED)",
+  "department": "string (REQUIRED)",
+  "job_family": "string (REQUIRED)",
+  "specialization": "string (REQUIRED)",
   "min_salary": "number|null",
   "max_salary": "number|null",
   "salary_currency": "mdl|eur|usd|gbp|null",
@@ -167,12 +167,13 @@ Return **only** valid JSON that follows this schema:
 }
 ```
 
-**Rules (apply only if the field exists):**
-1. Missing → `null`.
-2. `remote_work` → `"on-site"` if not mentioned.
-3. “today” / “azi” → `2025-11-05`.
-4. Moldova jobs → add `["Romanian","Russian"]` to `languages` if empty.
-5. One short action per item in `responsibilities`.
+**Rules:**
+1. **REQUIRED fields must always have a valid value** (never `null`). If not explicitly stated, infer from context.
+2. Missing optional fields → `null`.
+3. `remote_work` → `"on-site"` if not mentioned.
+4. "today" / "azi" → `2025-11-05`.
+5. Moldova jobs → add `["Romanian","Russian"]` to `languages` if empty.
+6. One short action per item in `responsibilities`.
 
 **No explanations, no markdown, no extra text.**
-    """
+"""
