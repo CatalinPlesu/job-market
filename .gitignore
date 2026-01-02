@@ -1,4 +1,5 @@
 /frontend/api/*
+!frontend/api/.gitkeep
 # Python-generated files
 __pycache__/
 *.py[oc]

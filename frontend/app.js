@@ -1,6 +1,99 @@
 // API Configuration
 const API_BASE = '/api';
 
+// Database Management
+const DatabaseManager = {
+    db: null,
+    loading: false,
+    loaded: false,
+    error: null,
+    initPromise: null,
+    
+    // Initialize SQL.js and load the database
+    async init() {
+        if (this.loaded) return this.db;
+        if (this.loading && this.initPromise) {
+            // Wait for existing initialization to complete
+            return this.initPromise;
+        }
+        
+        this.loading = true;
+        this.error = null;
+        
+        // Store the initialization promise so multiple calls can await it
+        this.initPromise = (async () => {
+            try {
+                console.log('Initializing SQL.js...');
+                
+                // Initialize SQL.js with CDN WASM files
+                const SQL = await initSqlJs({
+                    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+                });
+                
+                console.log('Loading database file...');
+                
+                // Load the database file
+                const response = await fetch(`${API_BASE}/data.db`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load database: ${response.status} ${response.statusText}`);
+                }
+                
+                const buffer = await response.arrayBuffer();
+                console.log(`Database loaded: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+                
+                // Create database instance
+                this.db = new SQL.Database(new Uint8Array(buffer));
+                this.loaded = true;
+                this.loading = false;
+                
+                console.log('Database ready for queries');
+                return this.db;
+                
+            } catch (error) {
+                console.error('Database initialization failed:', error);
+                this.error = error;
+                this.loading = false;
+                this.initPromise = null;
+                throw error;
+            }
+        })();
+        
+        return this.initPromise;
+    },
+    
+    // Execute a SQL query
+    query(sql, params = []) {
+        if (!this.db) {
+            throw new Error('Database not initialized. Call init() first.');
+        }
+        
+        try {
+            const results = this.db.exec(sql, params);
+            return results;
+        } catch (error) {
+            console.error('Query failed:', sql, error);
+            throw error;
+        }
+    },
+    
+    // Get query results as objects
+    queryObjects(sql, params = []) {
+        const results = this.query(sql, params);
+        if (results.length === 0) return [];
+        
+        const [result] = results;
+        const { columns, values } = result;
+        
+        return values.map(row => {
+            const obj = {};
+            columns.forEach((col, idx) => {
+                obj[col] = row[idx];
+            });
+            return obj;
+        });
+    }
+};
+
 // URL State Management Utilities
 const URLState = {
     // Parse query parameters from URL
@@ -91,6 +184,518 @@ const api = {
     getAnalysis: (filename) => m.request({ url: `${API_BASE}/analysis/${filename}` })
 };
 
+// SQL-based data access functions
+const dbApi = {
+    // Build WHERE clause from filters
+    buildWhereClause(filters, search) {
+        const conditions = [];
+        const params = [];  // Changed from {} to [] for positional parameters
+        
+        // Text search across multiple fields
+        if (search && search.trim()) {
+            const searchValue = `%${search.trim()}%`;
+            conditions.push(`(
+                jd.job_title LIKE ? OR
+                t.name LIKE ? OR
+                c.name LIKE ? OR
+                jf.name LIKE ? OR
+                sp.name LIKE ?
+            )`);
+            // Add the same search value 5 times for the 5 LIKE clauses
+            params.push(searchValue, searchValue, searchValue, searchValue, searchValue);
+        }
+        
+        // Job function filter
+        if (filters.job_function) {
+            conditions.push('jf.name = ?');
+            params.push(filters.job_function);
+        }
+        
+        // Seniority filter
+        if (filters.seniority_level) {
+            conditions.push('sl.name = ?');
+            params.push(filters.seniority_level);
+        }
+        
+        // City filter
+        if (filters.city) {
+            conditions.push('ci.name = ?');
+            params.push(filters.city);
+        }
+        
+        // Remote work filter
+        if (filters.remote_work) {
+            conditions.push('rw.name = ?');
+            params.push(filters.remote_work);
+        }
+        
+        // Industry filter
+        if (filters.industry) {
+            conditions.push('ind.name = ?');
+            params.push(filters.industry);
+        }
+        
+        // Company filter
+        if (filters.company) {
+            conditions.push('c.name = ?');
+            params.push(filters.company);
+        }
+        
+        // Employment type filter
+        if (filters.employment_type) {
+            conditions.push('et.name = ?');
+            params.push(filters.employment_type);
+        }
+        
+        // Contract type filter
+        if (filters.contract_type) {
+            conditions.push('ct.name = ?');
+            params.push(filters.contract_type);
+        }
+        
+        // Department filter
+        if (filters.department) {
+            conditions.push('d.name = ?');
+            params.push(filters.department);
+        }
+        
+        // Specialization filter
+        if (filters.specialization) {
+            conditions.push('sp.name = ?');
+            params.push(filters.specialization);
+        }
+        
+        // Education level filter
+        if (filters.education_level) {
+            conditions.push('el.name = ?');
+            params.push(filters.education_level);
+        }
+        
+        // Company size filter
+        if (filters.company_size) {
+            conditions.push('cs.name = ?');
+            params.push(filters.company_size);
+        }
+        
+        // Salary range filters
+        if (filters.salaryMin !== null && filters.salaryMin !== undefined) {
+            conditions.push('jd.min_salary >= ?');
+            params.push(filters.salaryMin);
+        }
+        
+        if (filters.salaryMax !== null && filters.salaryMax !== undefined) {
+            conditions.push('jd.max_salary <= ?');
+            params.push(filters.salaryMax);
+        }
+        
+        // Experience filters
+        if (filters.experienceMin !== null && filters.experienceMin !== undefined) {
+            conditions.push('jd.experience_years >= ?');
+            params.push(filters.experienceMin);
+        }
+        
+        if (filters.experienceMax !== null && filters.experienceMax !== undefined) {
+            conditions.push('jd.experience_years <= ?');
+            params.push(filters.experienceMax);
+        }
+        
+        const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+        return { whereClause, params };
+    },
+    
+    // Build ORDER BY clause from sort option
+    buildOrderByClause(sortOption) {
+        const sortMap = {
+            'date_desc': 'jd.posting_date DESC',
+            'date_asc': 'jd.posting_date ASC',
+            'salary_desc': 'jd.min_salary DESC',
+            'salary_asc': 'jd.min_salary ASC',
+            'title_asc': 't.name ASC',
+            'title_desc': 't.name DESC',
+            'company_asc': 'c.name ASC',
+            'company_desc': 'c.name DESC'
+        };
+        
+        return sortMap[sortOption] || sortMap['date_desc'];
+    },
+    
+    // Get jobs with pagination, filtering, and sorting
+    async getJobs(page = 1, limit = 20, filters = {}, search = '', sort = 'date_desc') {
+        await DatabaseManager.init();
+        
+        const { whereClause, params } = this.buildWhereClause(filters, search);
+        const orderBy = this.buildOrderByClause(sort);
+        const offset = (page - 1) * limit;
+        
+        // Main query to get jobs
+        const jobsQuery = `
+            SELECT 
+                jd.id,
+                t.name as title,
+                jf.name as job_function,
+                sp.name as specialization,
+                sl.name as seniority_level,
+                c.name as company,
+                cs.name as company_size,
+                ci.name as city,
+                reg.name as region,
+                cou.name as country,
+                rw.name as remote_work,
+                jd.min_salary,
+                jd.max_salary,
+                curr.code as salary_currency,
+                sper.name as salary_period,
+                et.name as employment_type,
+                ct.name as contract_type,
+                ws.name as work_schedule,
+                el.name as education_level,
+                jd.experience_years,
+                jd.posting_date,
+                jd.site,
+                jd.job_url,
+                jd.job_title as original_title,
+                jd.company_name as original_company,
+                jd.job_description as original_description,
+                ind.name as industry,
+                d.name as department,
+                jf2.name as job_family,
+                sd.name as shift_details,
+                tr.name as travel_requirements
+            FROM job_details jd
+            LEFT JOIN titles t ON jd.title_id = t.id
+            LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+            LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+            LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+            LEFT JOIN companies c ON jd.company_name_id = c.id
+            LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+            LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN regions reg ON jd.region_id = reg.id
+            LEFT JOIN countries cou ON jd.country_id = cou.id
+            LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+            LEFT JOIN currencies curr ON jd.salary_currency_id = curr.id
+            LEFT JOIN salary_periods sper ON jd.salary_period_id = sper.id
+            LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+            LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+            LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+            LEFT JOIN education_levels el ON jd.required_education_id = el.id
+            LEFT JOIN industries ind ON jd.industry_id = ind.id
+            LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+            LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+            LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+            ${whereClause}
+            ORDER BY ${orderBy}
+            LIMIT ${limit} OFFSET ${offset}
+        `;
+        
+        const jobs = DatabaseManager.queryObjects(jobsQuery, params);
+        
+        // Get total count
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM job_details jd
+            LEFT JOIN titles t ON jd.title_id = t.id
+            LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+            LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+            LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+            LEFT JOIN companies c ON jd.company_name_id = c.id
+            LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+            LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+            LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+            LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+            LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN education_levels el ON jd.required_education_id = el.id
+            LEFT JOIN industries ind ON jd.industry_id = ind.id
+            ${whereClause}
+        `;
+        
+        const countResult = DatabaseManager.queryObjects(countQuery, params);
+        const total = countResult[0]?.total || 0;
+        
+        // Format jobs to match the JSON API structure
+        const formattedJobs = await Promise.all(jobs.map(job => this.formatJob(job)));
+        
+        return {
+            jobs: formattedJobs,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
+    },
+    
+    // Format a job to match JSON API structure
+    async formatJob(job) {
+        // Get related data (skills, benefits, etc.)
+        const hardSkills = await this.getJobSkills(job.id, 'hard_skills');
+        const softSkills = await this.getJobSkills(job.id, 'soft_skills');
+        const certifications = await this.getJobRelated(job.id, 'certifications');
+        const benefits = await this.getJobRelated(job.id, 'benefits');
+        const responsibilities = await this.getJobResponsibilities(job.id);
+        const languages = await this.getJobLanguages(job.id);
+        const workEnvironment = await this.getJobRelated(job.id, 'work_environment');
+        const professionalDevelopment = await this.getJobRelated(job.id, 'professional_development');
+        
+        return {
+            id: job.id,
+            title: job.title,
+            job_function: job.job_function,
+            specialization: job.specialization,
+            seniority_level: job.seniority_level,
+            company: job.company,
+            company_size: job.company_size,
+            location: {
+                city: job.city,
+                region: job.region,
+                country: job.country,
+                remote_work: job.remote_work
+            },
+            salary: {
+                min: job.min_salary,
+                max: job.max_salary,
+                currency: job.salary_currency || 'MDL',
+                period: job.salary_period,
+                min_mdl: job.min_salary, // For Moldova market, assume MDL
+                max_mdl: job.max_salary
+            },
+            employment: {
+                type: job.employment_type,
+                contract: job.contract_type,
+                schedule: job.work_schedule
+            },
+            requirements: {
+                education: job.education_level,
+                experience_years: job.experience_years,
+                languages: languages,
+                hard_skills: hardSkills,
+                soft_skills: softSkills,
+                certifications: certifications
+            },
+            benefits: benefits,
+            posting_date: job.posting_date,
+            source: {
+                site: job.site,
+                url: job.job_url
+            },
+            parsed_view: {
+                responsibilities: responsibilities,
+                work_environment: workEnvironment,
+                professional_development: professionalDevelopment
+            },
+            raw: {
+                original_title: job.original_title,
+                original_company: job.original_company,
+                original_description: job.original_description
+            },
+            industry: job.industry,
+            department: job.department,
+            job_family: job.job_family,
+            shift_details: job.shift_details,
+            travel_requirements: job.travel_requirements
+        };
+    },
+    
+    // Get job skills (hard or soft)
+    async getJobSkills(jobId, skillType) {
+        // Validate skillType to prevent SQL injection
+        const allowedTypes = ['hard_skills', 'soft_skills'];
+        if (!allowedTypes.includes(skillType)) {
+            console.error('Invalid skill type:', skillType);
+            return [];
+        }
+        
+        const table = skillType;
+        const query = `
+            SELECT s.name
+            FROM ${table} s
+            JOIN job_details_${table} js ON s.id = js.${table}_id
+            WHERE js.job_details_id = ?
+        `;
+        
+        const results = DatabaseManager.queryObjects(query, [jobId]);
+        return results.map(r => r.name);
+    },
+    
+    // Get job related data (benefits, certifications, etc.)
+    async getJobRelated(jobId, relationType) {
+        // Validate relationType to prevent SQL injection
+        const allowedTypes = [
+            'certifications', 'benefits', 'work_environment', 
+            'professional_development', 'work_life_balance',
+            'physical_requirements', 'work_conditions', 'special_requirements'
+        ];
+        if (!allowedTypes.includes(relationType)) {
+            console.error('Invalid relation type:', relationType);
+            return [];
+        }
+        
+        const columnName = relationType === 'benefits' || relationType === 'work_environment' || 
+                          relationType === 'professional_development' ? 'description' : 'name';
+        const query = `
+            SELECT r.${columnName} as value
+            FROM ${relationType} r
+            JOIN job_details_${relationType} jr ON r.id = jr.${relationType}_id
+            WHERE jr.job_details_id = ?
+        `;
+        
+        const results = DatabaseManager.queryObjects(query, [jobId]);
+        return results.map(r => r.value);
+    },
+    
+    // Get job responsibilities
+    async getJobResponsibilities(jobId) {
+        const query = `
+            SELECT description
+            FROM responsibilities
+            WHERE job_detail_id = ?
+        `;
+        
+        const results = DatabaseManager.queryObjects(query, [jobId]);
+        return results.map(r => r.description);
+    },
+    
+    // Get job languages
+    async getJobLanguages(jobId) {
+        const query = `
+            SELECT language
+            FROM job_languages
+            WHERE job_detail_id = ?
+        `;
+        
+        const results = DatabaseManager.queryObjects(query, [jobId]);
+        return results.map(r => r.language);
+    },
+    
+    // Get metadata for filters (distinct values with counts)
+    async getMetadata() {
+        await DatabaseManager.init();
+        
+        const metadata = {};
+        
+        // Map table names to their foreign key column names in job_details
+        const tableToForeignKey = {
+            'job_functions': 'job_function_id',
+            'seniority_levels': 'seniority_level_id',
+            'cities': 'city_id',
+            'remote_work_options': 'remote_work_id',
+            'industries': 'industry_id',
+            'companies': 'company_name_id',
+            'employment_types': 'employment_type_id',
+            'contract_types': 'contract_type_id',
+            'departments': 'department_id',
+            'specializations': 'specialization_id',
+            'education_levels': 'required_education_id',
+            'company_sizes': 'company_size_id'
+        };
+        
+        // Helper function to get distinct values with counts
+        const getDistinctValues = (table, column, label) => {
+            const foreignKey = tableToForeignKey[table];
+            if (!foreignKey) {
+                console.error(`No foreign key mapping found for table: ${table}`);
+                return [];
+            }
+            
+            const query = `
+                SELECT ${column} as name, COUNT(*) as count
+                FROM job_details jd
+                LEFT JOIN ${table} t ON jd.${foreignKey} = t.id
+                WHERE t.${column} IS NOT NULL
+                GROUP BY t.${column}
+                ORDER BY count DESC, t.${column} ASC
+            `;
+            return DatabaseManager.queryObjects(query);
+        };
+        
+        // Get metadata for each filterable field
+        try {
+            metadata.job_function = getDistinctValues('job_functions', 'name', 'Job Function');
+            metadata.seniority_level = getDistinctValues('seniority_levels', 'name', 'Seniority');
+            metadata.location = getDistinctValues('cities', 'name', 'City');
+            metadata.remote_work = getDistinctValues('remote_work_options', 'name', 'Remote Work');
+            metadata.industry = getDistinctValues('industries', 'name', 'Industry');
+            metadata.company_name = getDistinctValues('companies', 'name', 'Company');
+            metadata.employment_type = getDistinctValues('employment_types', 'name', 'Employment Type');
+            metadata.contract_type = getDistinctValues('contract_types', 'name', 'Contract Type');
+            metadata.department = getDistinctValues('departments', 'name', 'Department');
+            metadata.specialization = getDistinctValues('specializations', 'name', 'Specialization');
+            metadata.education_level = getDistinctValues('education_levels', 'name', 'Education');
+            metadata.company_size = getDistinctValues('company_sizes', 'name', 'Company Size');
+        } catch (error) {
+            console.error('Error getting metadata:', error);
+        }
+        
+        // Get total jobs count
+        const totalQuery = 'SELECT COUNT(*) as total FROM job_details';
+        const totalResult = DatabaseManager.queryObjects(totalQuery);
+        const totalJobs = totalResult[0]?.total || 0;
+        
+        return {
+            total_jobs: totalJobs,
+            metadata: metadata
+        };
+    },
+    
+    // Get filter counts based on currently active filters
+    async getFilteredCounts(fieldKey, activeFilters = {}) {
+        await DatabaseManager.init();
+        
+        // Map field keys to table info
+        const fieldToTableMap = {
+            'job_function': { table: 'job_functions', foreignKey: 'job_function_id', column: 'name' },
+            'seniority_level': { table: 'seniority_levels', foreignKey: 'seniority_level_id', column: 'name' },
+            'city': { table: 'cities', foreignKey: 'city_id', column: 'name' },
+            'remote_work': { table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name' },
+            'industry': { table: 'industries', foreignKey: 'industry_id', column: 'name' },
+            'company': { table: 'companies', foreignKey: 'company_name_id', column: 'name' },
+            'employment_type': { table: 'employment_types', foreignKey: 'employment_type_id', column: 'name' },
+            'contract_type': { table: 'contract_types', foreignKey: 'contract_type_id', column: 'name' },
+            'department': { table: 'departments', foreignKey: 'department_id', column: 'name' },
+            'specialization': { table: 'specializations', foreignKey: 'specialization_id', column: 'name' },
+            'education_level': { table: 'education_levels', foreignKey: 'required_education_id', column: 'name' },
+            'company_size': { table: 'company_sizes', foreignKey: 'company_size_id', column: 'name' }
+        };
+        
+        const tableInfo = fieldToTableMap[fieldKey];
+        if (!tableInfo) {
+            console.error(`No table mapping found for field: ${fieldKey}`);
+            return [];
+        }
+        
+        // Build WHERE clause excluding the current field
+        const filtersWithoutCurrent = { ...activeFilters };
+        delete filtersWithoutCurrent[fieldKey];
+        
+        const { whereClause, params } = this.buildWhereClause(filtersWithoutCurrent, '');
+        
+        // Query to get counts for this field with current filters applied
+        const query = `
+            SELECT t.${tableInfo.column} as name, COUNT(*) as count
+            FROM job_details jd
+            LEFT JOIN titles ti ON jd.title_id = ti.id
+            LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+            LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+            LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+            LEFT JOIN companies c ON jd.company_name_id = c.id
+            LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+            LEFT JOIN cities ci ON jd.city_id = ci.id
+            LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+            LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+            LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+            LEFT JOIN departments d ON jd.department_id = d.id
+            LEFT JOIN education_levels el ON jd.required_education_id = el.id
+            LEFT JOIN industries ind ON jd.industry_id = ind.id
+            LEFT JOIN ${tableInfo.table} t ON jd.${tableInfo.foreignKey} = t.id
+            ${whereClause}
+            GROUP BY t.${tableInfo.column}
+            HAVING t.${tableInfo.column} IS NOT NULL
+            ORDER BY count DESC, t.${tableInfo.column} ASC
+        `;
+        
+        return DatabaseManager.queryObjects(query, params);
+    }
+};
+
 // Helper to check if filters are active
 const hasActiveFilters = (filters) => {
     return Object.keys(filters).some(k => filters[k] !== null && filters[k] !== undefined && filters[k] !== '');
@@ -111,6 +716,9 @@ const state = {
         experienceMax: null
     },
     loading: false,
+    dbLoading: false,
+    dbLoaded: false,
+    dbError: null,
     analysisIndex: null,
     selectedAnalysis: null,
     selectedAnalysisData: null,
@@ -343,13 +951,44 @@ const Loading = {
 
 // Home Page
 const HomePage = {
-    oninit: () => {
-        api.getJobsIndex().then(data => {
-            state.jobsIndex = data;
-        });
+    oninit: async () => {
+        try {
+            state.dbLoading = true;
+            await DatabaseManager.init();
+            state.dbLoaded = true;
+            
+            const metadata = await dbApi.getMetadata();
+            state.jobsIndex = metadata;
+            state.dbLoading = false;
+            m.redraw();
+        } catch (error) {
+            console.error('Failed to load database:', error);
+            state.dbError = error;
+            state.dbLoading = false;
+            m.redraw();
+        }
     },
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
-        m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
+        state.dbLoading ? m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
+            m('div', { class: 'hero-content text-center' }, [
+                m('div', { class: 'max-w-md' }, [
+                    m('h1', { class: 'text-5xl font-bold mb-4' }, 'Moldova Job Market'),
+                    m('div', { class: 'flex flex-col items-center gap-4' }, [
+                        m('span', { class: 'loading loading-spinner loading-lg' }),
+                        m('p', { class: 'text-sm opacity-70' }, 'Loading job database...')
+                    ])
+                ])
+            ])
+        ]) : state.dbError ? m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
+            m('div', { class: 'hero-content text-center' }, [
+                m('div', { class: 'max-w-md' }, [
+                    m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
+                    m('div', { class: 'alert alert-error mt-6' }, [
+                        m('span', 'Failed to load database. Please make sure data.db is available in /api/')
+                    ])
+                ])
+            ])
+        ]) : m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg' }, [
             m('div', { class: 'hero-content text-center' }, [
                 m('div', { class: 'max-w-md' }, [
                     m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
@@ -622,20 +1261,133 @@ const getAvailableOptions = (jobs, filterKey) => {
 // Filter Component with Hierarchical Filtering (Left Sidebar)
 const FilterPanel = {
     showAdvanced: false,
+    salaryMinTimer: null,
+    salaryMaxTimer: null,
+    experienceMinTimer: null,
+    experienceMaxTimer: null,
+    filterCounts: {}, // Store dynamic filter counts
+    suggestions: [], // Store filter suggestions
+    suggestionsTimer: null,
+    
+    // Async function to get counts for a specific field
+    async getCountsForField(fieldKey) {
+        try {
+            const counts = await dbApi.getFilteredCounts(fieldKey, state.filters);
+            FilterPanel.filterCounts[fieldKey] = counts;
+            m.redraw();
+        } catch (error) {
+            console.error(`Error getting counts for ${fieldKey}:`, error);
+            FilterPanel.filterCounts[fieldKey] = [];
+        }
+    },
+    
+    // Async function to fetch suggestions
+    async fetchSuggestions() {
+        if (!state.search || state.search.trim() === '') {
+            FilterPanel.suggestions = [];
+            return;
+        }
+        
+        try {
+            const searchTerm = state.search.toLowerCase().trim();
+            const suggestions = [];
+            
+            await DatabaseManager.init();
+            
+            // Map of filterable fields to their table and foreign key info
+            const filterableFields = [
+                { key: 'job_function', table: 'job_functions', foreignKey: 'job_function_id', column: 'name', label: 'Job Function' },
+                { key: 'seniority_level', table: 'seniority_levels', foreignKey: 'seniority_level_id', column: 'name', label: 'Seniority Level' },
+                { key: 'industry', table: 'industries', foreignKey: 'industry_id', column: 'name', label: 'Industry' },
+                { key: 'department', table: 'departments', foreignKey: 'department_id', column: 'name', label: 'Department' },
+                { key: 'specialization', table: 'specializations', foreignKey: 'specialization_id', column: 'name', label: 'Specialization' },
+                { key: 'city', table: 'cities', foreignKey: 'city_id', column: 'name', label: 'City' },
+                { key: 'company', table: 'companies', foreignKey: 'company_name_id', column: 'name', label: 'Company' },
+                { key: 'employment_type', table: 'employment_types', foreignKey: 'employment_type_id', column: 'name', label: 'Employment Type' },
+                { key: 'contract_type', table: 'contract_types', foreignKey: 'contract_type_id', column: 'name', label: 'Contract Type' },
+                { key: 'remote_work', table: 'remote_work_options', foreignKey: 'remote_work_id', column: 'name', label: 'Remote Work' },
+                { key: 'education_level', table: 'education_levels', foreignKey: 'required_education_id', column: 'name', label: 'Education Level' },
+                { key: 'company_size', table: 'company_sizes', foreignKey: 'company_size_id', column: 'name', label: 'Company Size' }
+            ];
+            
+            // Search across all filterable fields with counts
+            for (const fieldInfo of filterableFields) {
+                // Build WHERE clause for current active filters (excluding this field)
+                const filtersWithoutCurrent = { ...state.filters };
+                delete filtersWithoutCurrent[fieldInfo.key];
+                
+                const { whereClause, params } = dbApi.buildWhereClause(filtersWithoutCurrent, '');
+                
+                // Query with JOIN to count actual jobs
+                const query = `
+                    SELECT t.${fieldInfo.column} as value, COUNT(DISTINCT jd.id) as count
+                    FROM job_details jd
+                    LEFT JOIN titles ti ON jd.title_id = ti.id
+                    LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                    LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                    LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                    LEFT JOIN companies c ON jd.company_name_id = c.id
+                    LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                    LEFT JOIN cities ci ON jd.city_id = ci.id
+                    LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                    LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                    LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                    LEFT JOIN departments d ON jd.department_id = d.id
+                    LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                    LEFT JOIN industries ind ON jd.industry_id = ind.id
+                    LEFT JOIN ${fieldInfo.table} t ON jd.${fieldInfo.foreignKey} = t.id
+                    ${whereClause}
+                    ${whereClause ? 'AND' : 'WHERE'} LOWER(t.${fieldInfo.column}) LIKE ?
+                    GROUP BY t.${fieldInfo.column}
+                    HAVING count > 0
+                    ORDER BY count DESC, t.${fieldInfo.column}
+                    LIMIT 3
+                `;
+                
+                const results = DatabaseManager.queryObjects(query, [...params, `%${searchTerm}%`]);
+                
+                results.forEach(row => {
+                    suggestions.push({
+                        value: row.value,
+                        count: row.count,
+                        field: fieldInfo.key,
+                        fieldName: fieldInfo.label,
+                        fieldDisplay: fieldInfo.label
+                    });
+                });
+            }
+            
+            // Sort suggestions by relevance (exact match, then starts with, then by count)
+            suggestions.sort((a, b) => {
+                const aLower = a.value.toLowerCase();
+                const bLower = b.value.toLowerCase();
+                const searchLower = searchTerm.toLowerCase();
+                
+                // Exact match first
+                if (aLower === searchLower && bLower !== searchLower) return -1;
+                if (bLower === searchLower && aLower !== searchLower) return 1;
+                
+                // Starts with
+                if (aLower.startsWith(searchLower) && !bLower.startsWith(searchLower)) return -1;
+                if (bLower.startsWith(searchLower) && !aLower.startsWith(searchLower)) return 1;
+                
+                // Sort by count (higher counts first)
+                return b.count - a.count;
+            });
+            
+            FilterPanel.suggestions = suggestions.slice(0, 10);
+            m.redraw();
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+            FilterPanel.suggestions = [];
+        }
+    },
+    
     view: () => {
         if (!state.jobsIndex) return null;
         
-        // Get filtered jobs based on current filters for hierarchical filtering
-        const filteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, state.filters));
-        
-        // Calculate salary range from all jobs
+        // Calculate salary range - use reasonable defaults
         const salaryRange = { min: 0, max: 100000 };
-        state.allLoadedJobs.forEach(job => {
-            const minSalary = job.salary?.min_mdl || job.salary?.min;
-            const maxSalary = job.salary?.max_mdl || job.salary?.max;
-            if (minSalary && minSalary > 0) salaryRange.min = Math.min(salaryRange.min === 0 ? minSalary : salaryRange.min, minSalary);
-            if (maxSalary) salaryRange.max = Math.max(salaryRange.max, maxSalary);
-        });
         
         // All available filter fields - organized following schema order
         // Excludes non-filterable fields like contact info
@@ -689,209 +1441,31 @@ const FilterPanel = {
         const handleFilterChange = async () => {
             JobsPage.displayPage = 1;
             
-            // Determine which pages we need to load for the current display page
-            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-            
-            // Calculate which pages are needed for the current display page
-            if (filterMetadata && filterMetadata.pages) {
-                const pagesToLoad = new Set();
-                // We need to load enough pages to satisfy the current display page
-                const itemsNeeded = state.itemsPerPage;
-                let itemsAccumulated = 0;
-                
-                for (const pageInfo of filterMetadata.pages) {
-                    if (itemsAccumulated < itemsNeeded) {
-                        pagesToLoad.add(pageInfo.page);
-                        itemsAccumulated += pageInfo.count;
-                    } else {
-                        break;
-                    }
-                }
-                
-                // Load the identified pages
-                if (pagesToLoad.size > 0) {
-                    const promises = [];
-                    for (const page of pagesToLoad) {
-                        if (!state.loadedPages.has(page)) {
-                            promises.push(JobsPage.loadPage(page));
-                        }
-                    }
-                    if (promises.length > 0) {
-                        await Promise.all(promises);
-                    }
-                }
-            }
-            
             // Update URL with new filter state
             URLState.update();
             
-            // Trigger auto-load after filter change
-            setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
+            // Reload jobs with new filters
+            await JobsPage.loadJobs();
             m.redraw();
         };
         
-        // Function to get available filter suggestions
-        const getFilterSuggestions = () => {
-            if (!state.search || state.search.trim() === '') return [];
-            
-            const searchTerm = state.search.toLowerCase().trim();
-            const suggestions = [];
-            
-            // Collect all available values from all filter fields
-            filterFields.forEach(field => {
-                // Get available options for this field
-                const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
-                const currentFieldIndex = hierarchyLevels.indexOf(field.key);
-                
-                let filterForOptions;
-                if (currentFieldIndex !== -1) {
-                    filterForOptions = {};
-                    for (let i = 0; i < currentFieldIndex; i++) {
-                        const parentKey = hierarchyLevels[i];
-                        if (state.filters[parentKey]) {
-                            filterForOptions[parentKey] = state.filters[parentKey];
-                        }
-                    }
-                } else {
-                    filterForOptions = { ...state.filters };
-                    delete filterForOptions[field.key];
-                }
-                
-                const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
-                
-                const availableValuesSet = new Set();
-                baseFilteredJobs.forEach(job => {
-                    const value = getJobFieldValue(job, field.key);
-                    if (value !== null && value !== undefined && value !== '') {
-                        if (Array.isArray(value)) {
-                            value.forEach(v => availableValuesSet.add(v));
-                        } else {
-                            availableValuesSet.add(value);
-                        }
-                    }
-                });
-                
-                // Check if any values match the search term
-                const matchingValues = Array.from(availableValuesSet)
-                    .filter(value => value.toLowerCase().includes(searchTerm))
-                    .slice(0, 5); // Limit to 5 suggestions
-                
-                matchingValues.forEach(value => {
-                    suggestions.push({
-                        value: value,
-                        field: field.key,
-                        fieldName: field.label,
-                        fieldDisplay: field.display || field.label
-                    });
-                });
-            });
-            
-            // Sort suggestions by relevance (exact match first, then starts with, then contains)
-            suggestions.sort((a, b) => {
-                const aLower = a.value.toLowerCase();
-                const bLower = b.value.toLowerCase();
-                const searchLower = searchTerm.toLowerCase();
-                
-                // Exact match
-                if (aLower === searchLower && bLower !== searchLower) return -1;
-                if (bLower === searchLower && aLower !== searchLower) return 1;
-                
-                // Starts with
-                if (aLower.startsWith(searchLower) && !bLower.startsWith(searchLower)) return -1;
-                if (bLower.startsWith(searchLower) && !aLower.startsWith(searchLower)) return 1;
-                
-                // Contains (alphabetical for ties)
-                if (aLower.includes(searchLower) && bLower.includes(searchLower)) {
-                    return a.value.localeCompare(b.value);
-                }
-                
-                return 0;
-            });
-            
-            return suggestions.slice(0, 10); // Limit total suggestions
-        };
-        
         // Function to apply search as filter
-        const applySearchAsFilter = (suggestion = null) => {
+        const applySearchAsFilter = async (suggestion = null) => {
             if (!state.search || state.search.trim() === '') return;
-            
-            let searchTerm = state.search.toLowerCase().trim();
-            let applied = false;
             
             // If suggestion provided, use it
             if (suggestion) {
                 state.filters[suggestion.field] = suggestion.value;
                 state.search = ''; // Clear search input
-                applied = true;
-            } else {
-                // Try to find matching filter values
-                filterFields.forEach(field => {
-                    if (applied) return; // Stop if already applied
-                    
-                    // Get available options for this field
-                    const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
-                    const currentFieldIndex = hierarchyLevels.indexOf(field.key);
-                    
-                    let filterForOptions;
-                    if (currentFieldIndex !== -1) {
-                        filterForOptions = {};
-                        for (let i = 0; i < currentFieldIndex; i++) {
-                            const parentKey = hierarchyLevels[i];
-                            if (state.filters[parentKey]) {
-                                filterForOptions[parentKey] = state.filters[parentKey];
-                            }
-                        }
-                    } else {
-                        filterForOptions = { ...state.filters };
-                        delete filterForOptions[field.key];
-                    }
-                    
-                    const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
-                    
-                    const availableValuesSet = new Set();
-                    baseFilteredJobs.forEach(job => {
-                        const value = getJobFieldValue(job, field.key);
-                        if (value !== null && value !== undefined && value !== '') {
-                            if (Array.isArray(value)) {
-                                value.forEach(v => availableValuesSet.add(v));
-                            } else {
-                                availableValuesSet.add(value);
-                            }
-                        }
-                    });
-                    
-                    // Check for exact match first
-                    const exactMatch = Array.from(availableValuesSet).find(value => 
-                        value.toLowerCase() === searchTerm
-                    );
-                    
-                    if (exactMatch) {
-                        state.filters[field.key] = exactMatch;
-                        state.search = ''; // Clear search input
-                        applied = true;
-                        return;
-                    }
-                    
-                    // Check for starts with match
-                    const startsMatch = Array.from(availableValuesSet).find(value => 
-                        value.toLowerCase().startsWith(searchTerm)
-                    );
-                    
-                    if (startsMatch) {
-                        state.filters[field.key] = startsMatch;
-                        state.search = ''; // Clear search input
-                        applied = true;
-                        return;
-                    }
-                });
-            }
-            
-            if (applied) {
-                handleFilterChange();
+                
+                // Clear filter counts cache
+                FilterPanel.filterCounts = {};
+                
+                await handleFilterChange();
                 m.redraw();
             } else {
-                // If no filter match found, keep as general search
-                handleFilterChange();
+                // Keep as general search and trigger filter
+                await handleFilterChange();
             }
         };
         
@@ -900,14 +1474,22 @@ const FilterPanel = {
                 m('h3', { class: 'font-bold text-lg' }, 'Filters'),
                 m('button', { 
                     class: 'btn btn-xs btn-ghost',
-                    onclick: () => {
+                    onclick: async () => {
                         // Clear all filters - both numeric and categorical
                         Object.keys(state.filters).forEach(key => {
                             state.filters[key] = null;
                         });
                         state.search = '';
                         JobsPage.displayPage = 1;
+                        
+                        // Clear filter counts cache
+                        FilterPanel.filterCounts = {};
+                        
+                        // Update URL
                         URLState.update();
+                        
+                        // Reload jobs with no filters
+                        await JobsPage.loadJobs();
                         m.redraw();
                     }
                 }, 'Clear All')
@@ -925,6 +1507,11 @@ const FilterPanel = {
                             value: state.search || '',
                             oninput: (e) => {
                                 state.search = e.target.value;
+                                // Debounce suggestions fetching
+                                clearTimeout(FilterPanel.suggestionsTimer);
+                                FilterPanel.suggestionsTimer = setTimeout(() => {
+                                    FilterPanel.fetchSuggestions();
+                                }, 300);
                                 m.redraw(); // Trigger redraw to show/hide suggestions
                             },
                             onkeypress: (e) => {
@@ -945,7 +1532,7 @@ const FilterPanel = {
                         }),
                         // Suggestions dropdown
                         (() => {
-                            const suggestions = getFilterSuggestions();
+                            const suggestions = FilterPanel.suggestions;
                             if (suggestions.length === 0 || !state.search) return null;
                             
                             return m('div', { 
@@ -961,8 +1548,13 @@ const FilterPanel = {
                                         },
                                         title: `Apply "${suggestion.value}" to ${suggestion.fieldDisplay}`
                                     }, [
-                                        m('div', { class: 'font-medium text-base-content' }, suggestion.value),
-                                        m('div', { class: 'text-xs opacity-70' }, `Apply to: ${suggestion.fieldDisplay}`)
+                                        m('div', { class: 'flex justify-between items-center' }, [
+                                            m('div', [
+                                                m('div', { class: 'font-medium text-base-content' }, suggestion.value),
+                                                m('div', { class: 'text-xs opacity-70' }, `Apply to: ${suggestion.fieldDisplay}`)
+                                            ]),
+                                            m('div', { class: 'badge badge-sm badge-info' }, suggestion.count)
+                                        ])
                                     ])
                                 )
                             ]);
@@ -972,11 +1564,6 @@ const FilterPanel = {
                         class: 'btn btn-sm btn-primary',
                         onclick: applySearchAsFilter
                     }, 'Apply')
-                ]),
-                m('div', { class: 'text-xs opacity-70 mt-1' }, [
-                    'Tip: Type a value and press Enter to apply it as a filter, or click Apply. ',
-                    m('span', { class: 'font-medium' }, 'Examples:'),
-                    ' "Developer", "Chisinau", "Java", "Senior"'
                 ])
             ]),
             
@@ -989,10 +1576,11 @@ const FilterPanel = {
                     state.availablePageSizes.map(size =>
                         m('button', {
                             class: `btn btn-sm ${state.itemsPerPage === size ? 'btn-primary' : 'btn-ghost'}`,
-                            onclick: () => {
+                            onclick: async () => {
                                 state.itemsPerPage = size;
                                 JobsPage.displayPage = 1;
                                 URLState.update();
+                                await JobsPage.loadJobs();
                                 m.redraw();
                             }
                         }, size)
@@ -1008,9 +1596,10 @@ const FilterPanel = {
                     state.sortOptions.map(option =>
                         m('button', {
                             class: `btn btn-sm ${state.sort === option.value ? 'btn-primary' : 'btn-ghost'} w-full`,
-                            onclick: () => {
+                            onclick: async () => {
                                 state.sort = option.value;
                                 URLState.update();
+                                await JobsPage.loadJobs();
                                 m.redraw();
                             }
                         }, option.label)
@@ -1031,47 +1620,12 @@ const FilterPanel = {
                         value: state.filters.salaryMin || '',
                         oninput: (e) => {
                             state.filters.salaryMin = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.salaryMinTimer);
+                            FilterPanel.salaryMinTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     m('input', { 
@@ -1081,47 +1635,12 @@ const FilterPanel = {
                         value: state.filters.salaryMax || '',
                         oninput: (e) => {
                             state.filters.salaryMax = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.salaryMaxTimer);
+                            FilterPanel.salaryMaxTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     (state.filters.salaryMin || state.filters.salaryMax) && m('div', { class: 'text-xs opacity-70' }, 
@@ -1142,47 +1661,12 @@ const FilterPanel = {
                         value: state.filters.experienceMin !== null ? state.filters.experienceMin : '',
                         oninput: (e) => {
                             state.filters.experienceMin = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.experienceMinTimer);
+                            FilterPanel.experienceMinTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     m('input', { 
@@ -1193,47 +1677,12 @@ const FilterPanel = {
                         value: state.filters.experienceMax !== null ? state.filters.experienceMax : '',
                         oninput: (e) => {
                             state.filters.experienceMax = e.target.value ? parseInt(e.target.value) : null;
-                            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-                            if (filterMetadata && filterMetadata.pages) {
-                                // Load pages for current page
-                                const pagesToLoad = new Set();
-                                const startItem = (JobsPage.displayPage - 1) * state.itemsPerPage;
-                                const endItem = startItem + state.itemsPerPage;
-                                let itemsAccumulated = 0;
-                                
-                                for (const pageInfo of filterMetadata.pages) {
-                                    if (itemsAccumulated < endItem) {
-                                        pagesToLoad.add(pageInfo.page);
-                                        itemsAccumulated += pageInfo.count;
-                                    } else {
-                                        break;
-                                    }
-                                }
-                                
-                                if (pagesToLoad.size > 0) {
-                                    const promises = [];
-                                    for (const page of pagesToLoad) {
-                                        if (!state.loadedPages.has(page)) {
-                                            promises.push(JobsPage.loadPage(page));
-                                        }
-                                    }
-                                    if (promises.length > 0) {
-                                        Promise.all(promises).then(() => {
-                                            URLState.update();
-                                            m.redraw();
-                                        });
-                                    } else {
-                                        URLState.update();
-                                        m.redraw();
-                                    }
-                                } else {
-                                    URLState.update();
-                                    m.redraw();
-                                }
-                            } else {
-                                URLState.update();
-                                m.redraw();
-                            }
+                            // Debounce the filter change
+                            clearTimeout(FilterPanel.experienceMaxTimer);
+                            FilterPanel.experienceMaxTimer = setTimeout(() => {
+                                handleFilterChange();
+                            }, 500);
+                            URLState.update();
                         }
                     }),
                     (state.filters.experienceMin !== null || state.filters.experienceMax !== null) && 
@@ -1247,86 +1696,39 @@ const FilterPanel = {
             
             // All filters grouped by section
             m('div', { class: 'space-y-6' },
-                // Group filters by section
+                // Group filters by section - only show basic filters from metadata
                 Object.entries(
-                    filterFields.reduce((acc, field) => {
-                        if (!acc[field.section]) acc[field.section] = [];
-                        acc[field.section].push(field);
-                        return acc;
-                    }, {})
+                    filterFields
+                        .filter(field => {
+                            // Only show fields that have metadata
+                            const metadataKey = getMetadataKey(field.key);
+                            return state.jobsIndex.metadata && state.jobsIndex.metadata[metadataKey];
+                        })
+                        .reduce((acc, field) => {
+                            if (!acc[field.section]) acc[field.section] = [];
+                            acc[field.section].push(field);
+                            return acc;
+                        }, {})
                 ).map(([section, fields]) => 
                     m('div', { class: 'space-y-2' }, [
                         m('div', { class: 'text-xs font-semibold opacity-60 uppercase tracking-wide' }, section),
                         ...fields.map(field => {
-                            // Define hierarchical field relationships
-                            const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
-                            const currentFieldIndex = hierarchyLevels.indexOf(field.key);
+                            // Get metadata or dynamic counts for this field
+                            const metadataKey = getMetadataKey(field.key);
                             
-                            // Determine which filters to use for calculating options
-                            let filterForOptions;
-                            
-                            // If this field is part of the hierarchy, use special filtering logic
-                            if (currentFieldIndex !== -1) {
-                                // For hierarchy fields, ONLY use parent fields in the hierarchy
-                                // Ignore all other filters (seniority, location, etc.) AND child fields
-                                filterForOptions = {};
-                                for (let i = 0; i < currentFieldIndex; i++) {
-                                    const parentKey = hierarchyLevels[i];
-                                    if (state.filters[parentKey]) {
-                                        filterForOptions[parentKey] = state.filters[parentKey];
-                                    }
-                                }
+                            // Use dynamic counts if available, otherwise fall back to static metadata
+                            let options = [];
+                            if (FilterPanel.filterCounts[field.key]) {
+                                options = FilterPanel.filterCounts[field.key];
                             } else {
-                                // For non-hierarchical fields, exclude this field but include all others
-                                filterForOptions = { ...state.filters };
-                                delete filterForOptions[field.key];
+                                // Use static metadata as initial fallback
+                                options = state.jobsIndex.metadata[metadataKey] || [];
+                                // Trigger async fetch of dynamic counts
+                                FilterPanel.getCountsForField(field.key);
                             }
                             
-                            const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
-                            
-                            // Extract unique values from filtered jobs for this field
-                            const availableValuesSet = new Set();
-                            baseFilteredJobs.forEach(job => {
-                                const value = getJobFieldValue(job, field.key);
-                                if (value !== null && value !== undefined && value !== '') {
-                                    if (Array.isArray(value)) {
-                                        value.forEach(v => availableValuesSet.add(v));
-                                    } else {
-                                        availableValuesSet.add(value);
-                                    }
-                                }
-                            });
-                            const availableOptions = Array.from(availableValuesSet).sort();
-                            
-                            // Calculate counts for each option
-                            const optionCounts = {};
-                            
-                            // Try to use metadata counts when available and no other filters are active
-                            const useMetadataCounts = !hasActiveFilters(filterForOptions) && 
-                                                     state.jobsIndex && 
-                                                     state.jobsIndex.metadata;
-                            
-                            if (useMetadataCounts) {
-                                // Use metadata counts for better UX (shows correct totals immediately)
-                                const metadataKey = getMetadataKey(field.key);
-                                if (state.jobsIndex.metadata[metadataKey]) {
-                                    const metadataItems = state.jobsIndex.metadata[metadataKey];
-                                    for (const item of metadataItems) {
-                                        if (availableOptions.includes(item.name)) {
-                                            optionCounts[item.name] = item.count;
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Fall back to counting from loaded jobs when filters are active
-                                availableOptions.forEach(option => {
-                                    // Create temporary filter state with this option
-                                    const tempFilters = { ...state.filters, [field.key]: option };
-                                    // Count how many jobs match with this option
-                                    const count = state.allLoadedJobs.filter(job => matchesFilters(job, tempFilters)).length;
-                                    optionCounts[option] = count;
-                                });
-                            }
+                            // Filter out options with 0 count
+                            const availableOptions = options.filter(opt => opt.count > 0);
                             
                             return m('div', { class: 'form-control' }, [
                                 m('label', { class: 'label py-1' }, [
@@ -1341,15 +1743,15 @@ const FilterPanel = {
                                         } else {
                                             state.filters[field.key] = null;
                                         }
+                                        // Clear cached counts so they refresh
+                                        FilterPanel.filterCounts = {};
                                         handleFilterChange();
                                     }
                                 }, [
                                     m('option', { value: '' }, 'All'),
-                                    ...availableOptions
-                                        .filter(f => (optionCounts[f] || 0) > 0)  // Only show options with at least 1 job
-                                        .map(f => 
-                                            m('option', { value: f }, `${f} (${optionCounts[f]})`)
-                                        )
+                                    ...availableOptions.map(item => 
+                                        m('option', { value: item.name }, `${item.name} (${item.count})`)
+                                    )
                                 ])
                             ]);
                         })
@@ -1364,81 +1766,6 @@ const FilterPanel = {
 const JobsPage = {
     displayPage: 1, // Current display page for filtered results
     loadingMore: false,
-    autoLoadThreshold: 2, // Auto-load when within 2 pages of the end
-    
-    // Load a single page of jobs
-    loadPage: async (pageNum) => {
-        if (state.loadedPages.has(pageNum)) {
-            return; // Already loaded
-        }
-        
-        try {
-            const pageData = await api.getJobsPage(pageNum);
-            // Add jobs, avoiding duplicates
-            const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
-            state.allLoadedJobs.push(...newJobs);
-            newJobs.forEach(j => state.loadedJobIds.add(j.id));
-            state.loadedPages.add(pageNum);
-            return newJobs;
-        } catch (err) {
-            console.error(`Error loading page ${pageNum}:`, err);
-            return [];
-        }
-    },
-    
-    // Automatically load more pages if needed
-    autoLoadMoreIfNeeded: async () => {
-        if (JobsPage.loadingMore || !state.jobsIndex) return;
-        
-        // Check if all pages are already loaded
-        if (state.loadedPages.size >= state.jobsIndex.total_pages) return;
-        
-        // Limit automatic loading to prevent excessive memory use
-        // Max 15 pages (1500 jobs) loaded automatically
-        const maxAutoLoadPages = 15;
-        if (state.loadedPages.size >= maxAutoLoadPages) return;
-        
-        const { total, totalPages } = JobsPage.getDisplayedJobs();
-        const currentPage = JobsPage.displayPage;
-        
-        // Auto-load if we're near the end of available filtered results
-        // OR if we have very few results due to filtering
-        const nearEnd = currentPage >= totalPages - JobsPage.autoLoadThreshold;
-        const needsMoreData = total < state.itemsPerPage * 3; // Less than 3 pages worth of results
-        
-        if (nearEnd || needsMoreData) {
-            await JobsPage.loadMorePages(3);
-        }
-    },
-    
-    // Load next batch of pages
-    loadMorePages: async (numPages = 3) => {
-        if (JobsPage.loadingMore || !state.jobsIndex) return;
-        
-        // Find the first unloaded page
-        let nextPage = 1;
-        while (nextPage <= state.jobsIndex.total_pages && state.loadedPages.has(nextPage)) {
-            nextPage++;
-        }
-        
-        if (nextPage > state.jobsIndex.total_pages) return;
-        
-        JobsPage.loadingMore = true;
-        const promises = [];
-        let pagesLoaded = 0;
-        
-        // Load up to numPages starting from nextPage
-        for (let page = nextPage; page <= state.jobsIndex.total_pages && pagesLoaded < numPages; page++) {
-            if (!state.loadedPages.has(page)) {
-                promises.push(JobsPage.loadPage(page));
-                pagesLoaded++;
-            }
-        }
-        
-        await Promise.all(promises);
-        JobsPage.loadingMore = false;
-        m.redraw();
-    },
     
     oninit: async () => {
         // Initialize URL state before loading data
@@ -1453,95 +1780,48 @@ const JobsPage = {
             state.search = urlState.search;
         }
         
-        // Load index and first page only
+        // Ensure database is loaded
         state.loading = true;
         try {
-            // Load index first to know metadata
-            const index = await api.getJobsIndex();
-            state.jobsIndex = index;
+            await DatabaseManager.init();
+            state.dbLoaded = true;
             
-            // Initialize if needed
-            if (!state.allLoadedJobs) {
-                state.allLoadedJobs = [];
-                state.loadedJobIds = new Set();
-                state.loadedPages = new Set();
+            // Load metadata if not already loaded
+            if (!state.jobsIndex) {
+                const metadata = await dbApi.getMetadata();
+                state.jobsIndex = metadata;
             }
             
-            // Load only the first page initially for fast initial load
-            if (state.allLoadedJobs.length === 0) {
-                await JobsPage.loadPage(1);
-            }
+            // Load initial jobs
+            await JobsPage.loadJobs();
             
             state.loading = false;
             m.redraw();
         } catch (err) {
             console.error('Error loading jobs:', err);
+            state.dbError = err;
             state.loading = false;
             m.redraw();
         }
     },
     
-    getDisplayedJobs: () => {
-        const isFiltered = hasActiveFilters(state.filters);
-        
-        // Apply search filter if present
-        let jobsToDisplay = state.allLoadedJobs;
-        if (state.search && state.search.trim()) {
-            const searchTerm = state.search.toLowerCase().trim();
-            jobsToDisplay = jobsToDisplay.filter(job => {
-                const searchableText = [
-                    job.title || '',
-                    job.company || '',
-                    job.location?.city || '',
-                    job.job_function || '',
-                    job.industry || '',
-                    job.seniority_level || '',
-                    ...(job.requirements?.hard_skills || []),
-                    ...(job.requirements?.soft_skills || []),
-                    ...(job.requirements?.languages || [])
-                ].join(' ').toLowerCase();
-                return searchableText.includes(searchTerm);
-            });
-        }
-        
-        // Apply other filters
-        if (isFiltered) {
-            // When filtering, use metadata to get the total count immediately
-            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-            const totalFromMetadata = filterMetadata ? filterMetadata.count : 0;
+    loadJobs: async () => {
+        try {
+            const result = await dbApi.getJobs(
+                JobsPage.displayPage,
+                state.itemsPerPage,
+                state.filters,
+                state.search,
+                state.sort
+            );
             
-            // Filter loaded jobs for display
-            const filtered = jobsToDisplay.filter(job => matchesFilters(job, state.filters));
+            state.jobs = result.jobs;
+            state.totalJobs = result.total;
+            state.totalPages = result.totalPages;
             
-            // Apply sorting
-            const sortedFiltered = sortJobs(filtered, state.sort);
-            
-            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
-            const end = start + state.itemsPerPage;
-            const effectiveTotal = totalFromMetadata > 0 ? totalFromMetadata : sortedFiltered.length;
-            
-            return {
-                jobs: sortedFiltered.slice(start, end),
-                total: effectiveTotal,
-                totalPages: Math.ceil(effectiveTotal / state.itemsPerPage),
-                isFiltered: true
-            };
-        } else {
-            // When not filtering, use metadata to show total available
-            const totalJobsFromMetadata = state.jobsIndex ? state.jobsIndex.total_jobs : 0;
-            const start = (JobsPage.displayPage - 1) * state.itemsPerPage;
-            const end = start + state.itemsPerPage;
-            
-            // Apply sorting to all jobs
-            const sortedJobs = sortJobs(jobsToDisplay, state.sort);
-            const displayJobs = sortedJobs.slice(start, end);
-            
-            return {
-                jobs: displayJobs,
-                total: totalJobsFromMetadata,
-                totalPages: Math.ceil(totalJobsFromMetadata / state.itemsPerPage),
-                isFiltered: false
-            };
+        } catch (err) {
+            console.error('Error loading jobs:', err);
+            state.jobs = [];
         }
     },
     
@@ -1552,75 +1832,8 @@ const JobsPage = {
         // Update URL with new page number
         URLState.update();
         
-        const isFiltered = hasActiveFilters(state.filters);
-        
-        if (isFiltered) {
-            // When filtering, load pages based on filter metadata
-            const filterMetadata = getActiveFilterMetadata(state.filters, state.jobsIndex);
-            
-            // Calculate which pages are needed for the requested display page
-            if (filterMetadata && filterMetadata.pages) {
-                const pagesToLoad = new Set();
-                const startItem = (pageNumber - 1) * state.itemsPerPage;
-                const endItem = startItem + state.itemsPerPage;
-                
-                let itemsAccumulated = 0;
-                
-                for (const pageInfo of filterMetadata.pages) {
-                    const pageStart = itemsAccumulated;
-                    const pageEnd = itemsAccumulated + pageInfo.count;
-                    
-                    // Check if this page overlaps with our display range
-                    if (pageEnd > startItem && pageStart < endItem) {
-                        pagesToLoad.add(pageInfo.page);
-                    }
-                    
-                    itemsAccumulated += pageInfo.count;
-                    
-                    // Stop if we've gone past what we need
-                    if (itemsAccumulated >= endItem) break;
-                }
-                
-                // Load the identified pages
-                if (pagesToLoad.size > 0) {
-                    const promises = [];
-                    for (const page of pagesToLoad) {
-                        if (!state.loadedPages.has(page)) {
-                            promises.push(JobsPage.loadPage(page));
-                        }
-                    }
-                    if (promises.length > 0) {
-                        await Promise.all(promises);
-                    }
-                }
-            }
-        } else if (state.jobsIndex) {
-            // If not filtering, we need to ensure the actual page from metadata is loaded
-            // Calculate which metadata page contains the jobs we need
-            const jobsPerApiPage = state.jobsIndex.jobs_per_page || DEFAULT_JOBS_PER_API_PAGE;
-            const startJobIndex = (pageNumber - 1) * state.itemsPerPage;
-            const endJobIndex = startJobIndex + state.itemsPerPage;
-            
-            // Determine which API pages we need
-            const startApiPage = Math.floor(startJobIndex / jobsPerApiPage) + 1;
-            const endApiPage = Math.floor((endJobIndex - 1) / jobsPerApiPage) + 1;
-            
-            // Load any missing pages
-            const pagesToLoad = [];
-            for (let apiPage = startApiPage; apiPage <= Math.min(endApiPage, state.jobsIndex.total_pages); apiPage++) {
-                if (!state.loadedPages.has(apiPage)) {
-                    pagesToLoad.push(JobsPage.loadPage(apiPage));
-                }
-            }
-            
-            if (pagesToLoad.length > 0) {
-                await Promise.all(pagesToLoad);
-            }
-        }
-        
-        // Trigger auto-load check after navigation
-        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 100);
-        
+        // Load jobs for this page
+        await JobsPage.loadJobs();
         m.redraw();
     },
     
@@ -1691,11 +1904,9 @@ const JobsPage = {
     },
     
     view: () => {
-        const displayData = JobsPage.getDisplayedJobs();
-        const { jobs, total, totalPages, isFiltered } = displayData;
-        
-        // Auto-load more data if needed (non-blocking)
-        setTimeout(() => JobsPage.autoLoadMoreIfNeeded(), 0);
+        const jobs = state.jobs || [];
+        const total = state.totalJobs || 0;
+        const totalPages = state.totalPages || 0;
         
         return m('div', { class: 'flex min-h-0 flex-1' }, [
             // Left Sidebar - Filters
@@ -1716,12 +1927,17 @@ const JobsPage = {
                                     index: ((JobsPage.displayPage - 1) * state.itemsPerPage) + idx + 1 
                                 })) :
                                 m('div', { class: 'text-center py-8 opacity-70' }, 
-                                    isFiltered ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
+                                    hasActiveFilters(state.filters) || state.search ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
                                 )
                         ]),
                         
                         // Bottom pagination
-                        JobsPage.renderPagination(totalPages)
+                        JobsPage.renderPagination(totalPages),
+                        
+                        // Stats footer
+                        m('div', { class: 'text-center text-sm opacity-70 mt-4' }, 
+                            `Showing ${jobs.length > 0 ? ((JobsPage.displayPage - 1) * state.itemsPerPage) + 1 : 0} - ${((JobsPage.displayPage - 1) * state.itemsPerPage) + jobs.length} of ${total.toLocaleString()} jobs`
+                        )
                     ]
                 ])
             ])
@@ -1736,53 +1952,80 @@ const JobDetailPage = {
     oninit: async (vnode) => {
         const jobId = parseInt(vnode.attrs.id);
         
-        // First, check if job is already in loaded jobs
-        let foundJob = state.allLoadedJobs?.find(j => j.id === jobId);
-        
-        if (foundJob) {
-            JobDetailPage.job = foundJob;
-            return;
-        }
-        
-        // Job not in loaded pages, need to search for it
+        // Try to get job from database using SQL
         JobDetailPage.job = null;
         
-        // Load index if not already loaded
-        if (!state.jobsIndex) {
-            try {
-                state.jobsIndex = await api.getJobsIndex();
-            } catch (err) {
-                console.error('Error loading index:', err);
-                return;
-            }
-        }
-        
-        // Search through pages efficiently - load one page at a time
-        // Start with pages not yet loaded
         try {
-            for (let page = 1; page <= state.jobsIndex.total_pages; page++) {
-                // Skip if already loaded and checked
-                if (state.loadedPages?.has(page)) continue;
-                
-                const pageData = await api.getJobsPage(page);
-                const job = pageData.jobs.find(j => j.id === jobId);
-                
-                if (job) {
-                    JobDetailPage.job = job;
-                    // Also add to loaded jobs for caching, avoiding duplicates using the Set
-                    if (!state.allLoadedJobs) state.allLoadedJobs = [];
-                    if (!state.loadedJobIds) state.loadedJobIds = new Set();
-                    const newJobs = pageData.jobs.filter(j => !state.loadedJobIds.has(j.id));
-                    state.allLoadedJobs.push(...newJobs);
-                    newJobs.forEach(j => state.loadedJobIds.add(j.id));
-                    if (!state.loadedPages) state.loadedPages = new Set();
-                    state.loadedPages.add(page);
-                    m.redraw();
-                    return;
-                }
+            await DatabaseManager.init();
+            
+            // Query for specific job by ID
+            const query = `
+                SELECT 
+                    jd.id,
+                    t.name as title,
+                    jf.name as job_function,
+                    sp.name as specialization,
+                    sl.name as seniority_level,
+                    c.name as company,
+                    cs.name as company_size,
+                    ci.name as city,
+                    reg.name as region,
+                    cou.name as country,
+                    rw.name as remote_work,
+                    jd.min_salary,
+                    jd.max_salary,
+                    curr.code as salary_currency,
+                    sper.name as salary_period,
+                    et.name as employment_type,
+                    ct.name as contract_type,
+                    ws.name as work_schedule,
+                    el.name as education_level,
+                    jd.experience_years,
+                    jd.posting_date,
+                    jd.site,
+                    jd.job_url,
+                    jd.job_title as original_title,
+                    jd.company_name as original_company,
+                    jd.job_description as original_description,
+                    ind.name as industry,
+                    d.name as department,
+                    jf2.name as job_family,
+                    sd.name as shift_details,
+                    tr.name as travel_requirements
+                FROM job_details jd
+                LEFT JOIN titles t ON jd.title_id = t.id
+                LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                LEFT JOIN companies c ON jd.company_name_id = c.id
+                LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                LEFT JOIN cities ci ON jd.city_id = ci.id
+                LEFT JOIN regions reg ON jd.region_id = reg.id
+                LEFT JOIN countries cou ON jd.country_id = cou.id
+                LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                LEFT JOIN currencies curr ON jd.salary_currency_id = curr.id
+                LEFT JOIN salary_periods sper ON jd.salary_period_id = sper.id
+                LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                LEFT JOIN industries ind ON jd.industry_id = ind.id
+                LEFT JOIN departments d ON jd.department_id = d.id
+                LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                WHERE jd.id = ?
+            `;
+            
+            const jobs = DatabaseManager.queryObjects(query, [jobId]);
+            
+            if (jobs.length > 0) {
+                // Format the job
+                JobDetailPage.job = await dbApi.formatJob(jobs[0]);
+                m.redraw();
             }
         } catch (err) {
-            console.error('Error searching for job:', err);
+            console.error('Error loading job:', err);
         }
     },
     view: () => {
