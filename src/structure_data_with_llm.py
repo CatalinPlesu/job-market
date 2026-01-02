@@ -421,6 +421,34 @@ Begin JSON object:"""
                             ))
                 
                 data_session.commit()
+                
+                # Sync job_checks from scrape.db to data.db
+                try:
+                    from src.scrape_database import JobCheck as ScrapeJobCheck
+                    from src.data_database import JobCheck as DataJobCheck
+                    
+                    # Get all job_checks from scrape.db for this job
+                    scrape_checks = scrape_session.query(ScrapeJobCheck).filter(
+                        ScrapeJobCheck.job_id == job.id
+                    ).all()
+                    
+                    # Sync each check to data.db
+                    for scrape_check in scrape_checks:
+                        data_check = DataJobCheck(
+                            job_detail_id=detail.id,
+                            check_date=scrape_check.check_date,
+                            http_status=scrape_check.http_status
+                        )
+                        data_session.add(data_check)
+                    
+                    if scrape_checks:
+                        data_session.commit()
+                except Exception as check_error:
+                    # Don't fail the job if check syncing fails, just log it
+                    data_session.rollback()
+                    # Re-commit the job detail without checks
+                    data_session.commit()
+                
                 return job_id, True, "Success", None, job.site
                 
         except SQLAlchemyError as e:
@@ -438,6 +466,76 @@ Begin JSON object:"""
         if 'extracted_data' in locals() and extracted_data:
             error_details += f"\n\nExtracted data:\n{json.dumps(extracted_data, indent=2)}"
         return job_id, False, error_msg, error_details, None
+    
+    finally:
+        scrape_session.close()
+        data_session.close()
+
+
+def sync_job_checks(job_url, scrape_session_class, data_session_class):
+    """Sync job_checks from scrape.db to data.db for a specific job.
+    
+    Args:
+        job_url: The job URL to sync checks for
+        scrape_session_class: SQLAlchemy session class for scrape.db
+        data_session_class: SQLAlchemy session class for data.db
+    
+    Returns:
+        tuple: (success, message, checks_synced_count)
+    """
+    scrape_session = scrape_session_class()
+    data_session = data_session_class()
+    
+    try:
+        # Find the job in scrape.db
+        from src.scrape_database import JobCheck as ScrapeJobCheck
+        scrape_job = scrape_session.query(ScrapeJob).filter(ScrapeJob.job_url == job_url).first()
+        if not scrape_job:
+            return False, "Job not found in scrape.db", 0
+        
+        # Find the corresponding job_detail in data.db
+        from src.data_database import JobCheck as DataJobCheck
+        job_detail = data_session.query(JobDetail).filter(JobDetail.job_url == job_url).first()
+        if not job_detail:
+            return False, "JobDetail not found in data.db", 0
+        
+        # Get all job_checks from scrape.db for this job
+        scrape_checks = scrape_session.query(ScrapeJobCheck).filter(
+            ScrapeJobCheck.job_id == scrape_job.id
+        ).all()
+        
+        if not scrape_checks:
+            return True, "No checks to sync", 0
+        
+        # Get existing checks in data.db to avoid duplicates
+        existing_checks = data_session.query(DataJobCheck).filter(
+            DataJobCheck.job_detail_id == job_detail.id
+        ).all()
+        
+        # Create a set of (check_date, http_status) tuples for existing checks
+        existing_check_keys = {(check.check_date, check.http_status) for check in existing_checks}
+        
+        # Sync checks that don't exist yet in data.db
+        checks_added = 0
+        for scrape_check in scrape_checks:
+            check_key = (scrape_check.check_date, scrape_check.http_status)
+            if check_key not in existing_check_keys:
+                data_check = DataJobCheck(
+                    job_detail_id=job_detail.id,
+                    check_date=scrape_check.check_date,
+                    http_status=scrape_check.http_status
+                )
+                data_session.add(data_check)
+                checks_added += 1
+        
+        if checks_added > 0:
+            data_session.commit()
+        
+        return True, f"Synced {checks_added} new checks", checks_added
+    
+    except Exception as e:
+        data_session.rollback()
+        return False, f"Error syncing checks: {str(e)}", 0
     
     finally:
         scrape_session.close()
@@ -727,6 +825,47 @@ def structure_data_with_llm():
             print(f"T{err['thread']} | Job {err['job_id']} | {err['site']:<15} | {err['error']}")
         if len(error_log) > 20:
             print(f"... and {len(error_log) - 20} more")
+    
+    # Phase 2: Sync job_checks for all existing entries
+    print("\n" + "="*80)
+    print("SYNCING JOB_CHECKS FROM SCRAPE.DB TO DATA.DB")
+    print("="*80)
+    
+    # Get all job URLs from data.db
+    with DataSession() as data_session:
+        job_urls = [url[0] for url in data_session.query(JobDetail.job_url).all()]
+    
+    total_urls = len(job_urls)
+    if total_urls == 0:
+        print("No job details found in data.db to sync checks for.")
+    else:
+        print(f"Syncing job_checks for {total_urls} jobs...")
+        
+        synced_count = 0
+        checks_synced_total = 0
+        failed_sync = 0
+        
+        for i, job_url in enumerate(job_urls, 1):
+            success, message, checks_count = sync_job_checks(job_url, ScrapeSession, DataSession)
+            
+            if success:
+                synced_count += 1
+                checks_synced_total += checks_count
+            else:
+                failed_sync += 1
+            
+            # Progress indicator every 100 jobs
+            if i % 100 == 0 or i == total_urls:
+                print(f"  Progress: {i}/{total_urls} jobs processed | "
+                      f"✓ {synced_count} synced | ✗ {failed_sync} failed | "
+                      f"{checks_synced_total} checks synced")
+        
+        print(f"\n✓ Job checks sync completed!")
+        print(f"  Total jobs: {total_urls}")
+        print(f"  Successfully synced: {synced_count}")
+        print(f"  Failed: {failed_sync}")
+        print(f"  Total checks synced: {checks_synced_total}")
+        print("="*80)
 
 
 if __name__ == "__main__":
