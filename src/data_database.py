@@ -265,8 +265,16 @@ def get_data_db():
 
 
 def migrate_schema():
-    """Migrate the database schema to add any missing columns"""
+    """Migrate the database schema to add any missing columns
+    
+    This function is called automatically when the module is loaded to ensure
+    the database schema is up to date. It checks for missing columns and adds
+    them if necessary.
+    """
     from sqlalchemy import inspect, text
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     inspector = inspect(data_engine)
     
@@ -276,14 +284,18 @@ def migrate_schema():
         
         # Add llm_model column if it doesn't exist
         if 'llm_model' not in columns:
-            with data_engine.connect() as conn:
+            with data_engine.begin() as conn:
                 conn.execute(text('ALTER TABLE job_details ADD COLUMN llm_model VARCHAR(200)'))
-                conn.commit()
-                print("✓ Added llm_model column to job_details table")
+            logger.info("Added llm_model column to job_details table")
 
 
 # Create all tables in data database
 DataBase.metadata.create_all(data_engine)
 
-# Run migrations
-migrate_schema()
+# Run migrations automatically to handle schema updates
+# Note: This runs at module import time to ensure schema compatibility
+try:
+    migrate_schema()
+except Exception as e:
+    import logging
+    logging.getLogger(__name__).error(f"Failed to run database migration: {e}")
