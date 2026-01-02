@@ -39,10 +39,15 @@ class SkillsTrendsAnalysis(BaseAnalysis):
             Job.job_url.in_(job_detail_map.keys())
         ).all()
         
+        # Filter out bulk import to avoid bias
+        filtered_jobs = self._filter_bulk_import(jobs_scrape)
+        if not filtered_jobs:
+            return {'error': 'No valid job data after filtering bulk import'}
+        
         # Bucket skills by time period
         periods = defaultdict(Counter)
         
-        for job in jobs_scrape:
+        for job in filtered_jobs:
             if not job.created_at or job.job_url not in job_detail_map:
                 continue
             
@@ -85,8 +90,50 @@ class SkillsTrendsAnalysis(BaseAnalysis):
         
         return {
             'granularity': granularity,
-            'skill_trends': trends
+            'skill_trends': trends,
+            'data_quality': {
+                'total_jobs_before_filtering': len(jobs_scrape),
+                'jobs_after_filtering': len(filtered_jobs),
+                'filtering_applied': len(filtered_jobs) != len(jobs_scrape)
+            }
         }
+    
+    def _filter_bulk_import(self, jobs):
+        """Filter out bulk import jobs to avoid bias in trends."""
+        if not jobs:
+            return []
+        
+        # Count jobs by date
+        date_counts = {}
+        for job in jobs:
+            if job.created_at:
+                date_key = job.created_at.date().isoformat()
+                date_counts[date_key] = date_counts.get(date_key, 0) + 1
+        
+        if not date_counts:
+            return jobs
+        
+        # Identify bulk import date
+        bulk_import_date = max(date_counts.items(), key=lambda x: x[1])[0]
+        total_jobs = len(jobs)
+        bulk_job_count = date_counts[bulk_import_date]
+        
+        # Only filter if bulk import represents a significant portion
+        bulk_threshold = 0.8  # 80% threshold
+        
+        if bulk_job_count > total_jobs * bulk_threshold:
+            # Filter out bulk import date
+            filtered_jobs = []
+            for job in jobs:
+                if job.created_at:
+                    job_date = job.created_at.date().isoformat()
+                    if job_date != bulk_import_date:
+                        filtered_jobs.append(job)
+                else:
+                    filtered_jobs.append(job)
+            return filtered_jobs
+        
+        return jobs
     
     def get_visualization_hints(self):
         return {

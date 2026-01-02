@@ -2292,15 +2292,54 @@ const AnalysisPage = {
             'benefits': 'Most frequently offered employee benefits',
             'requirements': 'Common job requirements and qualifications',
             'top-companies': 'Companies posting the most jobs',
-            'posting-trends': 'Job posting volume over time',
-            'salary-trends': 'Salary changes and trends over time',
-            'skills-trends': 'Evolving skill demand over time',
-            'remote-work-trends': 'Remote work adoption trends',
-            'job-duration': 'How long job postings remain active',
-            'market-health': 'Overall job market health indicators',
+            'posting-trends': 'Job posting volume over time with market activity insights',
+            'salary-trends': 'Salary changes and trends over time with inflation-adjusted insights',
+            'skills-trends': 'Evolving skill demand over time with emerging trend analysis',
+            'remote-work-trends': 'Remote work adoption trends with hybrid work insights',
+            'job-duration': 'How long job postings remain active and time-to-fill metrics',
+            'market-health': 'Overall job market health indicators with growth metrics',
             'salary-by-hierarchy': 'Salary structure across organizational hierarchy'
         };
         return previewMap[analysis.id] || 'Detailed analysis with visualizations and statistics';
+    },
+    // Get data quality badge for analysis
+    getDataQualityBadge: (data) => {
+        if (!data || !data.data_quality) {
+            return null;
+        }
+        
+        const quality = data.data_quality;
+        const filteringApplied = quality.filtering_applied || false;
+        const jobsBefore = quality.total_jobs_before_filtering || 0;
+        const jobsAfter = quality.jobs_after_filtering || 0;
+        
+        if (!filteringApplied) {
+            return m('span', { class: 'badge badge-success badge-sm' }, 'Clean Data');
+        }
+        
+        const reductionPercent = Math.round(((jobsBefore - jobsAfter) / jobsBefore) * 100);
+        
+        return m('div', { class: 'tooltip tooltip-bottom' }, [
+            m('span', { 
+                class: 'badge badge-warning badge-sm cursor-pointer',
+                'data-tip': `Bulk import filtered: ${jobsBefore} → ${jobsAfter} jobs (${reductionPercent}% removed)`
+            }, `Filtered: ${reductionPercent}%`),
+            m('div', { class: 'text-xs opacity-70 mt-1' }, 
+                `Analyzing ${jobsAfter} active postings`
+            )
+        ]);
+    },
+    // Enhanced preview text with data quality info
+    getEnhancedPreviewText: (analysis) => {
+        const baseText = AnalysisPage.getPreviewText(analysis);
+        const dataQuality = analysis.previewData && analysis.previewData.data_quality;
+        
+        if (dataQuality && dataQuality.filtering_applied) {
+            const reductionPercent = Math.round(((dataQuality.total_jobs_before_filtering - dataQuality.jobs_after_filtering) / dataQuality.total_jobs_before_filtering) * 100);
+            return `${baseText} • Bulk import filtered (${reductionPercent}% removed for trend accuracy)`;
+        }
+        
+        return baseText;
     },
     // Render mini chart preview for analysis card
     renderMiniChart: (analysis) => {

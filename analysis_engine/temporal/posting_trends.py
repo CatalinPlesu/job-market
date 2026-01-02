@@ -31,8 +31,26 @@ class PostingTrendsAnalysis(BaseAnalysis):
         if not jobs:
             return {'error': 'No jobs data available'}
         
+        # Filter out the initial bulk import date to avoid bias
+        # We'll identify the bulk import date as the date with the highest job count
+        date_counts = {}
+        for job in jobs:
+            if job.created_at:
+                date_key = job.created_at.date().isoformat()
+                date_counts[date_key] = date_counts.get(date_key, 0) + 1
+        
+        if not date_counts:
+            return {'error': 'No valid job creation dates found'}
+        
+        # Identify bulk import date (highest count)
+        bulk_import_date = max(date_counts.items(), key=lambda x: x[1])[0]
+        bulk_import_threshold = date_counts[bulk_import_date] * 0.5  # If bulk date has more than 50% of total jobs
+        
+        # Only filter if bulk import is significant
+        filter_bulk = date_counts[bulk_import_date] > len(jobs) * 0.8  # 80% threshold
+        
         # Bucket by time period
-        periods = self._bucket_by_period(jobs, granularity)
+        periods = self._bucket_by_period(jobs, granularity, filter_bulk_import=filter_bulk)
         
         # Compute statistics per period
         trend_data = []
@@ -52,16 +70,39 @@ class PostingTrendsAnalysis(BaseAnalysis):
         
         return {
             'granularity': granularity,
-            'trends': trend_data
+            'trends': trend_data,
+            'bulk_import_date': bulk_import_date if filter_bulk else None,
+            'filtering_applied': filter_bulk
         }
     
-    def _bucket_by_period(self, jobs, granularity):
+    def _bucket_by_period(self, jobs, granularity, filter_bulk_import=False):
         """Group jobs by time period."""
         periods = defaultdict(list)
+        
+        # Identify bulk import date if filtering is enabled
+        if filter_bulk_import:
+            date_counts = {}
+            for job in jobs:
+                if job.created_at:
+                    date_key = job.created_at.date().isoformat()
+                    date_counts[date_key] = date_counts.get(date_key, 0) + 1
+            
+            if date_counts:
+                bulk_import_date = max(date_counts.items(), key=lambda x: x[1])[0]
+            else:
+                bulk_import_date = None
+        else:
+            bulk_import_date = None
         
         for job in jobs:
             if not job.created_at:
                 continue
+            
+            # Skip bulk import date if filtering is enabled
+            if filter_bulk_import and bulk_import_date:
+                job_date = job.created_at.date().isoformat()
+                if job_date == bulk_import_date:
+                    continue  # Skip jobs from bulk import date
             
             period_key = Aggregator.get_period_key(job.created_at, granularity)
             periods[period_key].append(job)
