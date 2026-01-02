@@ -570,12 +570,34 @@ const dbApi = {
         
         const metadata = {};
         
+        // Map table names to their foreign key column names in job_details
+        const tableToForeignKey = {
+            'job_functions': 'job_function_id',
+            'seniority_levels': 'seniority_level_id',
+            'cities': 'city_id',
+            'remote_work_options': 'remote_work_id',
+            'industries': 'industry_id',
+            'companies': 'company_name_id',
+            'employment_types': 'employment_type_id',
+            'contract_types': 'contract_type_id',
+            'departments': 'department_id',
+            'specializations': 'specialization_id',
+            'education_levels': 'required_education_id',
+            'company_sizes': 'company_size_id'
+        };
+        
         // Helper function to get distinct values with counts
         const getDistinctValues = (table, column, label) => {
+            const foreignKey = tableToForeignKey[table];
+            if (!foreignKey) {
+                console.error(`No foreign key mapping found for table: ${table}`);
+                return [];
+            }
+            
             const query = `
                 SELECT ${column} as name, COUNT(*) as count
                 FROM job_details jd
-                LEFT JOIN ${table} t ON jd.${table.slice(0, -1)}_id = t.id
+                LEFT JOIN ${table} t ON jd.${foreignKey} = t.id
                 WHERE t.${column} IS NOT NULL
                 GROUP BY t.${column}
                 ORDER BY count DESC, t.${column} ASC
