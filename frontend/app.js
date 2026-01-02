@@ -3494,27 +3494,17 @@ const AnalysisPage = {
     },
     
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
-        m('h1', { class: 'text-3xl font-bold mb-6' }, 'Custom Analysis Builder'),
-        
-        m('div', { class: 'alert alert-info mb-6' }, [
-            m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
-                m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
-            ]),
-            m('div', [
-                m('div', { class: 'font-bold' }, 'Create custom SQL queries and visualizations'),
-                m('div', { class: 'text-sm' }, 'Query the job database directly with SQL.js and visualize results with Chart.js. Your queries are saved in browser localStorage.')
-            ])
-        ]),
+        m('h1', { class: 'text-3xl font-bold mb-6' }, 'Analysis'),
         
         // Main Layout: Sidebar + Content
         m('div', { class: 'flex flex-col lg:flex-row gap-6' }, [
             // Left Sidebar - Predefined & Saved Analyses
-            m('div', { class: 'lg:w-80 flex-shrink-0' }, [
-                // Predefined Analyses
-                m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
-                    m('div', { class: 'card-body p-4' }, [
+            m('div', { class: 'lg:w-80 flex-shrink-0 flex flex-col' }, [
+                // Predefined Analyses (Expanded, Scrollable)
+                m('div', { class: 'card bg-base-100 shadow-xl flex-1 flex flex-col' }, [
+                    m('div', { class: 'card-body p-4 flex flex-col flex-1 min-h-0' }, [
                         m('h2', { class: 'card-title text-lg mb-2' }, 'Predefined Analyses'),
-                        m('div', { class: 'overflow-y-auto max-h-96' }, [
+                        m('div', { class: 'overflow-y-auto flex-1' }, [
                             m('div', { class: 'space-y-1' },
                                 PredefinedAnalyses.map(analysis => 
                                     m('div', { 
@@ -3537,7 +3527,7 @@ const AnalysisPage = {
                 ]),
                 
                 // Saved Queries
-                CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl mt-6' }, [
                     m('div', { class: 'card-body p-4' }, [
                         m('h2', { class: 'card-title text-lg mb-2' }, 'Saved Queries'),
                         m('div', { class: 'overflow-y-auto max-h-96' }, [
@@ -3579,21 +3569,10 @@ const AnalysisPage = {
                 // Query Results (Plot First!)
                 CustomAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
                     m('div', { class: 'card-body' }, [
-                        m('h2', { class: 'card-title' }, 'Results'),
                         
                         CustomAnalysisState.queryResult.success ? [
-                            // Success message
-                            m('div', { class: 'alert alert-success mb-4' }, [
-                                m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
-                                    m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' })
-                                ]),
-                                m('span', CustomAnalysisState.queryResult.savedMessage || 
-                                    `Query executed successfully. ${CustomAnalysisState.queryResult.rowCount} rows returned.`)
-                            ]),
-                            
-                            // Chart visualization (MOVED TO TOP)
+                            // Chart visualization (NO SUCCESS MESSAGE - just show chart)
                             CustomAnalysisState.queryResult.data.length > 0 && !CustomAnalysisState.queryResult.savedMessage && m('div', { class: 'mb-6' }, [
-                                m('h3', { class: 'text-lg font-bold mb-2' }, 'Visualization'),
                                 m('div', { class: 'chart-container' }, [
                                     m('canvas', {
                                         oncreate: (vnode) => {
@@ -3620,65 +3599,7 @@ const AnalysisPage = {
                                 ])
                             ]),
                             
-                            // Statistical Analysis
-                            CustomAnalysisState.queryResult.statistics && !CustomAnalysisState.queryResult.savedMessage && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4', open: true }, [
-                                m('summary', { class: 'collapse-title font-medium' }, '📊 Statistical Analysis'),
-                                m('div', { class: 'collapse-content' }, [
-                                    Object.entries(CustomAnalysisState.queryResult.statistics).map(([column, stats]) => 
-                                        m('div', { class: 'mb-4' }, [
-                                            m('h4', { class: 'font-bold text-sm mb-2' }, `Column: ${column}`),
-                                            m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2' }, [
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, 'Count'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.count)
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, 'Mean'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.mean.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, 'Median'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.median.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, 'Mode'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.mode.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, 'Std Dev'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.stdDev.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, 'Min - Max'),
-                                                    m('div', { class: 'stat-value text-sm' }, `${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}`)
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, '25th %ile'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.p25.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, '75th %ile'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.p75.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, '90th %ile'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.p90.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, '95th %ile'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.p95.toFixed(2))
-                                                ]),
-                                                m('div', { class: 'stat bg-base-300 rounded p-2' }, [
-                                                    m('div', { class: 'stat-title text-xs' }, '99th %ile'),
-                                                    m('div', { class: 'stat-value text-sm' }, stats.p99.toFixed(2))
-                                                ])
-                                            ])
-                                        ])
-                                    )
-                                ])
-                            ]),
-                            
-                            // Query SQL Display
+                            // SQL Query Display (removed statistical analysis)
                             CustomAnalysisState.currentQuery.sql && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4' }, [
                                 m('summary', { class: 'collapse-title font-medium' }, '📝 SQL Query'),
                                 m('div', { class: 'collapse-content' }, [
@@ -3927,68 +3848,6 @@ LIMIT 20`),
                             ])
                         ])
                     ]),
-                
-                // Advanced Configuration (Collapsible)
-                m('details', { class: 'collapse collapse-arrow bg-base-200 mt-4' }, [
-                    m('summary', { class: 'collapse-title font-medium' }, '⚙️ Advanced Configuration'),
-                    m('div', { class: 'collapse-content' }, [
-                        // Data Adapter Function
-                        m('div', { class: 'form-control mt-2' }, [
-                            m('label', { class: 'label' }, [
-                                m('span', { class: 'label-text' }, 'Data Adapter (JS Function)'),
-                                m('span', { class: 'label-text-alt' }, 'Transform data before charting')
-                            ]),
-                            m('textarea', {
-                                class: 'textarea textarea-bordered font-mono text-xs h-20',
-                                placeholder: 'return data.map(row => ({ label: row.name, value: row.count }));',
-                                value: CustomAnalysisState.currentQuery.dataAdapter || '',
-                                oninput: (e) => {
-                                    CustomAnalysisState.currentQuery.dataAdapter = e.target.value;
-                                }
-                            }),
-                            m('div', { class: 'label' }, [
-                                m('span', { class: 'label-text-alt text-xs' }, 'Function receives "data" parameter with query results')
-                            ])
-                        ]),
-                        
-                        // Custom Chart Config
-                        m('div', { class: 'form-control mt-2' }, [
-                            m('label', { class: 'label' }, [
-                                m('span', { class: 'label-text' }, 'Custom Chart Config (JSON)'),
-                                m('span', { class: 'label-text-alt' }, 'Full Chart.js configuration')
-                            ]),
-                            m('textarea', {
-                                class: 'textarea textarea-bordered font-mono text-xs h-24',
-                                placeholder: '{"type": "bar", "data": {...}, "options": {...}}',
-                                value: CustomAnalysisState.currentQuery.chartConfig || '',
-                                oninput: (e) => {
-                                    CustomAnalysisState.currentQuery.chartConfig = e.target.value;
-                                }
-                            }),
-                            m('div', { class: 'label' }, [
-                                m('span', { class: 'label-text-alt text-xs' }, 'Overrides auto-generated config. See Chart.js docs for options.')
-                            ])
-                        ]),
-                        
-                        // Statistics Toggle
-                        m('div', { class: 'form-control mt-2' }, [
-                            m('label', { class: 'label cursor-pointer' }, [
-                                m('span', { class: 'label-text' }, 'Show Statistical Analysis'),
-                                m('input', {
-                                    type: 'checkbox',
-                                    class: 'toggle toggle-primary',
-                                    checked: CustomAnalysisState.showStatistics,
-                                    onchange: (e) => {
-                                        CustomAnalysisState.showStatistics = e.target.checked;
-                                    }
-                                })
-                            ]),
-                            m('div', { class: 'label' }, [
-                                m('span', { class: 'label-text-alt text-xs' }, 'Compute mean, median, mode, std dev, percentiles for numeric columns')
-                            ])
-                        ])
-                    ])
-                ]),
                 
                 // Action Buttons
                 m('div', { class: 'card-actions justify-end gap-2 mt-4' }, [
