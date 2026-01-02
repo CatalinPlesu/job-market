@@ -1,5 +1,4 @@
 // SQL-based data access functions
-// SQL-based data access functions
 const dbApi = {
     // Build WHERE clause from filters
     buildWhereClause(filters, search) {
