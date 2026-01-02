@@ -1564,11 +1564,6 @@ const FilterPanel = {
                         class: 'btn btn-sm btn-primary',
                         onclick: applySearchAsFilter
                     }, 'Apply')
-                ]),
-                m('div', { class: 'text-xs opacity-70 mt-1' }, [
-                    'Tip: Type a value and press Enter to apply it as a filter, or click Apply. ',
-                    m('span', { class: 'font-medium' }, 'Examples:'),
-                    ' "Developer", "Chisinau", "Java", "Senior"'
                 ])
             ]),
             
