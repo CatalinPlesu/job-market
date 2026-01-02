@@ -491,30 +491,48 @@ const dbApi = {
     
     // Get job skills (hard or soft)
     async getJobSkills(jobId, skillType) {
+        // Validate skillType to prevent SQL injection
+        const allowedTypes = ['hard_skills', 'soft_skills'];
+        if (!allowedTypes.includes(skillType)) {
+            console.error('Invalid skill type:', skillType);
+            return [];
+        }
+        
         const table = skillType;
         const query = `
             SELECT s.name
             FROM ${table} s
             JOIN job_details_${table} js ON s.id = js.${table}_id
-            WHERE js.job_details_id = ${jobId}
+            WHERE js.job_details_id = ?
         `;
         
-        const results = DatabaseManager.queryObjects(query);
+        const results = DatabaseManager.queryObjects(query, [jobId]);
         return results.map(r => r.name);
     },
     
     // Get job related data (benefits, certifications, etc.)
     async getJobRelated(jobId, relationType) {
+        // Validate relationType to prevent SQL injection
+        const allowedTypes = [
+            'certifications', 'benefits', 'work_environment', 
+            'professional_development', 'work_life_balance',
+            'physical_requirements', 'work_conditions', 'special_requirements'
+        ];
+        if (!allowedTypes.includes(relationType)) {
+            console.error('Invalid relation type:', relationType);
+            return [];
+        }
+        
         const columnName = relationType === 'benefits' || relationType === 'work_environment' || 
                           relationType === 'professional_development' ? 'description' : 'name';
         const query = `
             SELECT r.${columnName} as value
             FROM ${relationType} r
             JOIN job_details_${relationType} jr ON r.id = jr.${relationType}_id
-            WHERE jr.job_details_id = ${jobId}
+            WHERE jr.job_details_id = ?
         `;
         
-        const results = DatabaseManager.queryObjects(query);
+        const results = DatabaseManager.queryObjects(query, [jobId]);
         return results.map(r => r.value);
     },
     
@@ -523,10 +541,10 @@ const dbApi = {
         const query = `
             SELECT description
             FROM responsibilities
-            WHERE job_detail_id = ${jobId}
+            WHERE job_detail_id = ?
         `;
         
-        const results = DatabaseManager.queryObjects(query);
+        const results = DatabaseManager.queryObjects(query, [jobId]);
         return results.map(r => r.description);
     },
     
@@ -535,10 +553,10 @@ const dbApi = {
         const query = `
             SELECT language
             FROM job_languages
-            WHERE job_detail_id = ${jobId}
+            WHERE job_detail_id = ?
         `;
         
-        const results = DatabaseManager.queryObjects(query);
+        const results = DatabaseManager.queryObjects(query, [jobId]);
         return results.map(r => r.language);
     },
     
@@ -1838,20 +1856,6 @@ const JobsPage = {
         ]);
     }
 };
-                                })) :
-                                m('div', { class: 'text-center py-8 opacity-70' }, 
-                                    isFiltered ? 'No jobs match your filters. Try adjusting your criteria.' : 'No jobs found'
-                                )
-                        ]),
-                        
-                        // Bottom pagination
-                        JobsPage.renderPagination(totalPages)
-                    ]
-                ])
-            ])
-        ]);
-    }
-};
 
 // Job Detail Page
 const JobDetailPage = {
@@ -1922,10 +1926,10 @@ const JobDetailPage = {
                 LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
                 LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
                 LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
-                WHERE jd.id = ${jobId}
+                WHERE jd.id = ?
             `;
             
-            const jobs = DatabaseManager.queryObjects(query);
+            const jobs = DatabaseManager.queryObjects(query, [jobId]);
             
             if (jobs.length > 0) {
                 // Format the job
