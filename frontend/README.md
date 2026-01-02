@@ -38,9 +38,14 @@ A single-page application (SPA) built with Mithril.js and DaisyUI for browsing j
   - **Note**: The raw description is pulled from the `job_description` column in the `job_details` table. If jobs show empty descriptions, ensure this field is populated during LLM processing.
 
 ### Analysis Dashboard
-- Overview statistics
-- Market trends and insights
-- Interactive charts (when data is available)
+- **Custom Analysis Builder**: SQL.js + Chart.js for custom queries
+  - 15+ predefined analyses (skills, salary, trends, distributions)
+  - Custom SQL query builder with live visualization
+  - Multiple chart types (bar, line, doughnut, pie)
+  - Save queries to browser localStorage
+  - Database structure documentation and query help
+  - No backend required - all analysis runs client-side
+- See [CUSTOM_ANALYSIS_GUIDE.md](../CUSTOM_ANALYSIS_GUIDE.md) for detailed documentation
 
 ## Usage
 
@@ -76,15 +81,9 @@ The SPA now uses SQLite databases loaded client-side for instant filtering and q
 ```
 /api/
 ├── data.db                  - SQLite database with job data (user must copy this)
-└── analysis/
-    ├── index.json           - Available analyses list
-    ├── benefits.json        - Benefits analysis
-    ├── employment-types.json - Employment types
-    ├── salary-overview.json - Salary overview
-    ├── skills-demand.json   - Skills demand
-    ├── market-health.json   - Market health
-    └── ... (22 analysis files total)
 ```
+
+**Note:** The analysis folder with JSON files is no longer needed. All analysis is now done client-side using the Custom Analysis Builder.
 
 ### Database Setup
 
@@ -95,14 +94,7 @@ The SPA now uses SQLite databases loaded client-side for instant filtering and q
 cp databases/data.db frontend/api/
 ```
 
-The database is loaded once when the application initializes and all job queries are performed client-side using SQL.js (WebAssembly SQLite).
-
-### Analysis Data
-
-Analysis endpoints remain server-generated JSON files. Generate these using:
-```bash
-python -m analysis_engine --output frontend/api/analysis
-```
+The database is loaded once when the application initializes and all job queries and analysis are performed client-side using SQL.js (WebAssembly SQLite).
 
 ## Customization
 
@@ -217,7 +209,10 @@ The frontend now supports comprehensive URL parameter management for enhanced us
 - [x] Global search with URL integration
 - [x] All 30+ database fields filterable (19 single-select + 11 multi-select)
 - [x] Multi-select support for many-to-many relationships
-- [ ] Charts render correctly (to be added when data available)
+- [x] Charts render correctly (custom analysis builder implemented)
+- [x] Custom SQL query builder with Chart.js visualization
+- [x] Predefined analysis queries for common insights
+- [x] Local storage for saved custom queries
 
 ## Recent Filter Enhancements (2026-01)
 

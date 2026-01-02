@@ -105,20 +105,14 @@ Process raw job descriptions with LLM:
 - Parse structured JSON response
 - Store normalized data in `data.db` with proper relationships
 
-### 8. Process Data (Generate Analysis)
-Generate statistical analyses from job market data:
-- Configure analysis parameters (output directory, time granularity, sample sizes)
-- Generate temporal and static analysis reports
-- Creates JSON files for frontend consumption in the analysis directory
-
-### 9. Copy Database Files to Frontend API
+### 8. Copy Database Files to Frontend API
 Copy both SQLite database files to frontend/api directory:
 - Automatically copies scrape.db and data.db to frontend/api
 - Creates frontend/api directory if it doesn't exist
 - Useful for making databases accessible to the frontend
 - Shows file sizes during copy operation
 
-### 10. Database Rollback
+### 9. Database Rollback
 Restore databases from previous backups:
 - Select which database to restore (scrape.db or data.db)
 - View available backups with timestamps and sizes
@@ -164,7 +158,12 @@ Restore databases from previous backups:
   - Extra slim job listings (Hacker News style)
   - Client-side filtering on multiple fields with hierarchical filtering
   - Job detail view with parsed/raw tabs
-  - Analysis dashboard with charts
+  - **Custom Analysis Builder**: SQL.js + Chart.js for custom data analysis
+    - 15+ predefined analysis queries (skills, salary, trends, etc.)
+    - Custom SQL query builder with live visualization
+    - Multiple chart types (bar, line, doughnut, pie)
+    - Save queries to browser localStorage
+    - Database structure documentation for users
   - Dark/light theme toggle
   - Mobile responsive design
   - See [frontend/README.md](frontend/README.md) for details
