@@ -355,7 +355,7 @@ const dbApi = {
         };
         
         // Helper function for one-to-many relationships (like languages)
-        const addOneToManyFilter = (filterKey, tableName, columnName = 'language', foreignKey = 'job_detail_id') => {
+        const addOneToManyFilter = (filterKey, tableName, columnName, foreignKey = 'job_detail_id') => {
             const filterValue = filters[filterKey];
             if (filterValue && filterValue.length > 0) {
                 // Ensure job has ALL selected items (AND logic across selections)
