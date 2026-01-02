@@ -189,112 +189,114 @@ const dbApi = {
     // Build WHERE clause from filters
     buildWhereClause(filters, search) {
         const conditions = [];
-        const params = {};
+        const params = [];  // Changed from {} to [] for positional parameters
         
         // Text search across multiple fields
         if (search && search.trim()) {
+            const searchValue = `%${search.trim()}%`;
             conditions.push(`(
-                jd.job_title LIKE :search OR
-                t.name LIKE :search OR
-                c.name LIKE :search OR
-                jf.name LIKE :search OR
-                sp.name LIKE :search
+                jd.job_title LIKE ? OR
+                t.name LIKE ? OR
+                c.name LIKE ? OR
+                jf.name LIKE ? OR
+                sp.name LIKE ?
             )`);
-            params.search = `%${search.trim()}%`;
+            // Add the same search value 5 times for the 5 LIKE clauses
+            params.push(searchValue, searchValue, searchValue, searchValue, searchValue);
         }
         
         // Job function filter
         if (filters.job_function) {
-            conditions.push('jf.name = :job_function');
-            params.job_function = filters.job_function;
+            conditions.push('jf.name = ?');
+            params.push(filters.job_function);
         }
         
         // Seniority filter
         if (filters.seniority_level) {
-            conditions.push('sl.name = :seniority_level');
-            params.seniority_level = filters.seniority_level;
+            conditions.push('sl.name = ?');
+            params.push(filters.seniority_level);
         }
         
         // City filter
         if (filters.city) {
-            conditions.push('ci.name = :city');
-            params.city = filters.city;
+            conditions.push('ci.name = ?');
+            params.push(filters.city);
         }
         
         // Remote work filter
         if (filters.remote_work) {
-            conditions.push('rw.name = :remote_work');
-            params.remote_work = filters.remote_work;
+            conditions.push('rw.name = ?');
+            params.push(filters.remote_work);
         }
         
         // Industry filter
         if (filters.industry) {
-            conditions.push('ind.name = :industry');
-            params.industry = filters.industry;
+            conditions.push('ind.name = ?');
+            params.push(filters.industry);
         }
         
         // Company filter
         if (filters.company) {
-            conditions.push('c.name = :company');
-            params.company = filters.company;
+            conditions.push('c.name = ?');
+            params.push(filters.company);
         }
         
         // Employment type filter
         if (filters.employment_type) {
-            conditions.push('et.name = :employment_type');
-            params.employment_type = filters.employment_type;
+            conditions.push('et.name = ?');
+            params.push(filters.employment_type);
         }
         
         // Contract type filter
         if (filters.contract_type) {
-            conditions.push('ct.name = :contract_type');
-            params.contract_type = filters.contract_type;
+            conditions.push('ct.name = ?');
+            params.push(filters.contract_type);
         }
         
         // Department filter
         if (filters.department) {
-            conditions.push('d.name = :department');
-            params.department = filters.department;
+            conditions.push('d.name = ?');
+            params.push(filters.department);
         }
         
         // Specialization filter
         if (filters.specialization) {
-            conditions.push('sp.name = :specialization');
-            params.specialization = filters.specialization;
+            conditions.push('sp.name = ?');
+            params.push(filters.specialization);
         }
         
         // Education level filter
         if (filters.education_level) {
-            conditions.push('el.name = :education_level');
-            params.education_level = filters.education_level;
+            conditions.push('el.name = ?');
+            params.push(filters.education_level);
         }
         
         // Company size filter
         if (filters.company_size) {
-            conditions.push('cs.name = :company_size');
-            params.company_size = filters.company_size;
+            conditions.push('cs.name = ?');
+            params.push(filters.company_size);
         }
         
         // Salary range filters
         if (filters.salaryMin !== null && filters.salaryMin !== undefined) {
-            conditions.push('jd.min_salary >= :salaryMin');
-            params.salaryMin = filters.salaryMin;
+            conditions.push('jd.min_salary >= ?');
+            params.push(filters.salaryMin);
         }
         
         if (filters.salaryMax !== null && filters.salaryMax !== undefined) {
-            conditions.push('jd.max_salary <= :salaryMax');
-            params.salaryMax = filters.salaryMax;
+            conditions.push('jd.max_salary <= ?');
+            params.push(filters.salaryMax);
         }
         
         // Experience filters
         if (filters.experienceMin !== null && filters.experienceMin !== undefined) {
-            conditions.push('jd.experience_years >= :experienceMin');
-            params.experienceMin = filters.experienceMin;
+            conditions.push('jd.experience_years >= ?');
+            params.push(filters.experienceMin);
         }
         
         if (filters.experienceMax !== null && filters.experienceMax !== undefined) {
-            conditions.push('jd.experience_years <= :experienceMax');
-            params.experienceMax = filters.experienceMax;
+            conditions.push('jd.experience_years <= ?');
+            params.push(filters.experienceMax);
         }
         
         const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
