@@ -1266,6 +1266,8 @@ const FilterPanel = {
     experienceMinTimer: null,
     experienceMaxTimer: null,
     filterCounts: {}, // Store dynamic filter counts
+    suggestions: [], // Store filter suggestions
+    suggestionsTimer: null,
     
     // Async function to get counts for a specific field
     async getCountsForField(fieldKey) {
@@ -1276,6 +1278,83 @@ const FilterPanel = {
         } catch (error) {
             console.error(`Error getting counts for ${fieldKey}:`, error);
             FilterPanel.filterCounts[fieldKey] = [];
+        }
+    },
+    
+    // Async function to fetch suggestions
+    async fetchSuggestions() {
+        if (!state.search || state.search.trim() === '') {
+            FilterPanel.suggestions = [];
+            return;
+        }
+        
+        try {
+            const searchTerm = state.search.toLowerCase().trim();
+            const suggestions = [];
+            
+            await DatabaseManager.init();
+            
+            // Map of filterable fields to their table and column info
+            const filterableFields = [
+                { key: 'job_function', table: 'job_functions', column: 'name', label: 'Job Function' },
+                { key: 'seniority_level', table: 'seniority_levels', column: 'name', label: 'Seniority Level' },
+                { key: 'industry', table: 'industries', column: 'name', label: 'Industry' },
+                { key: 'department', table: 'departments', column: 'name', label: 'Department' },
+                { key: 'specialization', table: 'specializations', column: 'name', label: 'Specialization' },
+                { key: 'city', table: 'cities', column: 'name', label: 'City' },
+                { key: 'company', table: 'companies', column: 'name', label: 'Company' },
+                { key: 'employment_type', table: 'employment_types', column: 'name', label: 'Employment Type' },
+                { key: 'contract_type', table: 'contract_types', column: 'name', label: 'Contract Type' },
+                { key: 'remote_work', table: 'remote_work_options', column: 'name', label: 'Remote Work' },
+                { key: 'education_level', table: 'education_levels', column: 'name', label: 'Education Level' },
+                { key: 'company_size', table: 'company_sizes', column: 'name', label: 'Company Size' }
+            ];
+            
+            // Search across all filterable fields
+            for (const fieldInfo of filterableFields) {
+                const query = `
+                    SELECT DISTINCT ${fieldInfo.column} as value
+                    FROM ${fieldInfo.table}
+                    WHERE LOWER(${fieldInfo.column}) LIKE ?
+                    ORDER BY ${fieldInfo.column}
+                    LIMIT 3
+                `;
+                
+                const results = DatabaseManager.queryObjects(query, [`%${searchTerm}%`]);
+                
+                results.forEach(row => {
+                    suggestions.push({
+                        value: row.value,
+                        field: fieldInfo.key,
+                        fieldName: fieldInfo.label,
+                        fieldDisplay: fieldInfo.label
+                    });
+                });
+            }
+            
+            // Sort suggestions by relevance
+            suggestions.sort((a, b) => {
+                const aLower = a.value.toLowerCase();
+                const bLower = b.value.toLowerCase();
+                const searchLower = searchTerm.toLowerCase();
+                
+                // Exact match first
+                if (aLower === searchLower && bLower !== searchLower) return -1;
+                if (bLower === searchLower && aLower !== searchLower) return 1;
+                
+                // Starts with
+                if (aLower.startsWith(searchLower) && !bLower.startsWith(searchLower)) return -1;
+                if (bLower.startsWith(searchLower) && !aLower.startsWith(searchLower)) return 1;
+                
+                // Contains (alphabetical for ties)
+                return a.value.localeCompare(b.value);
+            });
+            
+            FilterPanel.suggestions = suggestions.slice(0, 10);
+            m.redraw();
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+            FilterPanel.suggestions = [];
         }
     },
     
@@ -1345,168 +1424,23 @@ const FilterPanel = {
             m.redraw();
         };
         
-        // Function to get available filter suggestions
-        const getFilterSuggestions = () => {
-            if (!state.search || state.search.trim() === '') return [];
-            
-            const searchTerm = state.search.toLowerCase().trim();
-            const suggestions = [];
-            
-            // Collect all available values from all filter fields
-            filterFields.forEach(field => {
-                // Get available options for this field
-                const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
-                const currentFieldIndex = hierarchyLevels.indexOf(field.key);
-                
-                let filterForOptions;
-                if (currentFieldIndex !== -1) {
-                    filterForOptions = {};
-                    for (let i = 0; i < currentFieldIndex; i++) {
-                        const parentKey = hierarchyLevels[i];
-                        if (state.filters[parentKey]) {
-                            filterForOptions[parentKey] = state.filters[parentKey];
-                        }
-                    }
-                } else {
-                    filterForOptions = { ...state.filters };
-                    delete filterForOptions[field.key];
-                }
-                
-                const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
-                
-                const availableValuesSet = new Set();
-                baseFilteredJobs.forEach(job => {
-                    const value = getJobFieldValue(job, field.key);
-                    if (value !== null && value !== undefined && value !== '') {
-                        if (Array.isArray(value)) {
-                            value.forEach(v => availableValuesSet.add(v));
-                        } else {
-                            availableValuesSet.add(value);
-                        }
-                    }
-                });
-                
-                // Check if any values match the search term
-                const matchingValues = Array.from(availableValuesSet)
-                    .filter(value => value.toLowerCase().includes(searchTerm))
-                    .slice(0, 5); // Limit to 5 suggestions
-                
-                matchingValues.forEach(value => {
-                    suggestions.push({
-                        value: value,
-                        field: field.key,
-                        fieldName: field.label,
-                        fieldDisplay: field.display || field.label
-                    });
-                });
-            });
-            
-            // Sort suggestions by relevance (exact match first, then starts with, then contains)
-            suggestions.sort((a, b) => {
-                const aLower = a.value.toLowerCase();
-                const bLower = b.value.toLowerCase();
-                const searchLower = searchTerm.toLowerCase();
-                
-                // Exact match
-                if (aLower === searchLower && bLower !== searchLower) return -1;
-                if (bLower === searchLower && aLower !== searchLower) return 1;
-                
-                // Starts with
-                if (aLower.startsWith(searchLower) && !bLower.startsWith(searchLower)) return -1;
-                if (bLower.startsWith(searchLower) && !aLower.startsWith(searchLower)) return 1;
-                
-                // Contains (alphabetical for ties)
-                if (aLower.includes(searchLower) && bLower.includes(searchLower)) {
-                    return a.value.localeCompare(b.value);
-                }
-                
-                return 0;
-            });
-            
-            return suggestions.slice(0, 10); // Limit total suggestions
-        };
-        
         // Function to apply search as filter
-        const applySearchAsFilter = (suggestion = null) => {
+        const applySearchAsFilter = async (suggestion = null) => {
             if (!state.search || state.search.trim() === '') return;
-            
-            let searchTerm = state.search.toLowerCase().trim();
-            let applied = false;
             
             // If suggestion provided, use it
             if (suggestion) {
                 state.filters[suggestion.field] = suggestion.value;
                 state.search = ''; // Clear search input
-                applied = true;
-            } else {
-                // Try to find matching filter values
-                filterFields.forEach(field => {
-                    if (applied) return; // Stop if already applied
-                    
-                    // Get available options for this field
-                    const hierarchyLevels = ['industry', 'department', 'job_family', 'specialization'];
-                    const currentFieldIndex = hierarchyLevels.indexOf(field.key);
-                    
-                    let filterForOptions;
-                    if (currentFieldIndex !== -1) {
-                        filterForOptions = {};
-                        for (let i = 0; i < currentFieldIndex; i++) {
-                            const parentKey = hierarchyLevels[i];
-                            if (state.filters[parentKey]) {
-                                filterForOptions[parentKey] = state.filters[parentKey];
-                            }
-                        }
-                    } else {
-                        filterForOptions = { ...state.filters };
-                        delete filterForOptions[field.key];
-                    }
-                    
-                    const baseFilteredJobs = state.allLoadedJobs.filter(job => matchesFilters(job, filterForOptions));
-                    
-                    const availableValuesSet = new Set();
-                    baseFilteredJobs.forEach(job => {
-                        const value = getJobFieldValue(job, field.key);
-                        if (value !== null && value !== undefined && value !== '') {
-                            if (Array.isArray(value)) {
-                                value.forEach(v => availableValuesSet.add(v));
-                            } else {
-                                availableValuesSet.add(value);
-                            }
-                        }
-                    });
-                    
-                    // Check for exact match first
-                    const exactMatch = Array.from(availableValuesSet).find(value => 
-                        value.toLowerCase() === searchTerm
-                    );
-                    
-                    if (exactMatch) {
-                        state.filters[field.key] = exactMatch;
-                        state.search = ''; // Clear search input
-                        applied = true;
-                        return;
-                    }
-                    
-                    // Check for starts with match
-                    const startsMatch = Array.from(availableValuesSet).find(value => 
-                        value.toLowerCase().startsWith(searchTerm)
-                    );
-                    
-                    if (startsMatch) {
-                        state.filters[field.key] = startsMatch;
-                        state.search = ''; // Clear search input
-                        applied = true;
-                        return;
-                    }
-                });
-            }
-            
-            if (applied) {
-                handleFilterChange();
+                
+                // Clear filter counts cache
+                FilterPanel.filterCounts = {};
+                
+                await handleFilterChange();
                 m.redraw();
             } else {
-                // If no filter match found, keep as general search
-                handleFilterChange();
+                // Keep as general search and trigger filter
+                await handleFilterChange();
             }
         };
         
@@ -1548,6 +1482,11 @@ const FilterPanel = {
                             value: state.search || '',
                             oninput: (e) => {
                                 state.search = e.target.value;
+                                // Debounce suggestions fetching
+                                clearTimeout(FilterPanel.suggestionsTimer);
+                                FilterPanel.suggestionsTimer = setTimeout(() => {
+                                    FilterPanel.fetchSuggestions();
+                                }, 300);
                                 m.redraw(); // Trigger redraw to show/hide suggestions
                             },
                             onkeypress: (e) => {
@@ -1568,7 +1507,7 @@ const FilterPanel = {
                         }),
                         // Suggestions dropdown
                         (() => {
-                            const suggestions = getFilterSuggestions();
+                            const suggestions = FilterPanel.suggestions;
                             if (suggestions.length === 0 || !state.search) return null;
                             
                             return m('div', { 
