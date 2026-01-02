@@ -2791,7 +2791,342 @@ const ChartHelpers = {
     }
 };
 
-// Analysis Page
+// Custom Analysis Builder State
+const CustomAnalysisState = {
+    savedQueries: [],
+    currentQuery: {
+        name: '',
+        description: '',
+        sql: '',
+        chartType: 'bar'
+    },
+    queryResult: null,
+    chartInstance: null,
+    showHelp: false,
+    
+    // Load saved queries from localStorage
+    loadSavedQueries: () => {
+        try {
+            const saved = localStorage.getItem('customAnalysisQueries');
+            if (saved) {
+                CustomAnalysisState.savedQueries = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error('Failed to load saved queries:', e);
+        }
+    },
+    
+    // Save queries to localStorage
+    saveQueries: () => {
+        try {
+            localStorage.setItem('customAnalysisQueries', JSON.stringify(CustomAnalysisState.savedQueries));
+        } catch (e) {
+            console.error('Failed to save queries:', e);
+        }
+    },
+    
+    // Add new query
+    addQuery: (query) => {
+        CustomAnalysisState.savedQueries.push({
+            ...query,
+            id: Date.now(),
+            createdAt: new Date().toISOString()
+        });
+        CustomAnalysisState.saveQueries();
+    },
+    
+    // Delete query
+    deleteQuery: (id) => {
+        CustomAnalysisState.savedQueries = CustomAnalysisState.savedQueries.filter(q => q.id !== id);
+        CustomAnalysisState.saveQueries();
+    },
+    
+    // Execute query
+    executeQuery: async (sql) => {
+        try {
+            await DatabaseManager.init();
+            const results = DatabaseManager.queryObjects(sql);
+            CustomAnalysisState.queryResult = {
+                success: true,
+                data: results,
+                rowCount: results.length
+            };
+        } catch (error) {
+            CustomAnalysisState.queryResult = {
+                success: false,
+                error: error.message || 'Query execution failed'
+            };
+        }
+        m.redraw();
+    }
+};
+
+// Predefined Analysis Queries
+const PredefinedAnalyses = [
+    {
+        name: 'Job Postings Over Time',
+        description: 'Track daily job openings showing peak hiring seasons',
+        sql: `SELECT 
+    DATE(posting_date) as date,
+    COUNT(*) as job_count,
+    COUNT(DISTINCT company_name_id) as company_count
+FROM job_details
+WHERE posting_date >= date('now', '-90 days')
+GROUP BY DATE(posting_date)
+ORDER BY date DESC`,
+        chartType: 'line',
+        category: 'temporal'
+    },
+    {
+        name: 'Top Skills in Demand',
+        description: 'Most requested skills across all job postings',
+        sql: `SELECT 
+    hs.name as skill,
+    COUNT(DISTINCT jd.id) as job_count,
+    ROUND(COUNT(DISTINCT jd.id) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
+FROM hard_skills hs
+JOIN job_details_hard_skills jhs ON hs.id = jhs.hard_skills_id
+JOIN job_details jd ON jhs.job_details_id = jd.id
+GROUP BY hs.name
+ORDER BY job_count DESC
+LIMIT 20`,
+        chartType: 'bar',
+        category: 'skills'
+    },
+    {
+        name: 'Salary Distribution',
+        description: 'Salary ranges and quartiles across all jobs',
+        sql: `SELECT 
+    CASE 
+        WHEN min_salary < 10000 THEN '< 10k'
+        WHEN min_salary < 20000 THEN '10k-20k'
+        WHEN min_salary < 30000 THEN '20k-30k'
+        WHEN min_salary < 40000 THEN '30k-40k'
+        WHEN min_salary < 50000 THEN '40k-50k'
+        ELSE '50k+'
+    END as salary_range,
+    COUNT(*) as job_count
+FROM job_details
+WHERE min_salary IS NOT NULL
+GROUP BY salary_range
+ORDER BY 
+    CASE salary_range
+        WHEN '< 10k' THEN 1
+        WHEN '10k-20k' THEN 2
+        WHEN '20k-30k' THEN 3
+        WHEN '30k-40k' THEN 4
+        WHEN '40k-50k' THEN 5
+        ELSE 6
+    END`,
+        chartType: 'bar',
+        category: 'salary'
+    },
+    {
+        name: 'Top Skills by Salary',
+        description: 'Skills that command the highest average salaries',
+        sql: `SELECT 
+    hs.name as skill,
+    COUNT(DISTINCT jd.id) as job_count,
+    ROUND(AVG(jd.min_salary)) as avg_min_salary,
+    ROUND(AVG(jd.max_salary)) as avg_max_salary
+FROM hard_skills hs
+JOIN job_details_hard_skills jhs ON hs.id = jhs.hard_skills_id
+JOIN job_details jd ON jhs.job_details_id = jd.id
+WHERE jd.min_salary IS NOT NULL AND jd.max_salary IS NOT NULL
+GROUP BY hs.name
+HAVING job_count >= 5
+ORDER BY avg_max_salary DESC
+LIMIT 15`,
+        chartType: 'bar',
+        category: 'skills'
+    },
+    {
+        name: 'Salary by Seniority Level',
+        description: 'Average salary progression across seniority levels',
+        sql: `SELECT 
+    sl.name as seniority_level,
+    COUNT(*) as job_count,
+    ROUND(AVG(jd.min_salary)) as avg_min_salary,
+    ROUND(AVG(jd.max_salary)) as avg_max_salary
+FROM job_details jd
+JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+WHERE jd.min_salary IS NOT NULL
+GROUP BY sl.name
+ORDER BY avg_max_salary DESC`,
+        chartType: 'bar',
+        category: 'salary'
+    },
+    {
+        name: 'Jobs by Industry',
+        description: 'Job distribution across different industries',
+        sql: `SELECT 
+    i.name as industry,
+    COUNT(*) as job_count
+FROM job_details jd
+JOIN industries i ON jd.industry_id = i.id
+GROUP BY i.name
+ORDER BY job_count DESC
+LIMIT 15`,
+        chartType: 'doughnut',
+        category: 'distribution'
+    },
+    {
+        name: 'Remote Work Options',
+        description: 'Distribution of remote work opportunities',
+        sql: `SELECT 
+    rw.name as remote_option,
+    COUNT(*) as job_count,
+    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
+FROM job_details jd
+LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+GROUP BY rw.name
+ORDER BY job_count DESC`,
+        chartType: 'doughnut',
+        category: 'distribution'
+    },
+    {
+        name: 'Skill Co-Occurrences',
+        description: 'Top skill combinations that appear together',
+        sql: `SELECT 
+    hs1.name || ' + ' || hs2.name as skill_combination,
+    COUNT(DISTINCT jd.id) as job_count
+FROM job_details jd
+JOIN job_details_hard_skills jhs1 ON jd.id = jhs1.job_details_id
+JOIN hard_skills hs1 ON jhs1.hard_skills_id = hs1.id
+JOIN job_details_hard_skills jhs2 ON jd.id = jhs2.job_details_id
+JOIN hard_skills hs2 ON jhs2.hard_skills_id = hs2.id
+WHERE hs1.id < hs2.id
+GROUP BY hs1.name, hs2.name
+ORDER BY job_count DESC
+LIMIT 20`,
+        chartType: 'bar',
+        category: 'skills'
+    },
+    {
+        name: 'Top Companies Hiring',
+        description: 'Companies with the most active job postings',
+        sql: `SELECT 
+    c.name as company,
+    COUNT(*) as job_count,
+    COUNT(DISTINCT jd.title_id) as unique_titles
+FROM job_details jd
+JOIN companies c ON jd.company_name_id = c.id
+GROUP BY c.name
+ORDER BY job_count DESC
+LIMIT 20`,
+        chartType: 'bar',
+        category: 'companies'
+    },
+    {
+        name: 'Experience Requirements',
+        description: 'Distribution of required years of experience',
+        sql: `SELECT 
+    CASE 
+        WHEN experience_years = 0 THEN 'Entry Level'
+        WHEN experience_years BETWEEN 1 AND 2 THEN '1-2 years'
+        WHEN experience_years BETWEEN 3 AND 5 THEN '3-5 years'
+        WHEN experience_years BETWEEN 6 AND 10 THEN '6-10 years'
+        ELSE '10+ years'
+    END as experience_range,
+    COUNT(*) as job_count
+FROM job_details
+WHERE experience_years IS NOT NULL
+GROUP BY experience_range
+ORDER BY 
+    CASE experience_range
+        WHEN 'Entry Level' THEN 1
+        WHEN '1-2 years' THEN 2
+        WHEN '3-5 years' THEN 3
+        WHEN '6-10 years' THEN 4
+        ELSE 5
+    END`,
+        chartType: 'bar',
+        category: 'requirements'
+    },
+    {
+        name: 'Salary vs Experience',
+        description: 'How salary correlates with years of experience',
+        sql: `SELECT 
+    experience_years,
+    COUNT(*) as job_count,
+    ROUND(AVG(min_salary)) as avg_min_salary,
+    ROUND(AVG(max_salary)) as avg_max_salary
+FROM job_details
+WHERE experience_years IS NOT NULL 
+  AND min_salary IS NOT NULL 
+  AND experience_years <= 15
+GROUP BY experience_years
+ORDER BY experience_years`,
+        chartType: 'line',
+        category: 'salary'
+    },
+    {
+        name: 'Top Benefits Offered',
+        description: 'Most frequently offered employee benefits',
+        sql: `SELECT 
+    b.description as benefit,
+    COUNT(DISTINCT jd.id) as job_count,
+    ROUND(COUNT(DISTINCT jd.id) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
+FROM benefits b
+JOIN job_details_benefits jb ON b.id = jb.benefits_id
+JOIN job_details jd ON jb.job_details_id = jd.id
+GROUP BY b.description
+ORDER BY job_count DESC
+LIMIT 15`,
+        chartType: 'bar',
+        category: 'benefits'
+    },
+    {
+        name: 'Jobs by Location',
+        description: 'Geographic distribution of job opportunities',
+        sql: `SELECT 
+    c.name as city,
+    COUNT(*) as job_count
+FROM job_details jd
+JOIN cities c ON jd.city_id = c.id
+GROUP BY c.name
+ORDER BY job_count DESC
+LIMIT 15`,
+        chartType: 'doughnut',
+        category: 'distribution'
+    },
+    {
+        name: 'Salary by Job Function',
+        description: 'Average salaries across different job functions',
+        sql: `SELECT 
+    jf.name as job_function,
+    COUNT(*) as job_count,
+    ROUND(AVG(jd.min_salary)) as avg_min_salary,
+    ROUND(AVG(jd.max_salary)) as avg_max_salary
+FROM job_details jd
+JOIN job_functions jf ON jd.job_function_id = jf.id
+WHERE jd.min_salary IS NOT NULL
+GROUP BY jf.name
+HAVING job_count >= 5
+ORDER BY avg_max_salary DESC
+LIMIT 15`,
+        chartType: 'bar',
+        category: 'salary'
+    },
+    {
+        name: 'Top Soft Skills',
+        description: 'Most requested soft skills in job postings',
+        sql: `SELECT 
+    ss.name as skill,
+    COUNT(DISTINCT jd.id) as job_count,
+    ROUND(COUNT(DISTINCT jd.id) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
+FROM soft_skills ss
+JOIN job_details_soft_skills jss ON ss.id = jss.soft_skills_id
+JOIN job_details jd ON jss.job_details_id = jd.id
+GROUP BY ss.name
+ORDER BY job_count DESC
+LIMIT 15`,
+        chartType: 'bar',
+        category: 'skills'
+    }
+];
+
+// Analysis Page - Custom Query Builder
 const AnalysisPage = {
     // Helper function to get field value with fallback for backward compatibility
     getFieldValue: (item, fieldName) => {
@@ -3261,855 +3596,417 @@ const AnalysisPage = {
         }
     },
     oninit: () => {
-        api.getAnalysisIndex().then(data => {
-            state.analysisIndex = data;
-            // Load preview data for each analysis
-            if (data.analyses) {
-                data.analyses.forEach(analysis => {
-                    analysis.previewData = null; // Initialize
-                    api.getAnalysis(`${analysis.id}.json`).then(response => {
-                        analysis.previewData = response.data || response;
-                        m.redraw();
-                    }).catch(err => {
-                        console.error(`Error loading preview for ${analysis.id}:`, err);
-                    });
-                });
-            }
-        }).catch(err => {
-            console.error('Error loading analysis index:', err);
-            state.analysisIndex = { error: true };
+        // Load saved queries from localStorage
+        CustomAnalysisState.loadSavedQueries();
+        
+        // Initialize database
+        DatabaseManager.init().catch(err => {
+            console.error('Failed to initialize database:', err);
         });
     },
-    renderDistributionChart: (data) => {
-        if (!data || !data.distribution || data.distribution.length === 0) return null;
+    
+    renderChart: (vnode, data, chartType) => {
+        if (!data || data.length === 0) return null;
         
-        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, 'Distribution Chart'),
-                m('div', { class: 'chart-container' }, [
-                    m('canvas', {
-                        oncreate: (vnode) => {
-                            const labels = data.distribution.map(item => item.range || `${item.min}-${item.max}`);
-                            const values = data.distribution.map(item => item.count);
-                            
-                            ChartHelpers.createChart(vnode.dom, {
-                                type: 'bar',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        label: 'Number of Jobs',
-                                        data: values,
-                                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
-                                        borderColor: 'rgba(99, 102, 241, 1)',
-                                        borderWidth: 1
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    scales: {
-                                        y: {
-                                            beginAtZero: true,
-                                            ticks: {
-                                                precision: 0
-                                            }
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: {
-                                            display: false
-                                        },
-                                        tooltip: {
-                                            callbacks: {
-                                                afterLabel: (context) => {
-                                                    const item = data.distribution[context.dataIndex];
-                                                    return item.percentage ? `${item.percentage.toFixed(1)}% of total` : '';
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                        },
-                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                    })
-                ])
-            ])
-        ]);
-    },
-    renderTimeSeriesChart: (data) => {
-        if (!data || !data.time_series || data.time_series.length === 0) {
-            if (!data || !data.trends || data.trends.length === 0) return null;
-            // Use trends if time_series is not available
-            const trends = data.trends;
-            
-            return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-                m('div', { class: 'card-body' }, [
-                    m('h3', { class: 'card-title' }, 'Trend Over Time'),
-                    m('div', { class: 'chart-container' }, [
-                        m('canvas', {
-                            oncreate: (vnode) => {
-                                const labels = trends.map(item => item.date || item.period);
-                                const newJobs = trends.map(item => item.new_jobs || item.count || 0);
-                                const closedJobs = trends.map(item => item.closed_jobs || 0);
-                                
-                                const datasets = [{
-                                    label: 'New Jobs',
-                                    data: newJobs,
-                                    borderColor: 'rgba(34, 197, 94, 1)',
-                                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                                    fill: true,
-                                    tension: 0.4
-                                }];
-                                
-                                if (closedJobs.some(v => v > 0)) {
-                                    datasets.push({
-                                        label: 'Closed Jobs',
-                                        data: closedJobs,
-                                        borderColor: 'rgba(239, 68, 68, 1)',
-                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                        fill: true,
-                                        tension: 0.4
-                                    });
-                                }
-                                
-                                ChartHelpers.createChart(vnode.dom, {
-                                    type: 'line',
-                                    data: {
-                                        labels: labels,
-                                        datasets: datasets
-                                    },
-                                    options: {
-                                        responsive: true,
-                                        maintainAspectRatio: false,
-                                        scales: {
-                                            y: {
-                                                beginAtZero: true,
-                                                ticks: {
-                                                    precision: 0
-                                                }
-                                            }
-                                        },
-                                        plugins: {
-                                            legend: {
-                                                display: datasets.length > 1
-                                            }
-                                        }
-                                    }
-                                });
-                            },
-                            onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                        })
-                    ])
-                ])
-            ]);
+        const canvas = vnode.dom;
+        if (!canvas) return;
+        
+        // Destroy existing chart
+        if (CustomAnalysisState.chartInstance) {
+            CustomAnalysisState.chartInstance.destroy();
         }
         
-        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, 'Trend Over Time'),
-                m('div', { class: 'chart-container' }, [
-                    m('canvas', {
-                        oncreate: (vnode) => {
-                            const labels = data.time_series.map(item => item.date || item.period);
-                            const values = data.time_series.map(item => item.average || item.count || 0);
-                            
-                            ChartHelpers.createChart(vnode.dom, {
-                                type: 'line',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        label: 'Average',
-                                        data: values,
-                                        borderColor: 'rgba(99, 102, 241, 1)',
-                                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                                        fill: true,
-                                        tension: 0.4
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    scales: {
-                                        y: {
-                                            beginAtZero: true
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: {
-                                            display: false
-                                        }
-                                    }
-                                }
-                            });
-                        },
-                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                    })
-                ])
-            ])
-        ]);
+        // Prepare data for chart
+        const labels = data.map((row, idx) => {
+            // Try to find a label column (first non-numeric column)
+            const keys = Object.keys(row);
+            const labelKey = keys.find(k => typeof row[k] === 'string') || keys[0];
+            return row[labelKey];
+        });
+        
+        const values = data.map((row, idx) => {
+            // Try to find a numeric column for values
+            const keys = Object.keys(row);
+            const valueKey = keys.find(k => typeof row[k] === 'number' && k !== 'id') || keys[1];
+            return row[valueKey] || 0;
+        });
+        
+        let config = {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Count',
+                    data: values,
+                    backgroundColor: chartType === 'line' ? 'rgba(99, 102, 241, 0.2)' : 
+                                     ChartHelpers.generateColors(values.length),
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    borderWidth: 2,
+                    fill: chartType === 'line',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: chartType === 'doughnut' || chartType === 'pie'
+                    }
+                },
+                scales: chartType !== 'doughnut' && chartType !== 'pie' ? {
+                    y: {
+                        beginAtZero: true
+                    }
+                } : undefined
+            }
+        };
+        
+        CustomAnalysisState.chartInstance = new Chart(canvas, config);
     },
-    renderTopItemsChart: (data, key, title) => {
-        const items = data[key];
-        if (!items || items.length === 0) return null;
-        
-        const topItems = items.slice(0, 15); // Show top 15
-        
-        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, title),
-                m('div', { class: 'chart-container' }, [
-                    m('canvas', {
-                        oncreate: (vnode) => {
-                            const labels = topItems.map(item => ChartHelpers.extractLabel(item));
-                            const values = topItems.map(item => item.count);
-                            
-                            ChartHelpers.createChart(vnode.dom, {
-                                type: 'bar',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        label: 'Count',
-                                        data: values,
-                                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
-                                        borderColor: 'rgba(168, 85, 247, 1)',
-                                        borderWidth: 1
-                                    }]
-                                },
-                                options: {
-                                    indexAxis: 'y', // Horizontal bars
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    scales: {
-                                        x: {
-                                            beginAtZero: true,
-                                            ticks: {
-                                                precision: 0
-                                            }
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: {
-                                            display: false
-                                        },
-                                        tooltip: {
-                                            callbacks: {
-                                                afterLabel: (context) => {
-                                                    const item = topItems[context.dataIndex];
-                                                    return item.percentage ? `${item.percentage.toFixed(1)}% of total` : '';
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                        },
-                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                    })
-                ])
-            ])
-        ]);
-    },
-    renderEducationChart: (data) => {
-        if (!data || !data.by_education || data.by_education.length === 0) return null;
-        
-        const items = data.by_education;
-        
-        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, 'Salary by Education Level'),
-                
-                // Statistics cards
-                m('div', { class: 'grid grid-cols-2 md:grid-cols-4 gap-2 mb-4' }, 
-                    items.map(item => 
-                        m('div', { class: 'stat bg-base-200 rounded-lg p-2' }, [
-                            m('div', { class: 'stat-title text-xs' }, AnalysisPage.getFieldValue(item, 'education')),
-                            m('div', { class: 'stat-value text-sm' }, `${Math.round(item.average || 0).toLocaleString()}`),
-                            m('div', { class: 'stat-desc text-xs' }, `${item.count} jobs`)
-                        ])
-                    )
-                ),
-                
-                // Bar chart with grouped data
-                m('div', { class: 'chart-container' }, [
-                    m('canvas', {
-                        oncreate: (vnode) => {
-                            const labels = items.map(item => AnalysisPage.getFieldValue(item, 'education'));
-                            const avgSalaries = items.map(item => Math.round(item.average || 0));
-                            const medianSalaries = items.map(item => Math.round(item.median || 0));
-                            
-                            ChartHelpers.createChart(vnode.dom, {
-                                type: 'bar',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        label: 'Average Salary',
-                                        data: avgSalaries,
-                                        backgroundColor: 'rgba(99, 102, 241, 0.7)',
-                                        borderColor: 'rgba(99, 102, 241, 1)',
-                                        borderWidth: 1
-                                    }, {
-                                        label: 'Median Salary',
-                                        data: medianSalaries,
-                                        backgroundColor: 'rgba(168, 85, 247, 0.7)',
-                                        borderColor: 'rgba(168, 85, 247, 1)',
-                                        borderWidth: 1
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    scales: {
-                                        y: {
-                                            beginAtZero: true,
-                                            ticks: {
-                                                callback: (value) => `${value.toLocaleString()} MDL`
-                                            }
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: {
-                                            display: true,
-                                            position: 'top'
-                                        },
-                                        tooltip: {
-                                            callbacks: {
-                                                label: (context) => {
-                                                    const item = items[context.dataIndex];
-                                                    const label = context.dataset.label || '';
-                                                    const value = context.parsed.y;
-                                                    return [
-                                                        `${label}: ${value.toLocaleString()} MDL`,
-                                                        `Jobs: ${item.count}`,
-                                                        `Min: ${Math.round(item.min || 0).toLocaleString()} MDL`,
-                                                        `Max: ${Math.round(item.max || 0).toLocaleString()} MDL`
-                                                    ];
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                        },
-                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                    })
-                ])
-            ])
-        ]);
-    },
-    renderSkillsSalaryChart: (data) => {
-        if (!data || !data.top_10_highest_paying || data.top_10_highest_paying.length === 0) return null;
-        
-        const skills = data.top_10_highest_paying;
-        
-        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, 'Top 10 Highest Paying Skills'),
-                m('p', { class: 'text-sm text-gray-600 mb-4' }, 'Skills with the highest average salaries'),
-                
-                // Horizontal bar chart with statistics
-                m('div', { class: 'chart-container' }, [
-                    m('canvas', {
-                        oncreate: (vnode) => {
-                            const labels = skills.map(item => item.skill);
-                            const averages = skills.map(item => Math.round(item.average || 0));
-                            const medians = skills.map(item => Math.round(item.median || 0));
-                            
-                            ChartHelpers.createChart(vnode.dom, {
-                                type: 'bar',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        label: 'Average Salary',
-                                        data: averages,
-                                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                                        borderColor: 'rgba(34, 197, 94, 1)',
-                                        borderWidth: 1
-                                    }, {
-                                        label: 'Median Salary',
-                                        data: medians,
-                                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                                        borderColor: 'rgba(59, 130, 246, 1)',
-                                        borderWidth: 1
-                                    }]
-                                },
-                                options: {
-                                    indexAxis: 'y',
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    scales: {
-                                        x: {
-                                            beginAtZero: true,
-                                            ticks: {
-                                                callback: (value) => `${value.toLocaleString()} MDL`
-                                            }
-                                        }
-                                    },
-                                    plugins: {
-                                        legend: {
-                                            display: true,
-                                            position: 'top'
-                                        },
-                                        tooltip: {
-                                            callbacks: {
-                                                label: (context) => {
-                                                    const item = skills[context.dataIndex];
-                                                    const label = context.dataset.label || '';
-                                                    const value = context.parsed.x;
-                                                    return [
-                                                        `${label}: ${value.toLocaleString()} MDL`,
-                                                        `Jobs: ${item.count}`,
-                                                        `Min: ${Math.round(item.min || 0).toLocaleString()} MDL`,
-                                                        `Max: ${Math.round(item.max || 0).toLocaleString()} MDL`,
-                                                        `25th percentile: ${Math.round(item.percentile_25 || 0).toLocaleString()} MDL`,
-                                                        `75th percentile: ${Math.round(item.percentile_75 || 0).toLocaleString()} MDL`
-                                                    ];
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                        },
-                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                    })
-                ])
-            ])
-        ]);
-    },
-    renderBreakdownChart: (data) => {
-        // Check for various breakdown formats
-        const breakdownKey = data.by_function ? 'by_function' : 
-                            data.by_seniority ? 'by_seniority' : 
-                            data.by_location ? 'by_location' : 
-                            data.by_company_size ? 'by_company_size' : 
-                            data.by_education ? 'by_education' : 
-                            data.employment_types ? 'employment_types' :
-                            data.remote_options ? 'remote_options' :
-                            data.education_requirements ? 'education_requirements' :
-                            data.top_benefits ? 'top_benefits' : null;
-        
-        if (!breakdownKey || !data[breakdownKey] || data[breakdownKey].length === 0) return null;
-        
-        // Skip education - it has specialized rendering
-        if (breakdownKey === 'by_education') return null;
-        
-        const items = data[breakdownKey].slice(0, 10); // Top 10
-        const title = ChartHelpers.formatTitle(breakdownKey);
-        
-        return m('div', { class: 'card bg-base-100 shadow-xl' }, [
-            m('div', { class: 'card-body' }, [
-                m('h3', { class: 'card-title' }, `${title}`),
-                m('div', { class: 'chart-container' }, [
-                    m('canvas', {
-                        oncreate: (vnode) => {
-                            const labels = items.map(item => ChartHelpers.extractLabel(item));
-                            const values = items.map(item => item.count);
-                            const backgroundColors = ChartHelpers.generateColors(items.length);
-                            
-                            ChartHelpers.createChart(vnode.dom, {
-                                type: 'doughnut',
-                                data: {
-                                    labels: labels,
-                                    datasets: [{
-                                        data: values,
-                                        backgroundColor: backgroundColors,
-                                        borderWidth: 2,
-                                        borderColor: '#fff'
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: {
-                                            position: 'right',
-                                            labels: {
-                                                boxWidth: 12,
-                                                font: {
-                                                    size: 11
-                                                }
-                                            }
-                                        },
-                                        tooltip: {
-                                            callbacks: {
-                                                label: (context) => {
-                                                    const item = items[context.dataIndex];
-                                                    const label = context.label || '';
-                                                    const count = item.count || 0;
-                                                    const percentage = item.percentage ? ` (${item.percentage.toFixed(1)}%)` : '';
-                                                    const avg = item.average ? ` (Avg: ${Math.round(item.average).toLocaleString()} MDL)` : '';
-                                                    return `${label}: ${count}${percentage}${avg}`;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-                        },
-                        onremove: (vnode) => ChartHelpers.destroyChart(vnode.dom)
-                    })
-                ])
-            ])
-        ]);
-    },
-    renderAnalysisData: (data) => {
-        if (!data) return m(Loading);
-        if (data.error) return m('div', { class: 'alert alert-error' }, data.error);
-        
-        // Render based on analysis type - CHARTS FIRST, then tables as fallback
-        return m('div', { class: 'space-y-6' }, [
-            // Overall stats if present
-            data.overall && m('div', { class: 'stats stats-vertical lg:stats-horizontal shadow w-full' }, [
-                data.overall.count && m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Sample Size'),
-                    m('div', { class: 'stat-value text-primary' }, data.overall.count.toLocaleString())
-                ]),
-                data.overall.average && m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Average'),
-                    m('div', { class: 'stat-value' }, `${Math.round(data.overall.average).toLocaleString()} ${data.overall.currency || 'MDL'}`)
-                ]),
-                data.overall.median && m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Median'),
-                    m('div', { class: 'stat-value' }, `${Math.round(data.overall.median).toLocaleString()} ${data.overall.currency || 'MDL'}`)
-                ]),
-                data.overall.min && m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Range'),
-                    m('div', { class: 'stat-value text-sm' }, 
-                        `${Math.round(data.overall.min).toLocaleString()} - ${Math.round(data.overall.max).toLocaleString()}`)
-                ])
-            ]),
-            
-            // === CHARTS FIRST (Primary Visualizations) ===
-            
-            // Distribution chart (if available)
-            AnalysisPage.renderDistributionChart(data),
-            
-            // Time series chart (for temporal data)
-            AnalysisPage.renderTimeSeriesChart(data),
-            
-            // Top items charts (skills, companies, etc.)
-            data.top_skills && AnalysisPage.renderTopItemsChart(data, 'top_skills', 'Top In-Demand Skills'),
-            data.top_companies && AnalysisPage.renderTopItemsChart(data, 'top_companies', 'Top Companies'),
-            data.top_benefits && AnalysisPage.renderTopItemsChart(data, 'top_benefits', 'Most Common Benefits'),
-            
-            // Specialized skills-salary visualization
-            data.skills_salary && AnalysisPage.renderSkillsSalaryChart(data),
-            
-            // Requirements charts
-            data.education_requirements && AnalysisPage.renderBreakdownChart({ education_requirements: data.education_requirements }),
-            data.experience_requirements && AnalysisPage.renderDistributionChart({ distribution: data.experience_requirements }),
-            
-            // Education level - specialized bar chart with statistics
-            data.by_education && AnalysisPage.renderEducationChart(data),
-            
-            // Breakdown pie chart (general)
-            AnalysisPage.renderBreakdownChart(data),
-            
-            // === TABLES AS FALLBACK (Collapsible for detail) ===
-            
-            // Distribution table (detailed view, collapsed by default)
-            data.distribution && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
-                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Distribution Table (Detailed)'),
-                m('div', { class: 'collapse-content' }, [
-                    m('div', { class: 'overflow-x-auto' }, [
-                        m('table', { class: 'table table-zebra' }, [
-                            m('thead', [
-                                m('tr', [
-                                    m('th', 'Range'),
-                                    m('th', 'Count'),
-                                    m('th', 'Percentage'),
-                                    m('th', 'Visual')
-                                ])
-                            ]),
-                            m('tbody', 
-                                data.distribution.map(item => 
-                                    m('tr', [
-                                        m('td', item.range || `${item.min}-${item.max}`),
-                                        m('td', item.count.toLocaleString()),
-                                        m('td', `${item.percentage?.toFixed(1) || '0'}%`),
-                                        m('td', [
-                                            m('progress', { 
-                                                class: 'progress progress-primary w-32', 
-                                                value: item.percentage || 0, 
-                                                max: 100 
-                                            })
-                                        ])
-                                    ])
-                                )
-                            )
-                        ])
-                    ])
-                ])
-            ]),
-            
-            // Breakdown table (collapsed by default)
-            (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education) && 
-            m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
-                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Breakdown Table (Detailed)'),
-                m('div', { class: 'collapse-content' }, [
-                    m('div', { class: 'overflow-x-auto' }, [
-                        m('table', { class: 'table table-zebra' }, [
-                            m('thead', [
-                                m('tr', [
-                                    m('th', 'Category'),
-                                    m('th', 'Count'),
-                                    m('th', 'Average'),
-                                    m('th', 'Median')
-                                ])
-                            ]),
-                            m('tbody', 
-                                (data.by_function || data.by_seniority || data.by_location || data.by_company_size || data.by_education || []).map(item => 
-                                    m('tr', [
-                                        m('td', { class: 'font-medium' }, 
-                                            item.function || item.seniority || item.location || item.size || item.education || item.name
-                                        ),
-                                        m('td', item.count?.toLocaleString() || 'N/A'),
-                                        m('td', item.average ? `${Math.round(item.average).toLocaleString()} MDL` : 'N/A'),
-                                        m('td', item.median ? `${Math.round(item.median).toLocaleString()} MDL` : 'N/A')
-                                    ])
-                                )
-                            )
-                        ])
-                    ])
-                ])
-            ]),
-            
-            // Top skills/companies table (collapsed by default)
-            (data.top_skills || data.top_companies) && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
-                m('summary', { class: 'collapse-title font-bold text-lg' }, data.top_skills ? 'Top Skills Table (Detailed)' : 'Top Companies Table (Detailed)'),
-                m('div', { class: 'collapse-content' }, [
-                    m('div', { class: 'overflow-x-auto' }, [
-                        m('table', { class: 'table table-zebra' }, [
-                            m('thead', [
-                                m('tr', [
-                                    m('th', '#'),
-                                    m('th', 'Name'),
-                                    m('th', 'Count'),
-                                    m('th', 'Percentage')
-                                ])
-                            ]),
-                            m('tbody', 
-                                (data.top_skills || data.top_companies || []).slice(0, 20).map((item, idx) => 
-                                    m('tr', [
-                                        m('td', idx + 1),
-                                        m('td', { class: 'font-medium' }, item.name || item.skill || item.company),
-                                        m('td', item.count?.toLocaleString() || 'N/A'),
-                                        m('td', [
-                                            m('progress', { 
-                                                class: 'progress progress-secondary w-24', 
-                                                value: item.percentage || 0, 
-                                                max: 100 
-                                            }),
-                                            m('span', { class: 'text-xs ml-2' }, `${item.percentage?.toFixed(1) || 0}%`)
-                                        ])
-                                    ])
-                                )
-                            )
-                        ])
-                    ])
-                ])
-            ]),
-            
-            // Time series table (collapsed by default)
-            data.time_series && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
-                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Time Series Table (Detailed)'),
-                m('div', { class: 'collapse-content' }, [
-                    m('div', { class: 'overflow-x-auto' }, [
-                        m('table', { class: 'table table-sm' }, [
-                            m('thead', [
-                                m('tr', [
-                                    m('th', 'Date'),
-                                    m('th', 'Count'),
-                                    m('th', 'Average'),
-                                    m('th', 'Change')
-                                ])
-                            ]),
-                            m('tbody', 
-                                data.time_series.map((item, idx) => {
-                                    const prevItem = idx > 0 ? data.time_series[idx - 1] : null;
-                                    const change = prevItem && item.average && prevItem.average ? 
-                                        ((item.average - prevItem.average) / prevItem.average * 100).toFixed(1) : null;
-                                    return m('tr', [
-                                        m('td', item.date || item.period),
-                                        m('td', item.count?.toLocaleString() || 'N/A'),
-                                        m('td', item.average ? Math.round(item.average).toLocaleString() : 'N/A'),
-                                        m('td', change ? [
-                                            m('span', { 
-                                                class: change > 0 ? 'text-success' : 'text-error' 
-                                            }, `${change > 0 ? '+' : ''}${change}%`)
-                                        ] : '-')
-                                    ]);
-                                })
-                            )
-                        ])
-                    ])
-                ])
-            ]),
-            
-            // Skill combinations table (if present)
-            data.top_combinations && m('details', { class: 'collapse collapse-arrow bg-base-100 shadow-xl' }, [
-                m('summary', { class: 'collapse-title font-bold text-lg' }, 'Skill Combinations (Detailed)'),
-                m('div', { class: 'collapse-content' }, [
-                    m('div', { class: 'overflow-x-auto' }, [
-                        m('table', { class: 'table table-zebra' }, [
-                            m('thead', [
-                                m('tr', [
-                                    m('th', 'Skill 1'),
-                                    m('th', 'Skill 2'),
-                                    m('th', 'Count')
-                                ])
-                            ]),
-                            m('tbody', 
-                                data.top_combinations.slice(0, 30).map(item => 
-                                    m('tr', [
-                                        m('td', { class: 'font-medium' }, item.skill1),
-                                        m('td', { class: 'font-medium' }, item.skill2),
-                                        m('td', item.count?.toLocaleString() || 'N/A')
-                                    ])
-                                )
-                            )
-                        ])
-                    ])
-                ])
-            ]),
-            
-            // Raw JSON view (collapsible)
-            m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
-                m('summary', { class: 'collapse-title font-medium' }, 'View Raw JSON'),
-                m('div', { class: 'collapse-content' }, [
-                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, 
-                        JSON.stringify(data, null, 2)
-                    )
-                ])
-            ])
-        ]);
-    },
+    
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
-        m('h1', { class: 'text-3xl font-bold mb-6' }, 'Job Market Analysis'),
+        m('h1', { class: 'text-3xl font-bold mb-6' }, 'Custom Analysis Builder'),
         
-        state.analysisIndex ? [
-            !state.analysisIndex.error && state.analysisIndex.data_summary && m('div', { class: 'stats shadow mb-6 w-full' }, [
-                m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Total Jobs Analyzed'),
-                    m('div', { class: 'stat-value' }, state.analysisIndex.data_summary.total_jobs?.toLocaleString() || 'N/A')
-                ]),
-                m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Date Range'),
-                    m('div', { class: 'stat-value text-2xl' }, 
-                        state.analysisIndex.data_summary.date_range ? 
-                            `${formatDate(state.analysisIndex.data_summary.date_range.start)} - ${formatDate(state.analysisIndex.data_summary.date_range.end)}` :
-                            'N/A'
-                    )
-                ]),
-                m('div', { class: 'stat' }, [
-                    m('div', { class: 'stat-title' }, 'Jobs with Salary'),
-                    m('div', { class: 'stat-value' }, state.analysisIndex.data_summary.jobs_with_salary?.toLocaleString() || 'N/A')
-                ])
+        m('div', { class: 'alert alert-info mb-6' }, [
+            m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
             ]),
-            
-            state.analysisIndex.error ? 
-                m('div', { class: 'alert alert-warning mb-6' }, [
-                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
-                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' })
+            m('div', [
+                m('div', { class: 'font-bold' }, 'Create custom SQL queries and visualizations'),
+                m('div', { class: 'text-sm' }, 'Query the job database directly with SQL.js and visualize results with Chart.js. Your queries are saved in browser localStorage.')
+            ])
+        ]),
+        
+        // Database Help Section
+        m('details', { class: 'collapse collapse-arrow bg-base-200 mb-6' }, [
+            m('summary', { class: 'collapse-title font-bold text-lg' }, '📖 Database Structure & Query Help'),
+            m('div', { class: 'collapse-content' }, [
+                m('div', { class: 'prose max-w-none' }, [
+                    m('h3', 'Main Tables'),
+                    m('ul', [
+                        m('li', [
+                            m('strong', 'job_details'), ' - Main job postings table',
+                            m('ul', [
+                                m('li', 'Columns: id, posting_date, job_title, company_name, job_description, job_url, site'),
+                                m('li', 'Salary: min_salary, max_salary, salary_currency_id, salary_period_id'),
+                                m('li', 'Experience: experience_years'),
+                                m('li', 'Foreign keys to lookup tables (see below)')
+                            ])
+                        ]),
+                        m('li', [
+                            m('strong', 'Lookup Tables'), ' - Normalized reference data',
+                            m('ul', [
+                                m('li', 'titles, companies, cities, regions, countries'),
+                                m('li', 'job_functions, seniority_levels, industries, departments'),
+                                m('li', 'employment_types, contract_types, work_schedules'),
+                                m('li', 'remote_work_options, company_sizes, education_levels')
+                            ])
+                        ]),
+                        m('li', [
+                            m('strong', 'Skills & Benefits'), ' - Many-to-many relationships',
+                            m('ul', [
+                                m('li', 'hard_skills, soft_skills → job_details_hard_skills, job_details_soft_skills'),
+                                m('li', 'benefits → job_details_benefits'),
+                                m('li', 'certifications, licenses → job_details_certifications, job_details_licenses')
+                            ])
+                        ])
                     ]),
-                    m('span', 'Analysis data not yet generated. Run: python -m json_generator --output frontend/api')
-                ]) :
-                m('div', { class: 'alert alert-info mb-6' }, [
-                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
-                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
-                    ]),
-                    m('span', `${state.analysisIndex.analyses?.length || 0} analyses available. Click "View" to see data visualizations.`)
-                ]),
-            
-            state.analysisIndex.analyses && m('div', { class: 'grid grid-cols-1 lg:grid-cols-2 gap-4' },
-                state.analysisIndex.analyses.map((analysis, idx) => 
-                    m('a', { 
-                        href: `#!/analysis/${analysis.id}`,
-                        oncreate: m.route.link,
-                        class: 'card bg-base-100 shadow-lg hover:shadow-xl transition-shadow cursor-pointer border border-base-300'
-                    }, [
+                    m('h3', 'Example Query Patterns'),
+                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, `-- Count jobs by city
+SELECT c.name, COUNT(*) as count
+FROM job_details jd
+JOIN cities c ON jd.city_id = c.id
+GROUP BY c.name
+ORDER BY count DESC
+
+-- Average salary by seniority
+SELECT sl.name, AVG(jd.min_salary) as avg_salary
+FROM job_details jd
+JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+WHERE jd.min_salary IS NOT NULL
+GROUP BY sl.name
+
+-- Top skills with job counts
+SELECT hs.name, COUNT(DISTINCT jd.id) as jobs
+FROM hard_skills hs
+JOIN job_details_hard_skills jhs ON hs.id = jhs.hard_skills_id
+JOIN job_details jd ON jhs.job_details_id = jd.id
+GROUP BY hs.name
+ORDER BY jobs DESC
+LIMIT 20`),
+                    m('h3', 'Tips'),
+                    m('ul', [
+                        m('li', 'Always use JOINs to get readable names from lookup tables'),
+                        m('li', 'Use COUNT(DISTINCT jd.id) when joining many-to-many tables to avoid duplicates'),
+                        m('li', 'Filter NULL values for salary/experience analysis'),
+                        m('li', 'Use CASE statements to create salary ranges or experience buckets'),
+                        m('li', 'LIMIT results for better chart readability (usually 10-20 items)')
+                    ])
+                ])
+            ])
+        ]),
+        
+        // Predefined Analyses
+        m('div', { class: 'mb-8' }, [
+            m('h2', { class: 'text-2xl font-bold mb-4' }, 'Predefined Analyses'),
+            m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' },
+                PredefinedAnalyses.map(analysis => 
+                    m('div', { class: 'card bg-base-100 shadow-lg hover:shadow-xl transition-shadow' }, [
                         m('div', { class: 'card-body p-4' }, [
-                            // Header with number and title
-                            m('div', { class: 'flex items-start gap-2 mb-2' }, [
-                                m('span', { class: 'text-sm opacity-60 mt-1' }, `${idx + 1}.`),
-                                m('h3', { class: 'card-title text-base flex-1' }, analysis.title)
+                            m('h3', { class: 'card-title text-base' }, analysis.name),
+                            m('p', { class: 'text-sm opacity-70' }, analysis.description),
+                            m('div', { class: 'flex gap-2 mt-2' }, [
+                                m('span', { class: 'badge badge-outline badge-sm' }, analysis.chartType),
+                                m('span', { class: 'badge badge-secondary badge-sm' }, analysis.category)
                             ]),
-                            
-                            // Badges
-                            m('div', { class: 'flex flex-wrap gap-2 mb-3' }, [
-                                m('span', { class: 'badge badge-ghost badge-sm' }, analysis.id),
-                                analysis.temporal && m('span', { class: 'badge badge-secondary badge-sm' }, 'Time Series'),
-                                analysis.type && m('span', { class: 'badge badge-outline badge-sm' }, analysis.type)
-                            ]),
-                            
-                            // Preview section with mini chart
-                            m('div', { class: 'bg-base-200 rounded-lg p-3 mt-2' }, [
-                                m('div', { class: 'flex items-center justify-between mb-2' }, [
-                                    m('span', { class: 'text-xs opacity-70' }, 'Quick Preview'),
-                                    m('div', { class: 'flex items-center gap-1 text-primary' }, [
-                                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
-                                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
-                                        ]),
-                                        m('span', { class: 'text-xs font-medium' }, 'Click for details')
-                                    ])
-                                ]),
-                                AnalysisPage.renderMiniChart(analysis)
+                            m('div', { class: 'card-actions justify-end mt-4' }, [
+                                m('button', {
+                                    class: 'btn btn-sm btn-primary',
+                                    onclick: () => {
+                                        CustomAnalysisState.currentQuery = { ...analysis };
+                                        CustomAnalysisState.executeQuery(analysis.sql);
+                                        // Scroll to results
+                                        setTimeout(() => {
+                                            document.getElementById('query-builder')?.scrollIntoView({ behavior: 'smooth' });
+                                        }, 100);
+                                    }
+                                }, 'Run Analysis')
                             ])
                         ])
                     ])
                 )
             )
-        ] : m(Loading)
-    ])
-};
-
-// Analysis Detail Page (Full Page View)
-const AnalysisDetailPage = {
-    oninit: (vnode) => {
-        const analysisId = vnode.attrs.id;
-        state.selectedAnalysisData = null;
-        state.selectedAnalysis = null;
+        ]),
         
-        // Load analysis index if not already loaded
-        if (!state.analysisIndex) {
-            api.getAnalysisIndex().then(data => {
-                state.analysisIndex = data;
-                // Find the analysis
-                state.selectedAnalysis = data.analyses?.find(a => a.id === analysisId);
-                m.redraw();
-            });
-        } else {
-            state.selectedAnalysis = state.analysisIndex.analyses?.find(a => a.id === analysisId);
-        }
-        
-        // Load analysis data
-        const filename = `${analysisId}.json`;
-        api.getAnalysis(filename).then(response => {
-            state.selectedAnalysisData = response.data || response;
-            m.redraw();
-        }).catch(err => {
-            console.error(`Error loading ${filename}:`, err);
-            state.selectedAnalysisData = { error: `Failed to load ${filename}` };
-            m.redraw();
-        });
-    },
-    view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
-        // Breadcrumb navigation
-        m('div', { class: 'text-sm breadcrumbs mb-4' }, [
-            m('ul', [
-                m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Analysis')),
-                m('li', state.selectedAnalysis?.title || 'Loading...')
+        // Custom Query Builder
+        m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
+            m('div', { class: 'card-body' }, [
+                m('h2', { class: 'card-title' }, 'Custom Query Builder'),
+                
+                // Query Name
+                m('div', { class: 'form-control' }, [
+                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Query Name')),
+                    m('input', {
+                        type: 'text',
+                        class: 'input input-bordered',
+                        placeholder: 'My Custom Analysis',
+                        value: CustomAnalysisState.currentQuery.name,
+                        oninput: (e) => {
+                            CustomAnalysisState.currentQuery.name = e.target.value;
+                        }
+                    })
+                ]),
+                
+                // Query Description
+                m('div', { class: 'form-control' }, [
+                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Description')),
+                    m('input', {
+                        type: 'text',
+                        class: 'input input-bordered',
+                        placeholder: 'What does this query analyze?',
+                        value: CustomAnalysisState.currentQuery.description,
+                        oninput: (e) => {
+                            CustomAnalysisState.currentQuery.description = e.target.value;
+                        }
+                    })
+                ]),
+                
+                // SQL Query
+                m('div', { class: 'form-control' }, [
+                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'SQL Query')),
+                    m('textarea', {
+                        class: 'textarea textarea-bordered font-mono text-sm h-40',
+                        placeholder: 'SELECT ...',
+                        value: CustomAnalysisState.currentQuery.sql,
+                        oninput: (e) => {
+                            CustomAnalysisState.currentQuery.sql = e.target.value;
+                        }
+                    })
+                ]),
+                
+                // Chart Type
+                m('div', { class: 'form-control' }, [
+                    m('label', { class: 'label' }, m('span', { class: 'label-text' }, 'Chart Type')),
+                    m('select', {
+                        class: 'select select-bordered',
+                        value: CustomAnalysisState.currentQuery.chartType,
+                        onchange: (e) => {
+                            CustomAnalysisState.currentQuery.chartType = e.target.value;
+                        }
+                    }, [
+                        m('option', { value: 'bar' }, 'Bar Chart'),
+                        m('option', { value: 'line' }, 'Line Chart'),
+                        m('option', { value: 'doughnut' }, 'Doughnut Chart'),
+                        m('option', { value: 'pie' }, 'Pie Chart')
+                    ])
+                ]),
+                
+                // Action Buttons
+                m('div', { class: 'card-actions justify-end gap-2' }, [
+                    m('button', {
+                        class: 'btn btn-primary',
+                        onclick: () => {
+                            if (!CustomAnalysisState.currentQuery.sql) {
+                                alert('Please enter a SQL query');
+                                return;
+                            }
+                            CustomAnalysisState.executeQuery(CustomAnalysisState.currentQuery.sql);
+                        }
+                    }, 'Execute Query'),
+                    m('button', {
+                        class: 'btn btn-secondary',
+                        disabled: !CustomAnalysisState.currentQuery.name || !CustomAnalysisState.currentQuery.sql,
+                        onclick: () => {
+                            if (CustomAnalysisState.currentQuery.name && CustomAnalysisState.currentQuery.sql) {
+                                CustomAnalysisState.addQuery(CustomAnalysisState.currentQuery);
+                                alert('Query saved successfully!');
+                            }
+                        }
+                    }, 'Save Query')
+                ])
             ])
         ]),
         
-        // Title
-        state.selectedAnalysis && m('h1', { class: 'text-4xl font-bold mb-6' }, state.selectedAnalysis.title),
+        // Query Results
+        CustomAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
+            m('div', { class: 'card-body' }, [
+                m('h2', { class: 'card-title' }, 'Results'),
+                
+                CustomAnalysisState.queryResult.success ? [
+                    // Success message
+                    m('div', { class: 'alert alert-success mb-4' }, [
+                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
+                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' })
+                        ]),
+                        m('span', `Query executed successfully. ${CustomAnalysisState.queryResult.rowCount} rows returned.`)
+                    ]),
+                    
+                    // Chart visualization
+                    CustomAnalysisState.queryResult.data.length > 0 && m('div', { class: 'mb-6' }, [
+                        m('h3', { class: 'text-lg font-bold mb-2' }, 'Visualization'),
+                        m('div', { class: 'chart-container' }, [
+                            m('canvas', {
+                                oncreate: (vnode) => {
+                                    AnalysisPage.renderChart(vnode, CustomAnalysisState.queryResult.data, CustomAnalysisState.currentQuery.chartType);
+                                },
+                                onupdate: (vnode) => {
+                                    AnalysisPage.renderChart(vnode, CustomAnalysisState.queryResult.data, CustomAnalysisState.currentQuery.chartType);
+                                }
+                            })
+                        ])
+                    ]),
+                    
+                    // Data table
+                    CustomAnalysisState.queryResult.data.length > 0 && m('details', { class: 'collapse collapse-arrow bg-base-200' }, [
+                        m('summary', { class: 'collapse-title font-medium' }, 'View Data Table'),
+                        m('div', { class: 'collapse-content' }, [
+                            m('div', { class: 'overflow-x-auto' }, [
+                                m('table', { class: 'table table-zebra table-sm' }, [
+                                    m('thead', [
+                                        m('tr', 
+                                            Object.keys(CustomAnalysisState.queryResult.data[0]).map(key => 
+                                                m('th', key)
+                                            )
+                                        )
+                                    ]),
+                                    m('tbody',
+                                        CustomAnalysisState.queryResult.data.slice(0, 100).map(row => 
+                                            m('tr',
+                                                Object.values(row).map(val => 
+                                                    m('td', val)
+                                                )
+                                            )
+                                        )
+                                    )
+                                ])
+                            ]),
+                            CustomAnalysisState.queryResult.data.length > 100 && 
+                                m('div', { class: 'text-sm opacity-70 mt-2' }, 
+                                    `Showing first 100 rows of ${CustomAnalysisState.queryResult.data.length}`
+                                )
+                        ])
+                    ])
+                ] : [
+                    // Error message
+                    m('div', { class: 'alert alert-error' }, [
+                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'stroke-current shrink-0 h-6 w-6', fill: 'none', viewBox: '0 0 24 24' }, [
+                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z' })
+                        ]),
+                        m('span', CustomAnalysisState.queryResult.error)
+                    ])
+                ]
+            ])
+        ]),
         
-        // Analysis data
-        state.selectedAnalysisData ? 
-            AnalysisPage.renderAnalysisData(state.selectedAnalysisData) :
-            m(Loading)
+        // Saved Queries
+        CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl' }, [
+            m('div', { class: 'card-body' }, [
+                m('h2', { class: 'card-title' }, 'Saved Queries'),
+                m('div', { class: 'overflow-x-auto' }, [
+                    m('table', { class: 'table' }, [
+                        m('thead', [
+                            m('tr', [
+                                m('th', 'Name'),
+                                m('th', 'Description'),
+                                m('th', 'Chart Type'),
+                                m('th', 'Actions')
+                            ])
+                        ]),
+                        m('tbody',
+                            CustomAnalysisState.savedQueries.map(query => 
+                                m('tr', [
+                                    m('td', { class: 'font-medium' }, query.name),
+                                    m('td', query.description),
+                                    m('td', m('span', { class: 'badge badge-outline' }, query.chartType)),
+                                    m('td', [
+                                        m('div', { class: 'flex gap-2' }, [
+                                            m('button', {
+                                                class: 'btn btn-sm btn-ghost',
+                                                onclick: () => {
+                                                    CustomAnalysisState.currentQuery = { ...query };
+                                                    CustomAnalysisState.executeQuery(query.sql);
+                                                    document.getElementById('query-builder')?.scrollIntoView({ behavior: 'smooth' });
+                                                }
+                                            }, 'Load'),
+                                            m('button', {
+                                                class: 'btn btn-sm btn-ghost text-error',
+                                                onclick: () => {
+                                                    if (confirm(`Delete query "${query.name}"?`)) {
+                                                        CustomAnalysisState.deleteQuery(query.id);
+                                                        m.redraw();
+                                                    }
+                                                }
+                                            }, 'Delete')
+                                        ])
+                                    ])
+                                ])
+                            )
+                        )
+                    ])
+                ])
+            ])
+        ])
+    ])
+};
+
+// Remove old analysis detail page since we're not using JSON anymore
+const AnalysisDetailPage = {
+    view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
+        m('div', { class: 'alert alert-info' }, [
+            m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+            ]),
+            m('div', [
+                m('div', { class: 'font-bold' }, 'Analysis system updated'),
+                m('div', { class: 'text-sm' }, 'Please use the custom analysis builder on the main Analysis page.')
+            ])
+        ]),
+        m('a', {
+            href: '#!/analysis',
+            oncreate: m.route.link,
+            class: 'btn btn-primary mt-4'
+        }, 'Go to Analysis Builder')
     ])
 };
 
