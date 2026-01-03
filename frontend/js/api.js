@@ -85,11 +85,3 @@ const URLState = {
         return urlState;
     }
 };
-
-// API Client
-const api = {
-    getJobsIndex: () => m.request({ url: `${API_BASE}/jobs/index.json` }),
-    getJobsPage: (page) => m.request({ url: `${API_BASE}/jobs/page-${page}.json` }),
-    getAnalysisIndex: () => m.request({ url: `${API_BASE}/analysis/index.json` }),
-    getAnalysis: (filename) => m.request({ url: `${API_BASE}/analysis/${filename}` })
-};
