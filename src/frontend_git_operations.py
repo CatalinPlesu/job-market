@@ -67,7 +67,7 @@ class FrontendGitOperations:
             )
             
             if result.returncode != 0:
-                return False, "Git LFS is not installed. Install it with: apt-get install git-lfs or brew install git-lfs"
+                return False, "Git LFS is not installed. Install it with: sudo apt-get install git-lfs or brew install git-lfs"
             
             # Install Git LFS hooks in the repository
             subprocess.run(
@@ -87,12 +87,13 @@ class FrontendGitOperations:
             return True, "Git LFS configured for .db files"
         
         except subprocess.CalledProcessError as e:
-            error_msg = f"Failed to set up Git LFS: {e.stderr}"
+            error_msg = f"Failed to set up Git LFS: {getattr(e, 'stderr', str(e))}"
             self.logger.error(error_msg)
             return False, error_msg
         except Exception as e:
             error_msg = f"Failed to set up Git LFS: {e}"
             self.logger.error(error_msg)
+            return False, error_msg
             return False, error_msg
     
     def init_repo(self, force: bool = False) -> Tuple[bool, str]:
