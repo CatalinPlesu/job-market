@@ -19,7 +19,7 @@ GROUP BY DATE(posting_date)
 ORDER BY date ASC`,
             chartType: 'line',
             category: 'general',
-            applyFilters: false  // Don't apply user filters to general trends
+            applyFilters: true  // Apply user filters to show filtered market trends
         },
         {
             name: 'Job Creation Rate',
@@ -34,7 +34,7 @@ GROUP BY month
 ORDER BY month ASC`,
             chartType: 'bar',
             category: 'general',
-            applyFilters: false
+            applyFilters: true
         },
         {
             name: 'Market Activity by Industry',
@@ -52,7 +52,7 @@ ORDER BY job_count DESC
 LIMIT 15`,
             chartType: 'bar',
             category: 'general',
-            applyFilters: false
+            applyFilters: true
         },
         {
             name: 'Seasonal Hiring Patterns',
@@ -78,7 +78,7 @@ GROUP BY strftime('%m', posting_date)
 ORDER BY CAST(strftime('%m', posting_date) AS INTEGER)`,
             chartType: 'line',
             category: 'general',
-            applyFilters: false
+            applyFilters: true
         },
         {
             name: 'Top Hiring Companies',
@@ -95,7 +95,7 @@ ORDER BY jobs_posted DESC
 LIMIT 20`,
             chartType: 'bar',
             category: 'general',
-            applyFilters: false
+            applyFilters: true
         }
     ],
     
