@@ -69,7 +69,7 @@ const CustomAnalysisState = {
             if (shouldApplyFilters && CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0) {
                 // Build filter conditions and determine needed JOINs
                 const filterConditions = [];
-                const neededJoins = new Set();
+                const neededJoins = [];
                 
                 // Map filters to their table info
                 const filterTableMap = {
@@ -89,55 +89,49 @@ const CustomAnalysisState = {
                         const tableInfo = filterTableMap[filterKey];
                         filterConditions.push(tableInfo.condition);
                         params.push(filterValue);
-                        neededJoins.add(tableInfo);
+                        neededJoins.push(tableInfo);
                     }
                 }
                 
                 if (filterConditions.length > 0) {
-                    // Find the main job_details reference in the SQL
-                    // Look for patterns like "FROM job_details" or "FROM job_details jd" or "FROM job_details AS jd"
-                    const jdAliasMatch = sql.match(/(?:FROM|JOIN)\s+job_details(?:\s+(?:AS\s+)?(\w+))?/i);
-                    let jdAlias = 'job_details'; // Default to full table name
+                    // Use CTE approach for cleaner and more reliable filter injection
+                    // Build a CTE that filters job_details, then replace references in the main query
                     
-                    if (jdAliasMatch && jdAliasMatch[1]) {
-                        // An alias was found
-                        jdAlias = jdAliasMatch[1];
-                    }
+                    const joinStatements = neededJoins.map(joinInfo => 
+                        `LEFT JOIN ${joinInfo.table} ${joinInfo.alias} ON jd_base.${joinInfo.fk} = ${joinInfo.alias}.id`
+                    ).join('\n                ');
                     
-                    // Build JOIN statements for needed tables
-                    const joinStatements = [];
-                    for (const joinInfo of neededJoins) {
-                        joinStatements.push(
-                            `LEFT JOIN ${joinInfo.table} ${joinInfo.alias} ON ${jdAlias}.${joinInfo.fk} = ${joinInfo.alias}.id`
-                        );
-                    }
-                    
-                    // Combine filter conditions
                     const combinedConditions = filterConditions.join(' AND ');
                     
-                    // Insert JOINs after the job_details table reference
-                    if (joinStatements.length > 0) {
-                        // Find position to insert JOINs (after job_details FROM/JOIN with or without alias)
-                        const fromMatch = sql.match(/(FROM\s+job_details(?:\s+(?:AS\s+)?\w+)?)/i);
-                        if (fromMatch) {
-                            const insertPos = fromMatch.index + fromMatch[0].length;
-                            finalSQL = sql.slice(0, insertPos) + '\n' + joinStatements.join('\n') + '\n' + sql.slice(insertPos);
-                        } else {
-                            // Fallback: If we can't find the position, log error but continue
-                            console.error('Could not find position to insert JOINs in SQL:', sql);
-                        }
-                    }
+                    // Create CTE that selects filtered jobs
+                    const cteSQL = `WITH filtered_jobs AS (
+            SELECT jd_base.*
+            FROM job_details jd_base
+                ${joinStatements}
+            WHERE ${combinedConditions}
+        )`;
                     
-                    // Inject WHERE conditions
-                    finalSQL = SQLUtils.injectWhereConditions(finalSQL, combinedConditions);
+                    // Replace "FROM job_details" with "FROM filtered_jobs" in the main query
+                    // Handle various formats: "FROM job_details", "FROM job_details jd", "FROM job_details AS jd"
+                    finalSQL = sql.replace(/FROM\s+job_details(?:\s+(?:AS\s+)?(\w+))?/gi, (match, alias) => {
+                        // If there was an alias, keep it; otherwise use default
+                        return alias ? `FROM filtered_jobs ${alias}` : `FROM filtered_jobs`;
+                    });
+                    
+                    // Also replace JOIN job_details (for queries that join back to job_details)
+                    finalSQL = finalSQL.replace(/JOIN\s+job_details(?:\s+(?:AS\s+)?(\w+))?/gi, (match, alias) => {
+                        return alias ? `JOIN filtered_jobs ${alias}` : `JOIN filtered_jobs`;
+                    });
+                    
+                    // Prepend the CTE
+                    finalSQL = cteSQL + '\n        ' + finalSQL;
                     
                     // Debug logging
-                    console.log('Filter Debug Info:');
+                    console.log('Filter Debug Info (CTE Approach):');
                     console.log('- Active Filters:', CustomAnalysisState.jobPageFilters);
                     console.log('- Filter Conditions:', combinedConditions);
                     console.log('- Parameters:', params);
-                    console.log('- JD Alias detected:', jdAlias);
-                    console.log('- Joins added:', joinStatements);
+                    console.log('- Joins in CTE:', neededJoins.map(j => j.table));
                     console.log('- Final SQL:', finalSQL);
                 }
             }
