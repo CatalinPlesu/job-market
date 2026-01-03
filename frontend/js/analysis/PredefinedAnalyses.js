@@ -495,8 +495,7 @@ ORDER BY avg_max_salary DESC`,
     ROUND(AVG(CASE WHEN jd.posting_date >= date('now', '-180 days') AND jd.posting_date < date('now', '-90 days') THEN jd.max_salary END)) as previous_avg_salary,
     COUNT(*) as job_count
 FROM job_details jd
-JOIN cities c ON jd.city_id = c.id
-JOIN regions r ON c.region_id = r.id
+JOIN regions r ON jd.region_id = r.id
 WHERE jd.max_salary IS NOT NULL
   AND jd.posting_date >= date('now', '-180 days')
 GROUP BY r.name
