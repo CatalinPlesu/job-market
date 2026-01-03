@@ -13,10 +13,14 @@ const filters = ${JSON.stringify(filters, null, 2)};
 // Build WHERE clause from filters
 const { whereClause, params } = dbApi.buildWhereClause(filters, '');
 
+// Extract conditions from WHERE clause safely
+const whereMatch = whereClause.match(/^WHERE\\s+(.+)$/i);
+const conditions = whereMatch ? whereMatch[1] : whereClause;
+
 // Inject filters into base query
 const enhancedSQL = \`
 ${sql}
-\${whereClause ? (sql.toLowerCase().includes('where') ? ' AND ' + whereClause.substring(6) : ' ' + whereClause) : ''}
+\${conditions ? (sql.toLowerCase().includes('where') ? ' AND ' + conditions : ' WHERE ' + conditions) : ''}
 \`;
 `
             : `const sql = \`${sql}\`;

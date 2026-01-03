@@ -88,73 +88,85 @@ const AnalysisFilters = {
     // Apply filters to SQL query
     applyFilters: (sql, filters) => {
         let modifiedSQL = sql;
+        const addedConditions = [];
+        
+        // Validate and sanitize numeric inputs
+        const sanitizeNumber = (value) => {
+            const num = Number(value);
+            return (!isNaN(num) && isFinite(num) && num >= 0) ? Math.floor(num) : null;
+        };
+        
+        // Validate and sanitize string inputs for SQL
+        const sanitizeString = (value) => {
+            if (typeof value !== 'string') return null;
+            // Only allow alphanumeric, space, dash, underscore
+            return value.replace(/[^a-zA-Z0-9\s\-_]/g, '');
+        };
         
         // Apply time range filter
         if (filters.timeRange !== undefined && filters.timeRange !== null) {
-            const daysAgo = filters.timeRange;
-            const timeCondition = `posting_date >= date('now', '-${daysAgo} days')`;
-            
-            if (modifiedSQL.toLowerCase().includes('where')) {
-                modifiedSQL = modifiedSQL.replace(
-                    /WHERE/i,
-                    `WHERE ${timeCondition} AND`
-                );
-            } else {
-                // Add WHERE before GROUP BY or ORDER BY
-                const insertPosition = modifiedSQL.search(/GROUP BY|ORDER BY|LIMIT/i);
-                if (insertPosition > 0) {
-                    modifiedSQL = modifiedSQL.slice(0, insertPosition) + 
-                                  `WHERE ${timeCondition}\n` + 
-                                  modifiedSQL.slice(insertPosition);
-                }
+            const daysAgo = sanitizeNumber(filters.timeRange);
+            if (daysAgo !== null) {
+                const timeCondition = `posting_date >= date('now', '-${daysAgo} days')`;
+                addedConditions.push(timeCondition);
             }
         }
         
         // Apply salary filter
         if (filters.minSalary !== undefined && filters.minSalary !== null) {
-            const salaryCondition = `min_salary >= ${filters.minSalary}`;
+            const minSalary = sanitizeNumber(filters.minSalary);
+            if (minSalary !== null) {
+                const salaryCondition = `min_salary >= ${minSalary}`;
+                addedConditions.push(salaryCondition);
+            }
+        }
+        
+        // Apply result limit filter (modify existing LIMIT)
+        if (filters.limit !== undefined && filters.limit !== null) {
+            const limit = sanitizeNumber(filters.limit);
+            if (limit !== null && limit > 0) {
+                modifiedSQL = modifiedSQL.replace(/LIMIT\s+\d+/i, `LIMIT ${limit}`);
+            }
+        }
+        
+        // Apply seniority level filter (safe enum values only)
+        if (filters.seniorityLevel !== undefined && filters.seniorityLevel !== null) {
+            const validLevels = ['entry', 'junior', 'mid', 'senior', 'lead', 'manager', 'director', 'executive'];
+            const level = String(filters.seniorityLevel).toLowerCase();
+            if (validLevels.includes(level)) {
+                const seniorityCondition = `sl.name = '${level}'`;
+                addedConditions.push(seniorityCondition);
+            }
+        }
+        
+        // Apply remote work filter (safe enum values only)
+        if (filters.remoteWork !== undefined && filters.remoteWork !== null) {
+            const validOptions = ['remote', 'hybrid', 'on-site'];
+            const option = String(filters.remoteWork).toLowerCase();
+            if (validOptions.includes(option)) {
+                const remoteCondition = `rw.name = '${option}'`;
+                addedConditions.push(remoteCondition);
+            }
+        }
+        
+        // Inject all conditions into SQL if any were added
+        if (addedConditions.length > 0) {
+            const combinedConditions = addedConditions.join(' AND ');
             
             if (modifiedSQL.toLowerCase().includes('where')) {
-                modifiedSQL = modifiedSQL.replace(
-                    /WHERE/i,
-                    `WHERE ${salaryCondition} AND`
-                );
+                // Find the WHERE keyword and add our conditions
+                modifiedSQL = modifiedSQL.replace(/WHERE/i, `WHERE ${combinedConditions} AND `);
             } else {
+                // Insert WHERE clause before GROUP BY, ORDER BY, or LIMIT
                 const insertPosition = modifiedSQL.search(/GROUP BY|ORDER BY|LIMIT/i);
                 if (insertPosition > 0) {
                     modifiedSQL = modifiedSQL.slice(0, insertPosition) + 
-                                  `WHERE ${salaryCondition}\n` + 
+                                  `WHERE ${combinedConditions}\n` + 
                                   modifiedSQL.slice(insertPosition);
+                } else {
+                    // Add at the end if no GROUP BY, ORDER BY, or LIMIT found
+                    modifiedSQL = modifiedSQL.trim() + `\nWHERE ${combinedConditions}`;
                 }
-            }
-        }
-        
-        // Apply result limit filter
-        if (filters.limit !== undefined && filters.limit !== null) {
-            modifiedSQL = modifiedSQL.replace(/LIMIT\s+\d+/i, `LIMIT ${filters.limit}`);
-        }
-        
-        // Apply seniority level filter
-        if (filters.seniorityLevel !== undefined && filters.seniorityLevel !== null) {
-            const seniorityCondition = `sl.name = '${filters.seniorityLevel}'`;
-            
-            if (modifiedSQL.toLowerCase().includes('where')) {
-                modifiedSQL = modifiedSQL.replace(
-                    /WHERE/i,
-                    `WHERE ${seniorityCondition} AND`
-                );
-            }
-        }
-        
-        // Apply remote work filter
-        if (filters.remoteWork !== undefined && filters.remoteWork !== null) {
-            const remoteCondition = `rw.name = '${filters.remoteWork}'`;
-            
-            if (modifiedSQL.toLowerCase().includes('where')) {
-                modifiedSQL = modifiedSQL.replace(
-                    /WHERE/i,
-                    `WHERE ${remoteCondition} AND`
-                );
             }
         }
         

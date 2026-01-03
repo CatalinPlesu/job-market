@@ -72,21 +72,25 @@ const CustomAnalysisState = {
                 
                 if (whereClause) {
                     // Inject the filter WHERE clause into the query
+                    // Extract the WHERE keyword and conditions safely
+                    const whereMatch = whereClause.match(/^WHERE\s+(.+)$/i);
+                    const conditions = whereMatch ? whereMatch[1] : whereClause;
+                    
                     // If query already has WHERE, combine with AND
                     // If not, add WHERE before GROUP BY, ORDER BY, or LIMIT
                     if (finalSQL.toLowerCase().includes('where')) {
                         // Find the WHERE clause and add our filters
-                        finalSQL = finalSQL.replace(/WHERE/i, `WHERE ${whereClause.substring(6)} AND `);
+                        finalSQL = finalSQL.replace(/WHERE/i, `WHERE ${conditions} AND `);
                     } else {
                         // Insert WHERE clause before GROUP BY, ORDER BY, or LIMIT
                         const insertPosition = finalSQL.search(/GROUP BY|ORDER BY|LIMIT/i);
                         if (insertPosition > 0) {
                             finalSQL = finalSQL.slice(0, insertPosition) + 
-                                      whereClause + '\n' + 
+                                      `WHERE ${conditions}\n` + 
                                       finalSQL.slice(insertPosition);
                         } else {
                             // Add at the end if no GROUP BY, ORDER BY, or LIMIT found
-                            finalSQL = finalSQL + '\n' + whereClause;
+                            finalSQL = finalSQL.trim() + `\nWHERE ${conditions}`;
                         }
                     }
                     params = filterParams;
