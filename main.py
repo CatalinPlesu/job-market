@@ -76,6 +76,8 @@ class CopyDatabaseItem:
         return "Copy Database Files to Frontend API"
     
     def execute(self):
+        from src.frontend_operations import copy_databases_to_frontend
+        
         print("\n" + "="*80)
         print("DATABASE COPY")
         print("="*80)
@@ -84,64 +86,9 @@ class CopyDatabaseItem:
         print("  • data.db (processed data)")
         print()
         
-        # Fixed destination directory
-        dest_dir = "frontend/api"
-        dest_path = Path(dest_dir)
-        
-        # Create destination directory if it doesn't exist
-        try:
-            dest_path.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            print(f"\n✗ Error creating destination directory: {e}")
-            return True
-        
-        print(f"Copying databases to {dest_dir}...")
-        print()
-        
-        # Copy both databases
-        try:
-            self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
-            self._copy_db(Config.data_db_path, dest_path / "data.db")
-            
-            print()
-            print(f"✓ Database files copied successfully to {dest_path}/")
-            print(f"  - {dest_path}/scrape.db")
-            print(f"  - {dest_path}/data.db")
-        
-        except Exception as e:
-            print(f"\n✗ Error: {e}")
-            import traceback
-            traceback.print_exc()
-        
+        # Use shared function from frontend_operations
+        copy_databases_to_frontend()
         return True
-    
-    def _copy_db(self, source, destination):
-        """Helper method to copy a database file.
-        
-        Args:
-            source (str/Path): Path to source database file
-            destination (str/Path): Path to destination file
-            
-        Raises:
-            FileNotFoundError: If source file doesn't exist
-            OSError: If copy operation fails
-        """
-        source_path = Path(source)
-        
-        if not source_path.exists():
-            raise FileNotFoundError(f"Database file not found: {source_path}")
-        
-        print(f"Copying {source_path.name}...")
-        shutil.copy2(source_path, destination)
-        
-        # Verify copy was successful by checking destination exists
-        dest_path = Path(destination)
-        if not dest_path.exists():
-            raise OSError(f"Failed to copy {source_path.name} to {destination}")
-        
-        # Show file size
-        size_mb = source_path.stat().st_size / (1024 * 1024)
-        print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
 
 
 class DatabaseRollbackItem:

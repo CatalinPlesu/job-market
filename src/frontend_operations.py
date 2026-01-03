@@ -10,6 +10,36 @@ from src.frontend_git_operations import FrontendGitOperations
 from src.error_logger import get_logger
 
 
+def _copy_db(source, destination):
+    """
+    Helper function to copy a database file.
+    
+    Args:
+        source (str/Path): Path to source database file
+        destination (str/Path): Path to destination file
+        
+    Raises:
+        FileNotFoundError: If source file doesn't exist
+        OSError: If copy operation fails
+    """
+    source_path = Path(source)
+    
+    if not source_path.exists():
+        raise FileNotFoundError(f"Database file not found: {source_path}")
+    
+    print(f"Copying {source_path.name}...")
+    shutil.copy2(source_path, destination)
+    
+    # Verify copy was successful by checking destination exists
+    dest_path = Path(destination)
+    if not dest_path.exists():
+        raise OSError(f"Failed to copy {source_path.name} to {destination}")
+    
+    # Show file size
+    size_mb = source_path.stat().st_size / (1024 * 1024)
+    print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
+
+
 def copy_databases_to_frontend(dest_dir: str = "frontend/api") -> bool:
     """
     Copy both database files to the frontend/api directory.
@@ -27,33 +57,9 @@ def copy_databases_to_frontend(dest_dir: str = "frontend/api") -> bool:
         # Create destination directory if it doesn't exist
         dest_path.mkdir(parents=True, exist_ok=True)
         
-        # Copy scrape.db
-        source_scrape = Path(Config.scrape_db_path)
-        dest_scrape = dest_path / "scrape.db"
-        
-        if not source_scrape.exists():
-            logger.error(f"Source database not found: {source_scrape}")
-            print(f"✗ Source database not found: {source_scrape}")
-            return False
-        
-        print(f"Copying {source_scrape.name}...")
-        shutil.copy2(source_scrape, dest_scrape)
-        size_mb = source_scrape.stat().st_size / (1024 * 1024)
-        print(f"✓ {source_scrape.name} copied ({size_mb:.2f} MB)")
-        
-        # Copy data.db
-        source_data = Path(Config.data_db_path)
-        dest_data = dest_path / "data.db"
-        
-        if not source_data.exists():
-            logger.error(f"Source database not found: {source_data}")
-            print(f"✗ Source database not found: {source_data}")
-            return False
-        
-        print(f"Copying {source_data.name}...")
-        shutil.copy2(source_data, dest_data)
-        size_mb = source_data.stat().st_size / (1024 * 1024)
-        print(f"✓ {source_data.name} copied ({size_mb:.2f} MB)")
+        # Copy both databases using shared helper function
+        _copy_db(Config.scrape_db_path, dest_path / "scrape.db")
+        _copy_db(Config.data_db_path, dest_path / "data.db")
         
         print(f"\n✓ Database files copied successfully to {dest_path}/")
         return True
