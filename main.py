@@ -242,6 +242,62 @@ class DatabaseRollbackItem:
         return True
 
 
+class PushFrontendItem:
+    def get_item_description(self):
+        return "Push Frontend to Git (Copy DBs + Commit + Push)"
+    
+    def execute(self):
+        from src.frontend_operations import copy_databases_and_push
+        
+        print("\n" + "="*80)
+        print("PUSH FRONTEND TO GIT")
+        print("="*80)
+        print("\nThis will:")
+        print("  1. Copy database files to frontend/api")
+        print("  2. Initialize/update git repository in frontend")
+        print("  3. Commit and push changes to remote")
+        print()
+        
+        # Check if remote URL is configured
+        if not Config.frontend_git_remote_url:
+            print("⚠ Warning: No remote URL configured!")
+            print("Please set FRONTEND_GIT_REMOTE_URL in your environment or .env file")
+            print("Example: export FRONTEND_GIT_REMOTE_URL='https://github.com/user/repo.git'")
+            print()
+            
+            remote_url = input("Enter remote URL (or press Enter to skip): ").strip()
+            if not remote_url:
+                print("\nCancelled.")
+                return True
+        else:
+            remote_url = Config.frontend_git_remote_url
+            print(f"Remote URL: {remote_url}")
+            print(f"Branch: {Config.frontend_git_branch}")
+            print(f"Approach: {'Fresh (force push)' if Config.frontend_git_use_fresh_approach else 'Incremental'}")
+            print()
+        
+        confirm = input("Continue? (yes/no): ").strip().lower()
+        if confirm not in ("yes", "y"):
+            print("\nCancelled.")
+            return True
+        
+        print()
+        
+        # Execute the operation
+        try:
+            success = copy_databases_and_push(remote_url)
+            if success:
+                print("\n✓ Frontend pushed successfully!")
+            else:
+                print("\n✗ Failed to push frontend. Check logs for details.")
+        except Exception as e:
+            print(f"\n✗ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return True
+
+
 class ScheduledScrapingItem:
     def get_item_description(self):
         return "Run Scheduled Scraping (Stages 1&2 hourly, Stage 3 daily)"
@@ -288,6 +344,7 @@ def run():
     menu.register_item(RecheckAllJobsItem())
     menu.register_item(StructureDataItem())
     menu.register_item(CopyDatabaseItem())
+    menu.register_item(PushFrontendItem())  # Copy databases and push to git
     menu.register_item(DatabaseRollbackItem())
     
     # Run the menu

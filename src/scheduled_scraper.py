@@ -16,6 +16,7 @@ from src.scrape_job_recheck import recheck_site_jobs
 from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
 from src.error_logger import get_logger
 from src.database_backup import backup_all_databases
+from src.frontend_operations import copy_databases_and_push
 from datetime import date, datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -83,6 +84,7 @@ def run_stage_3_only():
     """
     Run Stage 3 (recheck alive jobs) only.
     Scheduled separately as this is the slowest stage.
+    After completion, copies databases to frontend and pushes to git.
     """
     logger = get_logger()
     report = DailyReport()
@@ -110,6 +112,9 @@ def run_stage_3_only():
         # Save report
         report.save()
         print(f"\n✓ Report saved to: {report.report_file}")
+        
+        # Copy databases to frontend and push to git
+        copy_databases_and_push()
         
     except Exception as e:
         logger.exception(f"Stage 3 failed: {e}")

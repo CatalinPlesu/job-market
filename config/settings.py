@@ -47,6 +47,15 @@ class Config:
     # Stage 1 Efficiency Settings
     # Stop scraping when this many consecutive jobs already exist in database
     stage1_consecutive_known_threshold = 30  # consecutive known jobs
+    
+    # Frontend Git Operations Settings
+    # Remote URL for the frontend git repository (e.g., GitHub Pages repo)
+    frontend_git_remote_url = os.getenv("FRONTEND_GIT_REMOTE_URL", "")
+    # Branch to push to (default: main)
+    frontend_git_branch = os.getenv("FRONTEND_GIT_BRANCH", "main")
+    # Use fresh repo approach (remove .git, init, push --force) to keep repo size small
+    # Set to False for incremental commits
+    frontend_git_use_fresh_approach = os.getenv("FRONTEND_GIT_FRESH_APPROACH", "true").lower() == "true"
 
     job_to_db_prompt = """
     Extract job posting data as JSON. Translate descriptive text to English; keep proper nouns original.
