@@ -196,10 +196,10 @@ const AnalysisPage = {
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
         m('h1', { class: 'text-3xl font-bold mb-6' }, 'Analysis'),
         
-        // Main Layout: Sidebar + Content
-        m('div', { class: 'flex flex-col lg:flex-row gap-6' }, [
-            // Left Sidebar - Predefined & Saved Analyses
-            m('div', { class: 'lg:w-80 flex-shrink-0 flex flex-col' }, [
+        // Main Layout: Sidebar + Content with independent scrolling
+        m('div', { class: 'flex flex-col lg:flex-row gap-6', style: 'height: calc(100vh - 12rem);' }, [
+            // Left Sidebar - Predefined & Saved Analyses (independently scrollable)
+            m('div', { class: 'lg:w-80 flex-shrink-0 flex flex-col overflow-y-auto' }, [
                 // Predefined Analyses (Expanded, Scrollable)
                 m('div', { class: 'card bg-base-100 shadow-xl flex-1 flex flex-col' }, [
                     m('div', { class: 'card-body p-4 flex flex-col flex-1 min-h-0' }, [
@@ -264,8 +264,8 @@ const AnalysisPage = {
                 ])
             ]),
             
-            // Main Content Area
-            m('div', { class: 'flex-1' }, [
+            // Main Content Area (independently scrollable)
+            m('div', { class: 'flex-1 overflow-y-auto' }, [
                 // Query Results (Plot First!)
                 CustomAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
                     m('div', { class: 'card-body' }, [
