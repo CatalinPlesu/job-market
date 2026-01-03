@@ -479,7 +479,7 @@ ORDER BY avg_max_salary DESC`,
     ROUND(AVG(jd.min_salary)) as avg_min_salary,
     ROUND(AVG(jd.max_salary)) as avg_max_salary
 FROM job_details jd
-JOIN education_levels el ON jd.education_level_id = el.id
+JOIN education_levels el ON jd.required_education_id = el.id
 WHERE jd.max_salary IS NOT NULL
 GROUP BY el.name
 ORDER BY avg_max_salary DESC`,
@@ -725,7 +725,7 @@ ORDER BY
     COUNT(*) as job_count,
     ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
 FROM job_details jd
-JOIN education_levels el ON jd.education_level_id = el.id
+JOIN education_levels el ON jd.required_education_id = el.id
 GROUP BY el.name
 ORDER BY job_count DESC`,
         chartType: 'doughnut',
