@@ -79,6 +79,13 @@ const CustomAnalysisState = {
                     // Inject conditions into SQL using shared utility
                     finalSQL = SQLUtils.injectWhereConditions(finalSQL, conditions);
                     params = filterParams;
+                    
+                    // Debug logging
+                    console.log('Filter Debug Info:');
+                    console.log('- Active Filters:', CustomAnalysisState.jobPageFilters);
+                    console.log('- WHERE Conditions:', conditions);
+                    console.log('- Parameters:', params);
+                    console.log('- Final SQL:', finalSQL);
                 }
             }
             

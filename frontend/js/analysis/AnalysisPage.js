@@ -326,6 +326,31 @@ const AnalysisPage = {
                             )
                         ])
                     ])
+                ]),
+                
+                // New Custom Query Button
+                m('div', { class: 'mt-4' }, [
+                    m('button', {
+                        class: 'btn btn-sm btn-outline w-full gap-2',
+                        onclick: () => {
+                            CustomAnalysisState.currentQuery = {
+                                name: '',
+                                description: '',
+                                sql: '',
+                                chartType: 'bar',
+                                isCustom: true,
+                                applyFilters: false
+                            };
+                            CustomAnalysisState.selectedAnalysisName = null;
+                            CustomAnalysisState.queryResult = null;
+                            m.redraw();
+                        }
+                    }, [
+                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M12 4v16m8-8H4' })
+                        ]),
+                        'New Custom Query'
+                    ])
                 ])
             ]),
             
@@ -409,11 +434,64 @@ const AnalysisPage = {
                                 ])
                             ]),
                             
-                            // SQL Query Display (removed statistical analysis)
+                            // SQL Query Display with Save as Template button
                             CustomAnalysisState.currentQuery.sql && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4' }, [
                                 m('summary', { class: 'collapse-title font-medium' }, '📝 SQL Query'),
                                 m('div', { class: 'collapse-content' }, [
-                                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, CustomAnalysisState.currentQuery.sql)
+                                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, CustomAnalysisState.currentQuery.sql),
+                                    
+                                    // Save as Template button (only for predefined analyses with filters)
+                                    CustomAnalysisState.selectedAnalysisName && CustomAnalysisState.jobPageFilters && 
+                                    Object.keys(CustomAnalysisState.jobPageFilters).length > 0 && m('div', { class: 'mt-4' }, [
+                                        m('button', {
+                                            class: 'btn btn-sm btn-outline gap-2',
+                                            onclick: async () => {
+                                                // Get the SQL with filters already baked in
+                                                let sqlWithFilters = CustomAnalysisState.currentQuery.sql;
+                                                
+                                                // Apply filters to SQL
+                                                const { whereClause, params: filterParams } = dbApi.buildWhereClause(
+                                                    CustomAnalysisState.jobPageFilters, 
+                                                    ''
+                                                );
+                                                
+                                                if (whereClause) {
+                                                    const conditions = SQLUtils.extractWhereConditions(whereClause);
+                                                    sqlWithFilters = SQLUtils.injectWhereConditions(sqlWithFilters, conditions);
+                                                    
+                                                    // Replace parameter placeholders with actual values
+                                                    filterParams.forEach((param, idx) => {
+                                                        sqlWithFilters = sqlWithFilters.replace('?', `'${param}'`);
+                                                    });
+                                                }
+                                                
+                                                // Create custom query with filters baked in
+                                                CustomAnalysisState.currentQuery = {
+                                                    name: `${CustomAnalysisState.currentQuery.name} (Filtered)`,
+                                                    description: `${CustomAnalysisState.currentQuery.description} - With filters: ${Object.entries(CustomAnalysisState.jobPageFilters).map(([k, v]) => `${k}=${v}`).join(', ')}`,
+                                                    sql: sqlWithFilters,
+                                                    chartType: CustomAnalysisState.currentQuery.chartType,
+                                                    labelColumn: CustomAnalysisState.currentQuery.labelColumn,
+                                                    valueColumns: CustomAnalysisState.currentQuery.valueColumns,
+                                                    isCustom: true,
+                                                    applyFilters: false  // Filters already in SQL
+                                                };
+                                                
+                                                // Clear selected analysis and filters
+                                                CustomAnalysisState.selectedAnalysisName = null;
+                                                CustomAnalysisState.jobPageFilters = null;
+                                                PersonalInterestFilters.state.pendingFilters = {};
+                                                PersonalInterestFilters.state.appliedFilters = {};
+                                                
+                                                m.redraw();
+                                            }
+                                        }, [
+                                            m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+                                                m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' })
+                                            ]),
+                                            'Create Custom Template with Filters'
+                                        ])
+                                    ])
                                 ])
                             ]),
                             
@@ -536,8 +614,8 @@ const AnalysisPage = {
                     ])
                 ]),
                 
-                // Custom Query Builder
-                m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
+                // Custom Query Builder (only show when not viewing predefined analysis or when explicitly creating custom query)
+                (!CustomAnalysisState.selectedAnalysisName || CustomAnalysisState.currentQuery.isCustom) && m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
             m('div', { class: 'card-body' }, [
                 m('div', { class: 'flex justify-between items-center mb-4' }, [
                     m('h2', { class: 'card-title' }, 'Custom Query Builder'),
