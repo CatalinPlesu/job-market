@@ -4,6 +4,29 @@
 
 This implementation adds automated deployment of database files to a frontend git repository (e.g., GitHub Pages) after the scheduled scraper completes its daily job check at midnight.
 
+**Important**: The frontend directory will be a separate git repository that uses **Git LFS (Large File Storage)** for database files.
+
+## Prerequisites
+
+### Git LFS Installation
+
+Database files can be large, so Git LFS is required to handle them efficiently:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install git-lfs
+```
+
+**macOS:**
+```bash
+brew install git-lfs
+```
+
+**Windows:**
+Download from https://git-lfs.github.com/
+
+The system will automatically configure Git LFS when initializing the frontend repository.
+
 ## Key Features
 
 ### 1. Manual Deployment (Menu Option #9)
@@ -11,16 +34,18 @@ This implementation adds automated deployment of database files to a frontend gi
 - **What it does**:
   1. Copies `scrape.db` and `data.db` to `frontend/api/`
   2. Initializes/updates git repository in `frontend/`
-  3. Commits changes with timestamp
-  4. Pushes to configured remote repository
+  3. Configures Git LFS for `.db` files (via `.gitattributes`)
+  4. Commits changes with timestamp
+  5. Pushes to configured remote repository
 
 ### 2. Automated Deployment (After Stage 3)
 - **When**: Daily at 00:00 (midnight) after Stage 3 completes
 - **What happens**:
   1. Stage 3 rechecks all alive jobs
   2. Automatically copies databases to `frontend/api/`
-  3. Commits and pushes to git repository
-  4. All without manual intervention
+  3. Sets up Git LFS (if not already configured)
+  4. Commits and pushes to git repository
+  5. All without manual intervention
 
 ## Configuration
 
@@ -123,22 +148,39 @@ https://username.github.io/job-market-frontend/
 
 ```
 job-market/
-├── frontend/                    # Frontend directory
+├── frontend/                    # Frontend directory (separate git repo)
 │   ├── .git/                   # Git repository (managed automatically)
-│   ├── api/                    # Database files (auto-copied)
-│   │   ├── scrape.db          # Raw scraped data
-│   │   └── data.db            # Processed data
+│   ├── .gitattributes          # Git LFS configuration (auto-created)
+│   ├── api/                    # Database files (auto-copied, tracked with LFS)
+│   │   ├── scrape.db          # Raw scraped data (stored in Git LFS)
+│   │   └── data.db            # Processed data (stored in Git LFS)
 │   ├── index.html             # Frontend entry point
 │   ├── js/                    # JavaScript modules
 │   └── ...
 ├── src/
 │   ├── frontend_operations.py     # Database copy + git orchestration
-│   ├── frontend_git_operations.py # Git operations module
+│   ├── frontend_git_operations.py # Git operations module with LFS support
 │   └── scheduled_scraper.py       # Modified to auto-deploy after Stage 3
 └── .env                       # Your configuration
 ```
 
 ## Troubleshooting
+
+### Issue: "Git LFS is not installed"
+
+**Solution**: Install Git LFS on your system
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install git-lfs
+```
+
+**macOS:**
+```bash
+brew install git-lfs
+```
+
+After installation, the system will automatically configure LFS for database files.
 
 ### Issue: "No remote URL configured"
 

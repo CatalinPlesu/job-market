@@ -51,9 +51,54 @@ class FrontendGitOperations:
             self.logger.error(f"Failed to remove .git directory: {e}")
             return False
     
+    def setup_git_lfs(self) -> Tuple[bool, str]:
+        """
+        Set up Git LFS for the repository and configure .db files to use LFS.
+        
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        try:
+            # Check if git-lfs is installed
+            result = subprocess.run(
+                ["git", "lfs", "version"],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                return False, "Git LFS is not installed. Install it with: apt-get install git-lfs or brew install git-lfs"
+            
+            # Install Git LFS hooks in the repository
+            subprocess.run(
+                ["git", "lfs", "install"],
+                cwd=self.frontend_dir,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            # Create .gitattributes file to track .db files with LFS
+            gitattributes_path = self.frontend_dir / ".gitattributes"
+            gitattributes_content = "# Track database files with Git LFS\napi/*.db filter=lfs diff=lfs merge=lfs -text\n"
+            
+            gitattributes_path.write_text(gitattributes_content)
+            
+            return True, "Git LFS configured for .db files"
+        
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Failed to set up Git LFS: {e.stderr}"
+            self.logger.error(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = f"Failed to set up Git LFS: {e}"
+            self.logger.error(error_msg)
+            return False, error_msg
+    
     def init_repo(self, force: bool = False) -> Tuple[bool, str]:
         """
         Initialize a git repository in the frontend directory.
+        Sets up Git LFS for database files.
         
         Args:
             force: If True, removes existing .git directory first
@@ -74,7 +119,15 @@ class FrontendGitOperations:
                 text=True,
                 check=True
             )
-            return True, "Git repository initialized"
+            
+            # Set up Git LFS for database files
+            lfs_success, lfs_msg = self.setup_git_lfs()
+            if not lfs_success:
+                # Log warning but don't fail - LFS is optional
+                self.logger.error(f"Git LFS setup failed: {lfs_msg}")
+                return True, f"Git repository initialized (warning: {lfs_msg})"
+            
+            return True, "Git repository initialized with LFS support"
         
         except subprocess.CalledProcessError as e:
             error_msg = f"Failed to initialize git repo: {e.stderr}"
