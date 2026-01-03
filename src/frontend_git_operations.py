@@ -45,7 +45,6 @@ class FrontendGitOperations:
         try:
             if self.has_git_repo():
                 shutil.rmtree(self.git_dir)
-                self.logger.info(f"Removed .git directory from {self.frontend_dir}")
                 return True
             return True  # Already removed
         except Exception as e:
@@ -75,7 +74,6 @@ class FrontendGitOperations:
                 text=True,
                 check=True
             )
-            self.logger.info(f"Initialized git repo in {self.frontend_dir}")
             return True, "Git repository initialized"
         
         except subprocess.CalledProcessError as e:
@@ -116,7 +114,6 @@ class FrontendGitOperations:
                     text=True,
                     check=True
                 )
-                self.logger.info(f"Updated remote '{remote_name}' to {remote_url}")
                 return True, f"Remote '{remote_name}' updated"
             else:
                 # Remote doesn't exist, add it
@@ -127,7 +124,6 @@ class FrontendGitOperations:
                     text=True,
                     check=True
                 )
-                self.logger.info(f"Added remote '{remote_name}' with URL {remote_url}")
                 return True, f"Remote '{remote_name}' added"
         
         except subprocess.CalledProcessError as e:
@@ -154,7 +150,6 @@ class FrontendGitOperations:
                 text=True,
                 check=True
             )
-            self.logger.info("Staged all changes")
             return True, "All changes staged"
         
         except subprocess.CalledProcessError as e:
@@ -184,13 +179,11 @@ class FrontendGitOperations:
                 text=True,
                 check=True
             )
-            self.logger.info(f"Created commit: {message}")
             return True, "Commit created"
         
         except subprocess.CalledProcessError as e:
             # Check if error is because nothing to commit
             if "nothing to commit" in e.stdout or "nothing to commit" in e.stderr:
-                self.logger.info("No changes to commit")
                 return True, "No changes to commit"
             error_msg = f"Failed to create commit: {e.stderr}"
             self.logger.error(error_msg)
@@ -225,7 +218,6 @@ class FrontendGitOperations:
                 text=True,
                 check=True
             )
-            self.logger.info(f"Pushed to {remote_name}/{branch}")
             return True, f"Pushed to {remote_name}/{branch}"
         
         except subprocess.CalledProcessError as e:

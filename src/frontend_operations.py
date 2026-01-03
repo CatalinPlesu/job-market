@@ -26,7 +26,6 @@ def copy_databases_to_frontend(dest_dir: str = "frontend/api") -> bool:
     try:
         # Create destination directory if it doesn't exist
         dest_path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Created/verified destination directory: {dest_path}")
         
         # Copy scrape.db
         source_scrape = Path(Config.scrape_db_path)
@@ -41,7 +40,6 @@ def copy_databases_to_frontend(dest_dir: str = "frontend/api") -> bool:
         shutil.copy2(source_scrape, dest_scrape)
         size_mb = source_scrape.stat().st_size / (1024 * 1024)
         print(f"✓ {source_scrape.name} copied ({size_mb:.2f} MB)")
-        logger.info(f"Copied {source_scrape} to {dest_scrape} ({size_mb:.2f} MB)")
         
         # Copy data.db
         source_data = Path(Config.data_db_path)
@@ -56,7 +54,6 @@ def copy_databases_to_frontend(dest_dir: str = "frontend/api") -> bool:
         shutil.copy2(source_data, dest_data)
         size_mb = source_data.stat().st_size / (1024 * 1024)
         print(f"✓ {source_data.name} copied ({size_mb:.2f} MB)")
-        logger.info(f"Copied {source_data} to {dest_data} ({size_mb:.2f} MB)")
         
         print(f"\n✓ Database files copied successfully to {dest_path}/")
         return True
@@ -140,7 +137,6 @@ def copy_databases_and_push(remote_url: str = None) -> bool:
         
         if success:
             print(f"✓ {message}")
-            logger.info(f"Successfully pushed frontend: {message}")
             return True
         else:
             print(f"✗ {message}")
