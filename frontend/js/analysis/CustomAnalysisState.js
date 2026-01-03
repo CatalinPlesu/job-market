@@ -16,6 +16,7 @@ const CustomAnalysisState = {
     showStatistics: true,  // Enable statistical computations
     selectedAnalysisName: null,  // Track selected analysis for visual highlighting
     jobPageFilters: null,  // Filters passed from jobs page
+    executedSQL: null,  // The actual SQL that was executed (with JOINs and filters)
     
     // Load saved queries from localStorage
     loadSavedQueries: () => {
@@ -142,6 +143,9 @@ const CustomAnalysisState = {
             }
             
             let results = DatabaseManager.queryObjects(finalSQL, params);
+            
+            // Store the executed SQL for display
+            CustomAnalysisState.executedSQL = finalSQL;
             
             // Apply data adapter if provided
             if (CustomAnalysisState.currentQuery.dataAdapter) {

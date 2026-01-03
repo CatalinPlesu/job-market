@@ -393,7 +393,7 @@ const AnalysisPage = {
                 // Code viewer - shows how query is executed and chart is created
                 CustomAnalysisState.queryResult && CustomAnalysisState.queryResult.success &&
                     m(CodeViewer, {
-                        sql: CustomAnalysisState.currentQuery.sql,
+                        sql: CustomAnalysisState.executedSQL || CustomAnalysisState.currentQuery.sql,  // Use executed SQL with JOINs
                         data: CustomAnalysisState.queryResult.data,
                         chartType: CustomAnalysisState.currentQuery.chartType,
                         labelColumn: CustomAnalysisState.currentQuery.labelColumn,
@@ -438,7 +438,19 @@ const AnalysisPage = {
                             CustomAnalysisState.currentQuery.sql && m('details', { class: 'collapse collapse-arrow bg-base-200 mb-4' }, [
                                 m('summary', { class: 'collapse-title font-medium' }, '📝 SQL Query'),
                                 m('div', { class: 'collapse-content' }, [
-                                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, CustomAnalysisState.currentQuery.sql),
+                                    // Show executed SQL if available (includes JOINs and filters), otherwise show original
+                                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, 
+                                        CustomAnalysisState.executedSQL || CustomAnalysisState.currentQuery.sql
+                                    ),
+                                    
+                                    // Show note if filters were applied
+                                    CustomAnalysisState.executedSQL && CustomAnalysisState.executedSQL !== CustomAnalysisState.currentQuery.sql && 
+                                    m('div', { class: 'alert alert-info mt-2' }, [
+                                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+                                        ]),
+                                        m('span', 'This SQL includes JOINs and WHERE conditions from your applied filters.')
+                                    ]),
                                     
                                     // Save as Template button (only for predefined analyses with filters)
                                     CustomAnalysisState.selectedAnalysisName && CustomAnalysisState.jobPageFilters && 
@@ -446,20 +458,17 @@ const AnalysisPage = {
                                         m('button', {
                                             class: 'btn btn-sm btn-outline gap-2',
                                             onclick: async () => {
-                                                // Get the SQL with filters already baked in
-                                                let sqlWithFilters = CustomAnalysisState.currentQuery.sql;
+                                                // Use the executed SQL which already has JOINs and filters
+                                                let sqlWithFilters = CustomAnalysisState.executedSQL || CustomAnalysisState.currentQuery.sql;
                                                 
-                                                // Apply filters to SQL
+                                                // Get filter params to replace placeholders
                                                 const { whereClause, params: filterParams } = dbApi.buildWhereClause(
                                                     CustomAnalysisState.jobPageFilters, 
                                                     ''
                                                 );
                                                 
-                                                if (whereClause) {
-                                                    const conditions = SQLUtils.extractWhereConditions(whereClause);
-                                                    sqlWithFilters = SQLUtils.injectWhereConditions(sqlWithFilters, conditions);
-                                                    
-                                                    // Replace parameter placeholders with actual values
+                                                // Replace parameter placeholders with actual values
+                                                if (filterParams && filterParams.length > 0) {
                                                     filterParams.forEach((param, idx) => {
                                                         sqlWithFilters = sqlWithFilters.replace('?', `'${param}'`);
                                                     });

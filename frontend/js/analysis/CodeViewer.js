@@ -6,18 +6,19 @@ const CodeViewer = {
     },
     
     generateQueryCode: (sql, filters) => {
-        const filtersCode = filters && Object.keys(filters).length > 0 
-            ? `// Applied filters from jobs page:
+        // Note: If SQL is already the executed SQL (with JOINs and filters), 
+        // we don't need to show filter injection code - just show the final SQL
+        const hasFilters = filters && Object.keys(filters).length > 0;
+        
+        const filtersCode = hasFilters
+            ? `// SQL already includes filters (JOINs and WHERE conditions added automatically)
 const filters = ${JSON.stringify(filters, null, 2)};
 
-// Build WHERE clause from filters
+// Build parameter values for the query
 const { whereClause, params } = dbApi.buildWhereClause(filters, '');
 
-// Extract conditions and inject into query using shared utilities
-const conditions = SQLUtils.extractWhereConditions(whereClause);
-const enhancedSQL = conditions 
-    ? SQLUtils.injectWhereConditions(\`${sql}\`, conditions)
-    : \`${sql}\`;
+// The SQL already has the necessary JOINs and filter conditions:
+const sql = \`${sql}\`;
 `
             : `const sql = \`${sql}\`;
 const params = [];
