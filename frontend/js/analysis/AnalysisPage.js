@@ -208,9 +208,14 @@ const AnalysisPage = {
                             m('div', { class: 'space-y-1' },
                                 PredefinedAnalyses.map(analysis => 
                                     m('div', { 
-                                        class: 'p-2 hover:bg-base-200 rounded cursor-pointer',
+                                        class: `p-2 hover:bg-base-200 rounded cursor-pointer ${
+                                            CustomAnalysisState.selectedAnalysisName === analysis.name 
+                                                ? 'bg-primary text-primary-content' 
+                                                : ''
+                                        }`,
                                         onclick: () => {
                                             CustomAnalysisState.currentQuery = { ...analysis };
+                                            CustomAnalysisState.selectedAnalysisName = analysis.name;
                                             CustomAnalysisState.executeQuery(analysis.sql);
                                         }
                                     }, [
@@ -234,7 +239,11 @@ const AnalysisPage = {
                             m('div', { class: 'space-y-1' },
                                 CustomAnalysisState.savedQueries.map(query => 
                                     m('div', { 
-                                        class: 'p-2 hover:bg-base-200 rounded'
+                                        class: `p-2 hover:bg-base-200 rounded ${
+                                            CustomAnalysisState.selectedAnalysisName === query.name 
+                                                ? 'bg-primary text-primary-content' 
+                                                : ''
+                                        }`
                                     }, [
                                         m('div', { class: 'font-medium text-sm' }, query.name),
                                         m('div', { class: 'text-xs opacity-70 mt-1' }, query.description),
@@ -243,6 +252,7 @@ const AnalysisPage = {
                                                 class: 'btn btn-xs btn-ghost',
                                                 onclick: () => {
                                                     CustomAnalysisState.currentQuery = { ...query };
+                                                    CustomAnalysisState.selectedAnalysisName = query.name;
                                                     CustomAnalysisState.executeQuery(query.sql);
                                                 }
                                             }, 'Load'),

@@ -14,6 +14,7 @@ const CustomAnalysisState = {
     chartInstance: null,
     showHelp: false,
     showStatistics: true,  // Enable statistical computations
+    selectedAnalysisName: null,  // Track selected analysis for visual highlighting
     
     // Load saved queries from localStorage
     loadSavedQueries: () => {
