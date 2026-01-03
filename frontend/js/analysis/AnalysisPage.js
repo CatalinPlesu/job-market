@@ -1,12 +1,20 @@
 const AnalysisPage = {
-    oninit: (vnode) => {
+    oninit: async (vnode) => {
         // Load saved queries from localStorage
         CustomAnalysisState.loadSavedQueries();
         
-        // Initialize database
-        DatabaseManager.init().catch(err => {
+        // Initialize database and load metadata for filters
+        try {
+            await DatabaseManager.init();
+            
+            // Load metadata if not already loaded (needed for PersonalInterestFilters)
+            if (!state.jobsIndex) {
+                const metadata = await dbApi.getMetadata();
+                state.jobsIndex = metadata;
+            }
+        } catch (err) {
             console.error('Failed to initialize database:', err);
-        });
+        }
         
         // Check if filters were passed from jobs page
         const jobFilters = vnode.attrs.filters;

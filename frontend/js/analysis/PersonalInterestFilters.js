@@ -3,10 +3,53 @@
 const PersonalInterestFilters = {
     state: {
         activeFilters: {},
-        showFilters: true
+        showFilters: true,
+        filterCounts: {} // Store dynamic filter counts
+    },
+    
+    // Async function to get counts for a specific field
+    async getCountsForField(fieldKey) {
+        try {
+            const counts = await dbApi.getFilteredCounts(fieldKey, PersonalInterestFilters.state.activeFilters);
+            PersonalInterestFilters.state.filterCounts[fieldKey] = counts;
+            m.redraw();
+        } catch (error) {
+            console.error(`Error getting counts for ${fieldKey}:`, error);
+            PersonalInterestFilters.state.filterCounts[fieldKey] = [];
+        }
+    },
+    
+    handleFilterChange: async (fieldKey, value) => {
+        // Update active filters
+        if (value) {
+            PersonalInterestFilters.state.activeFilters[fieldKey] = value;
+        } else {
+            delete PersonalInterestFilters.state.activeFilters[fieldKey];
+        }
+        
+        // Update CustomAnalysisState
+        CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
+        
+        // Recompute counts for all filters
+        const filterFields = ['industry', 'job_function', 'seniority_level', 'department', 'remote_work', 'city'];
+        for (const field of filterFields) {
+            await PersonalInterestFilters.getCountsForField(field);
+        }
+        
+        m.redraw();
     },
     
     view: () => {
+        // Define filter fields with their metadata keys
+        const filterFields = [
+            { key: 'industry', label: 'Industry', metadataKey: 'industry' },
+            { key: 'job_function', label: 'Job Function', metadataKey: 'job_function' },
+            { key: 'seniority_level', label: 'Seniority Level', metadataKey: 'seniority_level' },
+            { key: 'department', label: 'Department', metadataKey: 'department' },
+            { key: 'remote_work', label: 'Remote Work', metadataKey: 'remote_work' },
+            { key: 'city', label: 'City', metadataKey: 'location' }
+        ];
+        
         return m('div', { class: 'card bg-base-200 mb-6' }, [
             m('div', { class: 'card-body p-4' }, [
                 m('div', { class: 'flex justify-between items-center mb-3' }, [
@@ -23,145 +66,43 @@ const PersonalInterestFilters = {
                     'Select your interests to see personalized job market insights'
                 ),
                 
-                PersonalInterestFilters.state.showFilters && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3' }, [
-                    // Industry filter
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text text-xs font-semibold' }, 'Industry')),
-                        m('select', {
-                            class: 'select select-bordered select-sm',
-                            value: PersonalInterestFilters.state.activeFilters.industry || '',
-                            onchange: async (e) => {
-                                if (e.target.value) {
-                                    PersonalInterestFilters.state.activeFilters.industry = e.target.value;
-                                } else {
-                                    delete PersonalInterestFilters.state.activeFilters.industry;
+                PersonalInterestFilters.state.showFilters && m('div', { class: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3' }, 
+                    filterFields.map(field => {
+                        // Get options from filterCounts if available, otherwise from initial metadata
+                        let options = [];
+                        
+                        if (PersonalInterestFilters.state.filterCounts[field.key]) {
+                            // Use dynamic counts
+                            options = PersonalInterestFilters.state.filterCounts[field.key];
+                        } else if (state.jobsIndex?.metadata?.[field.metadataKey]) {
+                            // Use initial metadata
+                            options = state.jobsIndex.metadata[field.metadataKey];
+                            // Trigger loading of dynamic counts
+                            PersonalInterestFilters.getCountsForField(field.key);
+                        }
+                        
+                        // Filter out options with 0 count
+                        const availableOptions = options.filter(opt => opt.count > 0);
+                        
+                        return m('div', { class: 'form-control' }, [
+                            m('label', { class: 'label' }, 
+                                m('span', { class: 'label-text text-xs font-semibold' }, field.label)
+                            ),
+                            m('select', {
+                                class: 'select select-bordered select-sm',
+                                value: PersonalInterestFilters.state.activeFilters[field.key] || '',
+                                onchange: (e) => {
+                                    PersonalInterestFilters.handleFilterChange(field.key, e.target.value || null);
                                 }
-                                CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                m.redraw();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All Industries'),
-                            ...(state.jobsIndex?.metadata?.industry || []).map(item =>
-                                m('option', { value: item.name }, `${item.name} (${item.count})`)
-                            )
-                        ])
-                    ]),
-                    
-                    // Job Function filter
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text text-xs font-semibold' }, 'Job Function')),
-                        m('select', {
-                            class: 'select select-bordered select-sm',
-                            value: PersonalInterestFilters.state.activeFilters.job_function || '',
-                            onchange: async (e) => {
-                                if (e.target.value) {
-                                    PersonalInterestFilters.state.activeFilters.job_function = e.target.value;
-                                } else {
-                                    delete PersonalInterestFilters.state.activeFilters.job_function;
-                                }
-                                CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                m.redraw();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All Functions'),
-                            ...(state.jobsIndex?.metadata?.job_function || []).map(item =>
-                                m('option', { value: item.name }, `${item.name} (${item.count})`)
-                            )
-                        ])
-                    ]),
-                    
-                    // Seniority Level filter
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text text-xs font-semibold' }, 'Seniority Level')),
-                        m('select', {
-                            class: 'select select-bordered select-sm',
-                            value: PersonalInterestFilters.state.activeFilters.seniority_level || '',
-                            onchange: async (e) => {
-                                if (e.target.value) {
-                                    PersonalInterestFilters.state.activeFilters.seniority_level = e.target.value;
-                                } else {
-                                    delete PersonalInterestFilters.state.activeFilters.seniority_level;
-                                }
-                                CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                m.redraw();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All Levels'),
-                            ...(state.jobsIndex?.metadata?.seniority_level || []).map(item =>
-                                m('option', { value: item.name }, `${item.name} (${item.count})`)
-                            )
-                        ])
-                    ]),
-                    
-                    // Department filter
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text text-xs font-semibold' }, 'Department')),
-                        m('select', {
-                            class: 'select select-bordered select-sm',
-                            value: PersonalInterestFilters.state.activeFilters.department || '',
-                            onchange: async (e) => {
-                                if (e.target.value) {
-                                    PersonalInterestFilters.state.activeFilters.department = e.target.value;
-                                } else {
-                                    delete PersonalInterestFilters.state.activeFilters.department;
-                                }
-                                CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                m.redraw();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All Departments'),
-                            ...(state.jobsIndex?.metadata?.department || []).map(item =>
-                                m('option', { value: item.name }, `${item.name} (${item.count})`)
-                            )
-                        ])
-                    ]),
-                    
-                    // Remote Work filter
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text text-xs font-semibold' }, 'Remote Work')),
-                        m('select', {
-                            class: 'select select-bordered select-sm',
-                            value: PersonalInterestFilters.state.activeFilters.remote_work || '',
-                            onchange: async (e) => {
-                                if (e.target.value) {
-                                    PersonalInterestFilters.state.activeFilters.remote_work = e.target.value;
-                                } else {
-                                    delete PersonalInterestFilters.state.activeFilters.remote_work;
-                                }
-                                CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                m.redraw();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All Options'),
-                            ...(state.jobsIndex?.metadata?.remote_work || []).map(item =>
-                                m('option', { value: item.name }, `${item.name} (${item.count})`)
-                            )
-                        ])
-                    ]),
-                    
-                    // City filter
-                    m('div', { class: 'form-control' }, [
-                        m('label', { class: 'label' }, m('span', { class: 'label-text text-xs font-semibold' }, 'City')),
-                        m('select', {
-                            class: 'select select-bordered select-sm',
-                            value: PersonalInterestFilters.state.activeFilters.city || '',
-                            onchange: async (e) => {
-                                if (e.target.value) {
-                                    PersonalInterestFilters.state.activeFilters.city = e.target.value;
-                                } else {
-                                    delete PersonalInterestFilters.state.activeFilters.city;
-                                }
-                                CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                m.redraw();
-                            }
-                        }, [
-                            m('option', { value: '' }, 'All Cities'),
-                            ...(state.jobsIndex?.metadata?.location || []).slice(0, 20).map(item =>
-                                m('option', { value: item.name }, `${item.name} (${item.count})`)
-                            )
-                        ])
-                    ])
-                ]),
+                            }, [
+                                m('option', { value: '' }, `All ${field.label}s`),
+                                ...availableOptions.map(item =>
+                                    m('option', { value: item.name }, `${item.name} (${item.count})`)
+                                )
+                            ])
+                        ]);
+                    })
+                ),
                 
                 // Active filters display and actions
                 Object.keys(PersonalInterestFilters.state.activeFilters).length > 0 && m('div', { class: 'mt-4 pt-4 border-t border-base-300' }, [
@@ -173,18 +114,23 @@ const PersonalInterestFilters = {
                                 m('button', {
                                     class: 'btn btn-ghost btn-xs p-0 h-auto min-h-0',
                                     onclick: () => {
-                                        delete PersonalInterestFilters.state.activeFilters[key];
-                                        CustomAnalysisState.jobPageFilters = { ...PersonalInterestFilters.state.activeFilters };
-                                        m.redraw();
+                                        PersonalInterestFilters.handleFilterChange(key, null);
                                     }
                                 }, '×')
                             ])
                         ),
                         m('button', {
                             class: 'btn btn-xs btn-ghost',
-                            onclick: () => {
+                            onclick: async () => {
                                 PersonalInterestFilters.state.activeFilters = {};
                                 CustomAnalysisState.jobPageFilters = null;
+                                
+                                // Recompute counts for all filters
+                                const filterFields = ['industry', 'job_function', 'seniority_level', 'department', 'remote_work', 'city'];
+                                for (const field of filterFields) {
+                                    await PersonalInterestFilters.getCountsForField(field);
+                                }
+                                
                                 m.redraw();
                             }
                         }, 'Clear All')
