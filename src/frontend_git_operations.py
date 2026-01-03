@@ -172,22 +172,28 @@ class FrontendGitOperations:
             Tuple of (success: bool, message: str)
         """
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["git", "commit", "-m", message],
                 cwd=self.frontend_dir,
                 capture_output=True,
-                text=True,
-                check=True
+                text=True
             )
-            return True, "Commit created"
-        
-        except subprocess.CalledProcessError as e:
+            
+            # Check if commit succeeded
+            if result.returncode == 0:
+                return True, "Commit created"
+            
             # Check if error is because nothing to commit
-            if "nothing to commit" in e.stdout or "nothing to commit" in e.stderr:
+            # Git returns exit code 1 for "nothing to commit"
+            output = result.stdout + result.stderr
+            if "nothing to commit" in output.lower() or "nothing added to commit" in output.lower():
                 return True, "No changes to commit"
-            error_msg = f"Failed to create commit: {e.stderr}"
+            
+            # Other error occurred
+            error_msg = f"Failed to create commit: {result.stderr}"
             self.logger.error(error_msg)
             return False, error_msg
+            
         except Exception as e:
             error_msg = f"Failed to create commit: {e}"
             self.logger.error(error_msg)
