@@ -66,25 +66,69 @@ const CustomAnalysisState = {
             const shouldApplyFilters = CustomAnalysisState.currentQuery.applyFilters !== false;
             
             if (shouldApplyFilters && CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0) {
-                // Build WHERE clause from job page filters
-                const { whereClause, params: filterParams } = dbApi.buildWhereClause(
-                    CustomAnalysisState.jobPageFilters, 
-                    ''
-                );
+                // Build filter conditions and determine needed JOINs
+                const filterConditions = [];
+                const neededJoins = new Set();
                 
-                if (whereClause) {
-                    // Extract conditions using shared utility
-                    const conditions = SQLUtils.extractWhereConditions(whereClause);
+                // Map filters to their table info
+                const filterTableMap = {
+                    'industry': { table: 'industries', alias: 'ind_filter', fk: 'industry_id', condition: 'ind_filter.name = ?' },
+                    'job_function': { table: 'job_functions', alias: 'jf_filter', fk: 'job_function_id', condition: 'jf_filter.name = ?' },
+                    'seniority_level': { table: 'seniority_levels', alias: 'sl_filter', fk: 'seniority_level_id', condition: 'sl_filter.name = ?' },
+                    'department': { table: 'departments', alias: 'dept_filter', fk: 'department_id', condition: 'dept_filter.name = ?' },
+                    'remote_work': { table: 'remote_work_options', alias: 'rw_filter', fk: 'remote_work_id', condition: 'rw_filter.name = ?' },
+                    'city': { table: 'cities', alias: 'city_filter', fk: 'city_id', condition: 'city_filter.name = ?' },
+                    'company': { table: 'companies', alias: 'comp_filter', fk: 'company_name_id', condition: 'comp_filter.name = ?' },
+                    'employment_type': { table: 'employment_types', alias: 'et_filter', fk: 'employment_type_id', condition: 'et_filter.name = ?' }
+                };
+                
+                // Build conditions and track needed joins
+                for (const [filterKey, filterValue] of Object.entries(CustomAnalysisState.jobPageFilters)) {
+                    if (filterTableMap[filterKey]) {
+                        const tableInfo = filterTableMap[filterKey];
+                        filterConditions.push(tableInfo.condition);
+                        params.push(filterValue);
+                        neededJoins.add(tableInfo);
+                    }
+                }
+                
+                if (filterConditions.length > 0) {
+                    // Find the main job_details reference in the SQL
+                    // Look for patterns like "FROM job_details" or "JOIN job_details"
+                    const jdAliasMatch = sql.match(/(?:FROM|JOIN)\s+job_details(?:\s+AS)?\s+(\w+)/i);
+                    const jdAlias = jdAliasMatch ? jdAliasMatch[1] : 'jd';
                     
-                    // Inject conditions into SQL using shared utility
-                    finalSQL = SQLUtils.injectWhereConditions(finalSQL, conditions);
-                    params = filterParams;
+                    // Build JOIN statements for needed tables
+                    const joinStatements = [];
+                    for (const joinInfo of neededJoins) {
+                        joinStatements.push(
+                            `LEFT JOIN ${joinInfo.table} ${joinInfo.alias} ON ${jdAlias}.${joinInfo.fk} = ${joinInfo.alias}.id`
+                        );
+                    }
+                    
+                    // Combine filter conditions
+                    const combinedConditions = filterConditions.join(' AND ');
+                    
+                    // Insert JOINs after the job_details table reference
+                    if (joinStatements.length > 0) {
+                        // Find position to insert JOINs (after job_details FROM/JOIN)
+                        const fromMatch = sql.match(/(FROM\s+job_details(?:\s+AS)?\s+\w+)/i);
+                        if (fromMatch) {
+                            const insertPos = fromMatch.index + fromMatch[0].length;
+                            finalSQL = sql.slice(0, insertPos) + '\n' + joinStatements.join('\n') + '\n' + sql.slice(insertPos);
+                        }
+                    }
+                    
+                    // Inject WHERE conditions
+                    finalSQL = SQLUtils.injectWhereConditions(finalSQL, combinedConditions);
                     
                     // Debug logging
                     console.log('Filter Debug Info:');
                     console.log('- Active Filters:', CustomAnalysisState.jobPageFilters);
-                    console.log('- WHERE Conditions:', conditions);
+                    console.log('- Filter Conditions:', combinedConditions);
                     console.log('- Parameters:', params);
+                    console.log('- JD Alias detected:', jdAlias);
+                    console.log('- Joins added:', joinStatements);
                     console.log('- Final SQL:', finalSQL);
                 }
             }
