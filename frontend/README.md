@@ -2,6 +2,10 @@
 
 A single-page application (SPA) built with Mithril.js and DaisyUI for browsing jobs and viewing market analytics.
 
+## Architecture
+
+The frontend is now organized as a modular application with 20 focused JavaScript modules. See [js/README.md](js/README.md) for detailed documentation of the module structure.
+
 ## Technology Stack
 
 - **Mithril.js** - Lightweight SPA framework (via CDN)
