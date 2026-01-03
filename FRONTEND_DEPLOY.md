@@ -144,6 +144,12 @@ After deployment, your site will be available at:
 https://username.github.io/job-market-frontend/
 ```
 
+**Path Configuration**: The frontend automatically detects the correct API path based on the deployment environment:
+- On GitHub Pages: `https://username.github.io/Job-Market-Frontend/api/data.db`
+- On localhost: `http://localhost:8000/api/data.db`
+
+No configuration needed - the detection is handled automatically in `js/config.js`!
+
 ## File Structure
 
 ```
