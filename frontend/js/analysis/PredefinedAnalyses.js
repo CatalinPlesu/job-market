@@ -136,11 +136,11 @@ ORDER BY
             description: 'Most requested skills for your career path',
             sql: `SELECT 
     hs.name as skill,
-    COUNT(DISTINCT jd.id) as job_count,
+    COUNT(*) as job_count,
     ROUND(AVG(jd.max_salary)) as avg_salary
-FROM hard_skills hs
-JOIN job_details_hard_skills jhs ON hs.id = jhs.hard_skills_id
-JOIN job_details jd ON jhs.job_details_id = jd.id
+FROM job_details jd
+JOIN job_details_hard_skills jhs ON jd.id = jhs.job_details_id
+JOIN hard_skills hs ON jhs.hard_skills_id = hs.id
 WHERE jd.max_salary IS NOT NULL
 GROUP BY hs.name
 HAVING job_count >= 3
@@ -172,7 +172,7 @@ ORDER BY avg_salary DESC`,
             sql: `SELECT 
     rw.name as remote_option,
     COUNT(*) as job_count,
-    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage
 FROM job_details jd
 LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
 GROUP BY rw.name
@@ -231,11 +231,11 @@ LIMIT 20`,
             description: 'Most valuable certifications in your field',
             sql: `SELECT 
     cert.name as certification,
-    COUNT(DISTINCT jd.id) as job_count,
+    COUNT(*) as job_count,
     ROUND(AVG(jd.max_salary)) as avg_salary
-FROM certifications cert
-JOIN job_details_certifications jc ON cert.id = jc.certifications_id
-JOIN job_details jd ON jc.job_details_id = jd.id
+FROM job_details jd
+JOIN job_details_certifications jc ON jd.id = jc.job_details_id
+JOIN certifications cert ON jc.certifications_id = cert.id
 WHERE jd.max_salary IS NOT NULL
 GROUP BY cert.name
 HAVING job_count >= 2
@@ -284,11 +284,10 @@ LIMIT 20`,
             description: 'Most common benefits in your target positions',
             sql: `SELECT 
     b.description as benefit,
-    COUNT(DISTINCT jd.id) as job_count,
-    ROUND(COUNT(DISTINCT jd.id) * 100.0 / (SELECT COUNT(*) FROM job_details), 2) as percentage
-FROM benefits b
-JOIN job_details_benefits jb ON b.id = jb.benefits_id
-JOIN job_details jd ON jb.job_details_id = jd.id
+    COUNT(*) as job_count
+FROM job_details jd
+JOIN job_details_benefits jb ON jd.id = jb.job_details_id
+JOIN benefits b ON jb.benefits_id = b.id
 GROUP BY b.description
 HAVING job_count >= 2
 ORDER BY job_count DESC
