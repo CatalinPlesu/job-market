@@ -94,9 +94,14 @@ const CustomAnalysisState = {
                 
                 if (filterConditions.length > 0) {
                     // Find the main job_details reference in the SQL
-                    // Look for patterns like "FROM job_details" or "JOIN job_details"
-                    const jdAliasMatch = sql.match(/(?:FROM|JOIN)\s+job_details(?:\s+AS)?\s+(\w+)/i);
-                    const jdAlias = jdAliasMatch ? jdAliasMatch[1] : 'jd';
+                    // Look for patterns like "FROM job_details" or "FROM job_details jd" or "FROM job_details AS jd"
+                    const jdAliasMatch = sql.match(/(?:FROM|JOIN)\s+job_details(?:\s+(?:AS\s+)?(\w+))?/i);
+                    let jdAlias = 'job_details'; // Default to full table name
+                    
+                    if (jdAliasMatch && jdAliasMatch[1]) {
+                        // An alias was found
+                        jdAlias = jdAliasMatch[1];
+                    }
                     
                     // Build JOIN statements for needed tables
                     const joinStatements = [];
@@ -111,11 +116,14 @@ const CustomAnalysisState = {
                     
                     // Insert JOINs after the job_details table reference
                     if (joinStatements.length > 0) {
-                        // Find position to insert JOINs (after job_details FROM/JOIN)
-                        const fromMatch = sql.match(/(FROM\s+job_details(?:\s+AS)?\s+\w+)/i);
+                        // Find position to insert JOINs (after job_details FROM/JOIN with or without alias)
+                        const fromMatch = sql.match(/(FROM\s+job_details(?:\s+(?:AS\s+)?\w+)?)/i);
                         if (fromMatch) {
                             const insertPos = fromMatch.index + fromMatch[0].length;
                             finalSQL = sql.slice(0, insertPos) + '\n' + joinStatements.join('\n') + '\n' + sql.slice(insertPos);
+                        } else {
+                            // Fallback: If we can't find the position, log error but continue
+                            console.error('Could not find position to insert JOINs in SQL:', sql);
                         }
                     }
                     
