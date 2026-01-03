@@ -19,7 +19,7 @@ data.db*
 databases/
 
 # Generated JSON API files
-/pages/
+pages/
 
 # State files
 state.json
@@ -36,6 +36,6 @@ test_*.py
 *_test.py
 
 # Generated analysis JSON files
-/analysis_output/
+pages/
 # Exclude generated analysis files from frontend/api
 /frontend/api/*.json
