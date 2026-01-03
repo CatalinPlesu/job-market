@@ -3,23 +3,25 @@
 // For GitHub Pages: /repo-name/api
 // For localhost: /api
 function getApiBase() {
-    const path = window.location.pathname;
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
     
-    // Check if we're on GitHub Pages (path starts with a repo name)
-    // GitHub Pages URLs look like: /Repository-Name/...
-    const pathParts = path.split('/').filter(part => part.length > 0);
+    // Check if we're on GitHub Pages by examining the hostname
+    const isGitHubPages = hostname.endsWith('.github.io') || hostname.includes('githubusercontent.com');
     
-    // If the first part of the path is not a file (doesn't have an extension)
-    // and we're not at root, assume it's the GitHub Pages repo name
-    if (pathParts.length > 0 && !pathParts[0].includes('.')) {
-        const potentialRepoName = pathParts[0];
-        // If it looks like a repo name (contains hyphens or capital letters, typical of repo names)
-        if (potentialRepoName.includes('-') || /[A-Z]/.test(potentialRepoName)) {
-            return `/${potentialRepoName}/api`;
+    if (isGitHubPages) {
+        // Extract repo name from pathname
+        // GitHub Pages URLs: username.github.io/repo-name/...
+        const pathParts = pathname.split('/').filter(part => part.length > 0);
+        
+        if (pathParts.length > 0) {
+            // First path segment is the repository name
+            const repoName = pathParts[0];
+            return `/${repoName}/api`;
         }
     }
     
-    // Default to /api for localhost and other scenarios
+    // Default to /api for localhost and other hosting
     return '/api';
 }
 
