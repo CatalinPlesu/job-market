@@ -2016,6 +2016,22 @@ const FilterPanel = {
                 ])
             ]),
             
+            // Analyze These Jobs Button (if filters active)
+            hasActiveFilters(state.filters) && m('div', { class: 'mb-4' }, [
+                m('button', {
+                    class: 'btn btn-sm btn-secondary w-full gap-2',
+                    onclick: () => {
+                        // Navigate to analysis page with current filters
+                        m.route.set('/analysis', { filters: JSON.stringify(state.filters) });
+                    }
+                }, [
+                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', class: 'h-4 w-4', fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor' }, [
+                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' })
+                    ]),
+                    'Analyze These Jobs'
+                ])
+            ]),
+            
             m('div', { class: 'divider' }),
             
             // Items Per Page Selector
@@ -4642,7 +4658,18 @@ m.route(document.getElementById('app'), '/', {
         render: (vnode) => m(Layout, m(JobDetailPage, { id: vnode.attrs.id }))
     },
     '/analysis': {
-        render: () => m(Layout, m(AnalysisPage))
+        render: (vnode) => {
+            // Parse filters from URL if present
+            let filters = null;
+            if (vnode.attrs.filters) {
+                try {
+                    filters = JSON.parse(vnode.attrs.filters);
+                } catch (e) {
+                    console.error('Failed to parse filters:', e);
+                }
+            }
+            return m(Layout, m(AnalysisPage, { filters }));
+        }
     },
     '/analysis/:id': {
         render: (vnode) => m(Layout, m(AnalysisDetailPage, { id: vnode.attrs.id }))

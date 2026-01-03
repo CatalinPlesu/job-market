@@ -1,5 +1,5 @@
 const AnalysisPage = {
-    oninit: () => {
+    oninit: (vnode) => {
         // Load saved queries from localStorage
         CustomAnalysisState.loadSavedQueries();
         
@@ -7,6 +7,13 @@ const AnalysisPage = {
         DatabaseManager.init().catch(err => {
             console.error('Failed to initialize database:', err);
         });
+        
+        // Check if filters were passed from jobs page
+        const jobFilters = vnode.attrs.filters;
+        if (jobFilters && Object.keys(jobFilters).length > 0) {
+            CustomAnalysisState.jobPageFilters = jobFilters;
+            console.log('Received filters from jobs page:', jobFilters);
+        }
     },
     
     renderChart: (vnode, data, chartType, customConfig = null, labelColumn = null, valueColumns = []) => {
@@ -276,6 +283,46 @@ const AnalysisPage = {
             
             // Main Content Area (independently scrollable)
             m('div', { class: 'flex-1 overflow-y-auto' }, [
+                // Show filter injection notice if filters are active
+                CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0 &&
+                    m('div', { class: 'alert alert-info mb-6' }, [
+                        m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                            m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+                        ]),
+                        m('div', [
+                            m('div', { class: 'font-bold' }, 'Analyzing Filtered Jobs'),
+                            m('div', { class: 'text-sm' }, `Queries will analyze only jobs matching your filters from the jobs page.`),
+                            m('button', {
+                                class: 'btn btn-xs btn-ghost mt-2',
+                                onclick: () => {
+                                    CustomAnalysisState.jobPageFilters = null;
+                                    m.redraw();
+                                }
+                            }, 'Clear Filters')
+                        ])
+                    ]),
+                
+                // Interactive filters for predefined analyses
+                CustomAnalysisState.currentQuery.sql && 
+                    m(AnalysisFilters, {
+                        sql: CustomAnalysisState.currentQuery.sql,
+                        onFilterChange: (modifiedSQL, filters) => {
+                            CustomAnalysisState.currentQuery.sql = modifiedSQL;
+                            CustomAnalysisState.executeQuery(modifiedSQL);
+                        }
+                    }),
+                
+                // Code viewer - shows how query is executed and chart is created
+                CustomAnalysisState.queryResult && CustomAnalysisState.queryResult.success &&
+                    m(CodeViewer, {
+                        sql: CustomAnalysisState.currentQuery.sql,
+                        data: CustomAnalysisState.queryResult.data,
+                        chartType: CustomAnalysisState.currentQuery.chartType,
+                        labelColumn: CustomAnalysisState.currentQuery.labelColumn,
+                        valueColumns: CustomAnalysisState.currentQuery.valueColumns,
+                        filters: CustomAnalysisState.jobPageFilters
+                    }),
+                
                 // Query Results (Plot First!)
                 CustomAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
                     m('div', { class: 'card-body' }, [
@@ -361,72 +408,80 @@ const AnalysisPage = {
                 
                 // Database Help Section (Collapsible)
                 m('details', { class: 'collapse collapse-arrow bg-base-200 mb-6' }, [
-                    m('summary', { class: 'collapse-title font-bold text-lg' }, '📖 Database Structure & Query Help'),
+                    m('summary', { class: 'collapse-title font-bold text-lg' }, '📖 Complete Database Schema'),
                     m('div', { class: 'collapse-content' }, [
-                m('div', { class: 'prose max-w-none' }, [
-                    m('h3', 'Main Tables'),
-                    m('ul', [
-                        m('li', [
-                            m('strong', 'job_details'), ' - Main job postings table',
-                            m('ul', [
-                                m('li', 'Columns: id, posting_date, job_title, company_name, job_description, job_url, site'),
-                                m('li', 'Salary: min_salary, max_salary, salary_currency_id, salary_period_id'),
-                                m('li', 'Experience: experience_years'),
-                                m('li', 'Foreign keys to lookup tables (see below)')
-                            ])
-                        ]),
-                        m('li', [
-                            m('strong', 'Lookup Tables'), ' - Normalized reference data',
-                            m('ul', [
-                                m('li', 'titles, companies, cities, regions, countries'),
-                                m('li', 'job_functions, seniority_levels, industries, departments'),
-                                m('li', 'employment_types, contract_types, work_schedules'),
-                                m('li', 'remote_work_options, company_sizes, education_levels')
-                            ])
-                        ]),
-                        m('li', [
-                            m('strong', 'Skills & Benefits'), ' - Many-to-many relationships',
-                            m('ul', [
-                                m('li', 'hard_skills, soft_skills → job_details_hard_skills, job_details_soft_skills'),
-                                m('li', 'benefits → job_details_benefits'),
-                                m('li', 'certifications, licenses → job_details_certifications, job_details_licenses')
+                        m('div', { class: 'prose max-w-none' }, [
+                            m('div', { class: 'flex justify-between items-center mb-4' }, [
+                                m('h3', 'Database Structure'),
+                                m('button', {
+                                    class: 'btn btn-sm btn-outline',
+                                    onclick: () => {
+                                        navigator.clipboard.writeText(DatabaseSchema.getSchemaDocumentation());
+                                        const btn = event.target;
+                                        const originalText = btn.textContent;
+                                        btn.textContent = '✓ Copied!';
+                                        setTimeout(() => { btn.textContent = originalText; }, 2000);
+                                    }
+                                }, '📋 Copy Complete Schema')
+                            ]),
+                            
+                            // Main table info
+                            m('h4', 'Main Table: job_details'),
+                            m('p', DatabaseSchema.mainTable.description),
+                            m('details', { class: 'mb-4' }, [
+                                m('summary', { class: 'cursor-pointer font-semibold' }, 'View All Columns'),
+                                m('ul', { class: 'text-sm' },
+                                    DatabaseSchema.mainTable.columns.map(col =>
+                                        m('li', [
+                                            m('code', col.name),
+                                            ` (${col.type}): ${col.description}`,
+                                            col.indexed ? m('span', { class: 'badge badge-xs badge-info ml-2' }, 'INDEXED') : null
+                                        ])
+                                    )
+                                )
+                            ]),
+                            
+                            // Lookup tables
+                            m('h4', 'Lookup Tables (Many-to-One)'),
+                            m('p', 'Join these tables to get readable names for IDs:'),
+                            m('div', { class: 'grid grid-cols-2 gap-2 text-sm' },
+                                DatabaseSchema.lookupTables.map(table =>
+                                    m('div', { class: 'badge badge-outline' }, table.name)
+                                )
+                            ),
+                            
+                            // Many-to-many tables
+                            m('h4', 'Many-to-Many Tables'),
+                            m('p', 'Tables with many-to-many relationships (use COUNT(DISTINCT jd.id)):'),
+                            m('div', { class: 'grid grid-cols-2 gap-2 text-sm' },
+                                DatabaseSchema.manyToManyTables.map(table =>
+                                    m('div', { class: 'badge badge-secondary badge-outline' }, table.name)
+                                )
+                            ),
+                            
+                            // Example patterns
+                            m('h4', 'Common Query Patterns'),
+                            m('details', [
+                                m('summary', { class: 'cursor-pointer font-semibold' }, 'Basic Count'),
+                                m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, 
+                                    DatabaseSchema.exampleQueries.basicCount
+                                )
+                            ]),
+                            m('details', [
+                                m('summary', { class: 'cursor-pointer font-semibold' }, 'Salary Analysis'),
+                                m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, 
+                                    DatabaseSchema.exampleQueries.salaryAnalysis
+                                )
+                            ]),
+                            m('details', [
+                                m('summary', { class: 'cursor-pointer font-semibold' }, 'Skills Analysis (Many-to-Many)'),
+                                m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, 
+                                    DatabaseSchema.exampleQueries.skillsAnalysis
+                                )
                             ])
                         ])
-                    ]),
-                    m('h3', 'Example Query Patterns'),
-                    m('pre', { class: 'bg-base-300 p-4 rounded text-xs overflow-x-auto' }, `-- Count jobs by city
-SELECT c.name, COUNT(*) as count
-FROM job_details jd
-JOIN cities c ON jd.city_id = c.id
-GROUP BY c.name
-ORDER BY count DESC
-
--- Average salary by seniority
-SELECT sl.name, AVG(jd.min_salary) as avg_salary
-FROM job_details jd
-JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
-WHERE jd.min_salary IS NOT NULL
-GROUP BY sl.name
-
--- Top skills with job counts
-SELECT hs.name, COUNT(DISTINCT jd.id) as jobs
-FROM hard_skills hs
-JOIN job_details_hard_skills jhs ON hs.id = jhs.hard_skills_id
-JOIN job_details jd ON jhs.job_details_id = jd.id
-GROUP BY hs.name
-ORDER BY jobs DESC
-LIMIT 20`),
-                    m('h3', 'Tips'),
-                    m('ul', [
-                        m('li', 'Always use JOINs to get readable names from lookup tables'),
-                        m('li', 'Use COUNT(DISTINCT jd.id) when joining many-to-many tables to avoid duplicates'),
-                        m('li', 'Filter NULL values for salary/experience analysis'),
-                        m('li', 'Use CASE statements to create salary ranges or experience buckets'),
-                        m('li', 'LIMIT results for better chart readability (usually 10-20 items)')
                     ])
-                ])
-            ])
-        ]),
+                ]),
                 
                 // Custom Query Builder
                 m('div', { id: 'query-builder', class: 'card bg-base-100 shadow-xl mb-6' }, [
@@ -436,14 +491,33 @@ LIMIT 20`),
                     m('button', {
                         class: 'btn btn-sm btn-outline',
                         onclick: () => {
-                            navigator.clipboard.writeText(AI_PROMPT_TEMPLATE);
-                            // Show temporary success message
+                            // Generate enhanced AI prompt with full schema
+                            const enhancedPrompt = `I need help writing an SQL query for job market analysis.
+
+${DatabaseSchema.getSchemaDocumentation()}
+
+Please write a query that:
+[Describe what you want to analyze]
+
+Return:
+1. The SQL query
+2. Recommended chart type (bar, line, doughnut, pie, scatter, bubble, radar, polarArea, boxplot)
+3. Which columns to use for labels (X-axis) and values (Y-axis)
+
+Make sure to:
+- Use JOINs to get readable names from lookup tables
+- Use COUNT(DISTINCT jd.id) when joining many-to-many tables
+- Filter NULL values where appropriate
+- Use descriptive column aliases
+- LIMIT results for visualization (10-20 items usually)
+`;
+                            navigator.clipboard.writeText(enhancedPrompt);
                             const btn = event.target;
                             const originalText = btn.textContent;
                             btn.textContent = '✓ Copied!';
                             setTimeout(() => { btn.textContent = originalText; }, 2000);
                         }
-                    }, '📋 Copy AI Prompt')
+                    }, '📋 Copy Enhanced AI Prompt')
                 ]),
                 
                 // Query Name

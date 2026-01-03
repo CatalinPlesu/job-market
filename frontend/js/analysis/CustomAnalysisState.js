@@ -15,6 +15,7 @@ const CustomAnalysisState = {
     showHelp: false,
     showStatistics: true,  // Enable statistical computations
     selectedAnalysisName: null,  // Track selected analysis for visual highlighting
+    jobPageFilters: null,  // Filters passed from jobs page
     
     // Load saved queries from localStorage
     loadSavedQueries: () => {
@@ -57,7 +58,42 @@ const CustomAnalysisState = {
     executeQuery: async (sql) => {
         try {
             await DatabaseManager.init();
-            let results = DatabaseManager.queryObjects(sql);
+            
+            // Inject job page filters if present
+            let finalSQL = sql;
+            let params = [];
+            
+            if (CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0) {
+                // Build WHERE clause from job page filters
+                const { whereClause, params: filterParams } = dbApi.buildWhereClause(
+                    CustomAnalysisState.jobPageFilters, 
+                    ''
+                );
+                
+                if (whereClause) {
+                    // Inject the filter WHERE clause into the query
+                    // If query already has WHERE, combine with AND
+                    // If not, add WHERE before GROUP BY, ORDER BY, or LIMIT
+                    if (finalSQL.toLowerCase().includes('where')) {
+                        // Find the WHERE clause and add our filters
+                        finalSQL = finalSQL.replace(/WHERE/i, `WHERE ${whereClause.substring(6)} AND `);
+                    } else {
+                        // Insert WHERE clause before GROUP BY, ORDER BY, or LIMIT
+                        const insertPosition = finalSQL.search(/GROUP BY|ORDER BY|LIMIT/i);
+                        if (insertPosition > 0) {
+                            finalSQL = finalSQL.slice(0, insertPosition) + 
+                                      whereClause + '\n' + 
+                                      finalSQL.slice(insertPosition);
+                        } else {
+                            // Add at the end if no GROUP BY, ORDER BY, or LIMIT found
+                            finalSQL = finalSQL + '\n' + whereClause;
+                        }
+                    }
+                    params = filterParams;
+                }
+            }
+            
+            let results = DatabaseManager.queryObjects(finalSQL, params);
             
             // Apply data adapter if provided
             if (CustomAnalysisState.currentQuery.dataAdapter) {
