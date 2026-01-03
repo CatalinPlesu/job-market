@@ -209,7 +209,7 @@ class FrontendGitOperations:
             cmd = ["git", "push"]
             if force:
                 cmd.append("--force")
-            cmd.extend([remote_name, branch])
+            cmd.extend(["-u", remote_name, branch])  # Add -u to set upstream
             
             subprocess.run(
                 cmd,
