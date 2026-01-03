@@ -59,11 +59,13 @@ const CustomAnalysisState = {
         try {
             await DatabaseManager.init();
             
-            // Inject job page filters if present
+            // Inject job page filters if present AND if current query allows it
             let finalSQL = sql;
             let params = [];
             
-            if (CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0) {
+            const shouldApplyFilters = CustomAnalysisState.currentQuery.applyFilters !== false;
+            
+            if (shouldApplyFilters && CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0) {
                 // Build WHERE clause from job page filters
                 const { whereClause, params: filterParams } = dbApi.buildWhereClause(
                     CustomAnalysisState.jobPageFilters, 

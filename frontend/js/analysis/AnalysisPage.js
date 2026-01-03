@@ -207,13 +207,56 @@ const AnalysisPage = {
         m('div', { class: 'flex flex-col lg:flex-row gap-6', style: 'height: calc(100vh - 12rem);' }, [
             // Left Sidebar - Predefined & Saved Analyses (independently scrollable)
             m('div', { class: 'lg:w-80 flex-shrink-0 flex flex-col overflow-y-auto' }, [
-                // Predefined Analyses (Expanded, Scrollable)
-                m('div', { class: 'card bg-base-100 shadow-xl flex-1 flex flex-col' }, [
-                    m('div', { class: 'card-body p-4 flex flex-col flex-1 min-h-0' }, [
-                        m('h2', { class: 'card-title text-lg mb-2' }, 'Predefined Analyses'),
-                        m('div', { class: 'overflow-y-auto flex-1' }, [
+                // General Market Trends
+                m('div', { class: 'card bg-base-100 shadow-xl mb-4' }, [
+                    m('div', { class: 'card-body p-4' }, [
+                        m('h2', { class: 'card-title text-lg mb-2' }, [
+                            m('span', '📊'),
+                            'General Market Trends'
+                        ]),
+                        m('div', { class: 'text-xs opacity-70 mb-2' }, 'Overall job market insights'),
+                        m('div', { class: 'overflow-y-auto max-h-64' }, [
                             m('div', { class: 'space-y-1' },
-                                PredefinedAnalyses.map(analysis => 
+                                PredefinedAnalyses.generalTrends.map(analysis => 
+                                    m('div', { 
+                                        class: `p-2 hover:bg-base-200 rounded cursor-pointer ${
+                                            CustomAnalysisState.selectedAnalysisName === analysis.name 
+                                                ? 'bg-primary text-primary-content' 
+                                                : ''
+                                        }`,
+                                        onclick: () => {
+                                            CustomAnalysisState.currentQuery = { ...analysis };
+                                            CustomAnalysisState.selectedAnalysisName = analysis.name;
+                                            // Clear filters for general trends
+                                            const tempFilters = CustomAnalysisState.jobPageFilters;
+                                            CustomAnalysisState.jobPageFilters = null;
+                                            CustomAnalysisState.executeQuery(analysis.sql);
+                                            // Restore filters after execution for personal interest queries
+                                            setTimeout(() => {
+                                                CustomAnalysisState.jobPageFilters = tempFilters;
+                                            }, 100);
+                                        }
+                                    }, [
+                                        m('div', { class: 'font-medium text-sm' }, analysis.name),
+                                        m('div', { class: 'text-xs opacity-70 mt-1' }, analysis.description)
+                                    ])
+                                )
+                            )
+                        ])
+                    ])
+                ]),
+                
+                // Personal Interest Analyses
+                m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                    m('div', { class: 'card-body p-4' }, [
+                        m('h2', { class: 'card-title text-lg mb-2' }, [
+                            m('span', '🎯'),
+                            'Personal Interest'
+                        ]),
+                        m('div', { class: 'text-xs opacity-70 mb-2' }, 'Filtered to your career goals'),
+                        m('div', { class: 'overflow-y-auto max-h-96' }, [
+                            m('div', { class: 'space-y-1' },
+                                PredefinedAnalyses.personalInterest.map(analysis => 
                                     m('div', { 
                                         class: `p-2 hover:bg-base-200 rounded cursor-pointer ${
                                             CustomAnalysisState.selectedAnalysisName === analysis.name 
@@ -227,10 +270,7 @@ const AnalysisPage = {
                                         }
                                     }, [
                                         m('div', { class: 'font-medium text-sm' }, analysis.name),
-                                        m('div', { class: 'flex gap-1 mt-1' }, [
-                                            m('span', { class: 'badge badge-outline badge-xs' }, analysis.chartType),
-                                            m('span', { class: 'badge badge-secondary badge-xs' }, analysis.category)
-                                        ])
+                                        m('div', { class: 'text-xs opacity-70 mt-1' }, analysis.description)
                                     ])
                                 )
                             )
@@ -239,10 +279,10 @@ const AnalysisPage = {
                 ]),
                 
                 // Saved Queries
-                CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl mt-6' }, [
+                CustomAnalysisState.savedQueries.length > 0 && m('div', { class: 'card bg-base-100 shadow-xl mt-4' }, [
                     m('div', { class: 'card-body p-4' }, [
                         m('h2', { class: 'card-title text-lg mb-2' }, 'Saved Queries'),
-                        m('div', { class: 'overflow-y-auto max-h-96' }, [
+                        m('div', { class: 'overflow-y-auto max-h-64' }, [
                             m('div', { class: 'space-y-1' },
                                 CustomAnalysisState.savedQueries.map(query => 
                                     m('div', { 
@@ -283,22 +323,27 @@ const AnalysisPage = {
             
             // Main Content Area (independently scrollable)
             m('div', { class: 'flex-1 overflow-y-auto' }, [
-                // Show filter injection notice if filters are active
+                // Personal Interest Filters (shown when no job page filters)
+                !CustomAnalysisState.jobPageFilters || Object.keys(CustomAnalysisState.jobPageFilters).length === 0 ?
+                    m(PersonalInterestFilters) : null,
+                
+                // Show filter injection notice if filters are active from jobs page
                 CustomAnalysisState.jobPageFilters && Object.keys(CustomAnalysisState.jobPageFilters).length > 0 &&
                     m('div', { class: 'alert alert-info mb-6' }, [
                         m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
                             m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
                         ]),
                         m('div', [
-                            m('div', { class: 'font-bold' }, 'Analyzing Filtered Jobs'),
-                            m('div', { class: 'text-sm' }, `Queries will analyze only jobs matching your filters from the jobs page.`),
+                            m('div', { class: 'font-bold' }, 'Analyzing Jobs from Jobs Page'),
+                            m('div', { class: 'text-sm' }, `Personal interest analyses will use filters from the jobs page.`),
                             m('button', {
                                 class: 'btn btn-xs btn-ghost mt-2',
                                 onclick: () => {
                                     CustomAnalysisState.jobPageFilters = null;
+                                    PersonalInterestFilters.state.activeFilters = {};
                                     m.redraw();
                                 }
-                            }, 'Clear Filters')
+                            }, 'Clear & Use Manual Filters')
                         ])
                     ]),
                 
