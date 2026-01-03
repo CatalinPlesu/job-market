@@ -90,22 +90,9 @@ const AnalysisFilters = {
         let modifiedSQL = sql;
         const addedConditions = [];
         
-        // Validate and sanitize numeric inputs
-        const sanitizeNumber = (value) => {
-            const num = Number(value);
-            return (!isNaN(num) && isFinite(num) && num >= 0) ? Math.floor(num) : null;
-        };
-        
-        // Validate and sanitize string inputs for SQL
-        const sanitizeString = (value) => {
-            if (typeof value !== 'string') return null;
-            // Only allow alphanumeric, space, dash, underscore
-            return value.replace(/[^a-zA-Z0-9\s\-_]/g, '');
-        };
-        
         // Apply time range filter
         if (filters.timeRange !== undefined && filters.timeRange !== null) {
-            const daysAgo = sanitizeNumber(filters.timeRange);
+            const daysAgo = SQLUtils.sanitizeNumber(filters.timeRange);
             if (daysAgo !== null) {
                 const timeCondition = `posting_date >= date('now', '-${daysAgo} days')`;
                 addedConditions.push(timeCondition);
@@ -114,7 +101,7 @@ const AnalysisFilters = {
         
         // Apply salary filter
         if (filters.minSalary !== undefined && filters.minSalary !== null) {
-            const minSalary = sanitizeNumber(filters.minSalary);
+            const minSalary = SQLUtils.sanitizeNumber(filters.minSalary);
             if (minSalary !== null) {
                 const salaryCondition = `min_salary >= ${minSalary}`;
                 addedConditions.push(salaryCondition);
@@ -123,7 +110,7 @@ const AnalysisFilters = {
         
         // Apply result limit filter (modify existing LIMIT)
         if (filters.limit !== undefined && filters.limit !== null) {
-            const limit = sanitizeNumber(filters.limit);
+            const limit = SQLUtils.sanitizeNumber(filters.limit);
             if (limit !== null && limit > 0) {
                 modifiedSQL = modifiedSQL.replace(/LIMIT\s+\d+/i, `LIMIT ${limit}`);
             }
@@ -132,8 +119,8 @@ const AnalysisFilters = {
         // Apply seniority level filter (safe enum values only)
         if (filters.seniorityLevel !== undefined && filters.seniorityLevel !== null) {
             const validLevels = ['entry', 'junior', 'mid', 'senior', 'lead', 'manager', 'director', 'executive'];
-            const level = String(filters.seniorityLevel).toLowerCase();
-            if (validLevels.includes(level)) {
+            const level = SQLUtils.validateEnum(filters.seniorityLevel, validLevels);
+            if (level) {
                 const seniorityCondition = `sl.name = '${level}'`;
                 addedConditions.push(seniorityCondition);
             }
@@ -142,8 +129,8 @@ const AnalysisFilters = {
         // Apply remote work filter (safe enum values only)
         if (filters.remoteWork !== undefined && filters.remoteWork !== null) {
             const validOptions = ['remote', 'hybrid', 'on-site'];
-            const option = String(filters.remoteWork).toLowerCase();
-            if (validOptions.includes(option)) {
+            const option = SQLUtils.validateEnum(filters.remoteWork, validOptions);
+            if (option) {
                 const remoteCondition = `rw.name = '${option}'`;
                 addedConditions.push(remoteCondition);
             }
@@ -152,22 +139,7 @@ const AnalysisFilters = {
         // Inject all conditions into SQL if any were added
         if (addedConditions.length > 0) {
             const combinedConditions = addedConditions.join(' AND ');
-            
-            if (modifiedSQL.toLowerCase().includes('where')) {
-                // Find the WHERE keyword and add our conditions
-                modifiedSQL = modifiedSQL.replace(/WHERE/i, `WHERE ${combinedConditions} AND `);
-            } else {
-                // Insert WHERE clause before GROUP BY, ORDER BY, or LIMIT
-                const insertPosition = modifiedSQL.search(/GROUP BY|ORDER BY|LIMIT/i);
-                if (insertPosition > 0) {
-                    modifiedSQL = modifiedSQL.slice(0, insertPosition) + 
-                                  `WHERE ${combinedConditions}\n` + 
-                                  modifiedSQL.slice(insertPosition);
-                } else {
-                    // Add at the end if no GROUP BY, ORDER BY, or LIMIT found
-                    modifiedSQL = modifiedSQL.trim() + `\nWHERE ${combinedConditions}`;
-                }
-            }
+            modifiedSQL = SQLUtils.injectWhereConditions(modifiedSQL, combinedConditions);
         }
         
         return modifiedSQL;
