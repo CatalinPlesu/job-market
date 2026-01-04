@@ -46,7 +46,7 @@ class Config:
     
     # Stage 1 Efficiency Settings
     # Stop scraping when this many consecutive jobs already exist in database
-    stage1_consecutive_known_threshold = 30  # consecutive known jobs
+    stage1_consecutive_known_threshold = 150
     
     # Frontend Git Operations Settings
     # Remote URL for the frontend git repository (e.g., GitHub Pages repo)
