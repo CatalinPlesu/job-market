@@ -78,13 +78,13 @@ class FrontendGitOperations:
                 check=True
             )
             
-            # Create .gitattributes file to track .db files with LFS
+            # Create .gitattributes file to track .db files in public folder with LFS
             gitattributes_path = self.frontend_dir / ".gitattributes"
-            gitattributes_content = "# Track database files with Git LFS\napi/*.db filter=lfs diff=lfs merge=lfs -text\n"
+            gitattributes_content = "# Track database files with Git LFS\npublic/*.db filter=lfs diff=lfs merge=lfs -text\n"
             
             gitattributes_path.write_text(gitattributes_content)
             
-            return True, "Git LFS configured for .db files"
+            return True, "Git LFS configured for .db files in public folder"
         
         except subprocess.CalledProcessError as e:
             error_msg = f"Failed to set up Git LFS: {getattr(e, 'stderr', str(e))}"
@@ -94,12 +94,11 @@ class FrontendGitOperations:
             error_msg = f"Failed to set up Git LFS: {e}"
             self.logger.error(error_msg)
             return False, error_msg
-            return False, error_msg
     
     def init_repo(self, force: bool = False) -> Tuple[bool, str]:
         """
         Initialize a git repository in the frontend directory.
-        Note: Git LFS is NOT set up because GitHub Pages needs to serve the actual files.
+        Sets up Git LFS for database files in the public folder.
         
         Args:
             force: If True, removes existing .git directory first
@@ -121,10 +120,14 @@ class FrontendGitOperations:
                 check=True
             )
             
-            # Note: We do NOT set up Git LFS because GitHub Pages can't serve LFS files
-            # The database files need to be committed directly so they can be served by GitHub Pages
+            # Set up Git LFS for database files (required for files >100MB)
+            lfs_success, lfs_msg = self.setup_git_lfs()
+            if not lfs_success:
+                # Log warning but don't fail - LFS is optional for small files
+                self.logger.error(f"Git LFS setup failed: {lfs_msg}")
+                return True, f"Git repository initialized (warning: {lfs_msg})"
             
-            return True, "Git repository initialized"
+            return True, "Git repository initialized with LFS support"
         
         except subprocess.CalledProcessError as e:
             error_msg = f"Failed to initialize git repo: {getattr(e, 'stderr', str(e))}"

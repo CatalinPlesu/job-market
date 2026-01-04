@@ -1,6 +1,6 @@
-/frontend/api/*
-!frontend/api/.gitkeep
-!frontend/api/README.md
+/frontend/public/*
+!frontend/public/.gitkeep
+!frontend/public/README.md
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -35,8 +35,3 @@ scheduler_state_*.json
 # Test files
 test_*.py
 *_test.py
-
-# Generated analysis JSON files
-pages/
-# Exclude generated analysis files from frontend/api
-/frontend/api/*.json

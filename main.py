@@ -73,7 +73,7 @@ class StructureDataItem:
 
 class CopyDatabaseItem:
     def get_item_description(self):
-        return "Copy Database Files to Frontend API"
+        return "Copy Database Files to Frontend"
     
     def execute(self):
         from src.frontend_operations import copy_databases_to_frontend
@@ -81,7 +81,7 @@ class CopyDatabaseItem:
         print("\n" + "="*80)
         print("DATABASE COPY")
         print("="*80)
-        print("\nThis will copy both database files to frontend/api:")
+        print("\nThis will copy both database files to frontend/public:")
         print("  • scrape.db (raw scraped data)")
         print("  • data.db (processed data)")
         print()
@@ -200,8 +200,8 @@ class PushFrontendItem:
         print("PUSH FRONTEND TO GIT")
         print("="*80)
         print("\nThis will:")
-        print("  1. Copy database files to frontend/api")
-        print("  2. Initialize/update git repository in frontend")
+        print("  1. Copy database files to frontend/public")
+        print("  2. Initialize/update git repository in frontend with Git LFS")
         print("  3. Commit and push changes to remote")
         print()
         
@@ -256,7 +256,7 @@ class GitCommitPushFrontendItem:
         print("GIT COMMIT & PUSH FRONTEND")
         print("="*80)
         print("\nThis will:")
-        print("  1. Initialize/update git repository in frontend")
+        print("  1. Initialize/update git repository in frontend with Git LFS")
         print("  2. Commit ALL changes in frontend directory")
         print("  3. Push to remote")
         print()

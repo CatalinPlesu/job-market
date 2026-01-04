@@ -40,12 +40,12 @@ def _copy_db(source, destination):
     print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
 
 
-def copy_databases_to_frontend(dest_dir: str = "frontend/api") -> bool:
+def copy_databases_to_frontend(dest_dir: str = "frontend/public") -> bool:
     """
-    Copy both database files to the frontend/api directory.
+    Copy both database files to the frontend/public directory.
     
     Args:
-        dest_dir: Destination directory path (default: frontend/api)
+        dest_dir: Destination directory path (default: frontend/public)
     
     Returns:
         True if successful, False otherwise
@@ -104,7 +104,7 @@ def copy_databases_and_push(remote_url: str = None) -> bool:
         return False
     
     # Step 1: Copy databases
-    print("Step 1: Copying databases to frontend/api...")
+    print("Step 1: Copying databases to frontend/public...")
     if not copy_databases_to_frontend():
         return False
     
