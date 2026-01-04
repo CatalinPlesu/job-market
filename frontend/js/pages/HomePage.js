@@ -108,7 +108,7 @@ const HomePage = {
                                 ])
                             ]),
                             m('div', { class: 'text-sm opacity-70 max-w-xs' }, [
-                                'Easily modify analyses with your own AI chat tools to create custom insights'
+                                'Copy prompts to use with your own AI chat app (ChatGPT, Claude, etc.) for custom analysis'
                             ])
                         ])
                     ])
