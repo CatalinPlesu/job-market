@@ -48,7 +48,7 @@ const HomePage = {
             m('div', { class: 'hero min-h-[50vh] bg-base-200 rounded-lg mb-8' }, [
                 m('div', { class: 'hero-content text-center' }, [
                     m('div', { class: 'max-w-md' }, [
-                        m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
+                        m('h1', { class: 'text-5xl font-bold' }, 'Aggregated Job Listings'),
                         m('p', { class: 'py-6' }, 'Browse thousands of job opportunities across Moldova. Filter by location, salary, skills, and more.'),
                         state.jobsIndex ? 
                             m('a', { 
@@ -71,7 +71,7 @@ const HomePage = {
             m('div', { class: 'hero min-h-[40vh] bg-base-300 rounded-lg' }, [
                 m('div', { class: 'hero-content text-center' }, [
                     m('div', { class: 'max-w-2xl' }, [
-                        m('h2', { class: 'text-4xl font-bold mb-4' }, 'Market Analysis & Insights'),
+                        m('h2', { class: 'text-4xl font-bold mb-4' }, 'Market Trends Analysis'),
                         m('p', { class: 'py-4' }, 'Explore pre-made analyses to understand the job market trends, salary ranges, in-demand skills, and more.'),
                         m('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4 my-6' }, [
                             m('div', { class: 'stat bg-base-100 rounded-lg shadow' }, [
