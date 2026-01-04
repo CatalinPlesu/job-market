@@ -10,6 +10,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - 🌐 **Web Interface**: Interactive SPA for browsing jobs and analytics
 - 💾 **Database Copy**: Copy SQLite databases to frontend/api directory
 - 🔄 **Automation**: Scheduled scraping with intelligent optimization
+- 🚀 **Auto-Deploy**: Automatic git push to frontend repository (e.g., GitHub Pages) after daily scraping
 
 ## Quick Links
 
@@ -17,7 +18,47 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - [Deployment Guide](DEPLOYMENT.md) - Deploy to GitHub Pages, Netlify, etc.
 - [Analytics Specification](ANALYTICS_SPEC.md) - Planned analytics features
 
+## Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   # or with uv
+   uv pip install -e .
+   ```
+
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your settings
+   ```
+
+3. **Required configuration:**
+   - `ENDPOINT`: LLM API endpoint
+   - `LLM_API_KEY`: Your LLM API key
+   - `MODEL`: LLM model name
+   
+4. **Optional - Automated frontend deployment:**
+   - **Install Git LFS** (required for large database files):
+     - Ubuntu/Debian: `sudo apt-get install git-lfs`
+     - macOS: `brew install git-lfs`
+   - `FRONTEND_GIT_REMOTE_URL`: Your frontend git repository URL
+     - SSH format (recommended): `git@github.com:username/frontend-repo.git`
+     - HTTPS format: `https://github.com/username/frontend-repo.git`
+   - `FRONTEND_GIT_BRANCH`: Branch to push to (default: `main`)
+   - `FRONTEND_GIT_FRESH_APPROACH`: Use fresh repo approach (default: `true`)
+   - Database files in `frontend/public/` are automatically tracked with Git LFS
+
+5. **Run the application:**
+   ```bash
+   python main.py
+   ```
+
 ## Configuration Files
+
+**`.env`** - Environment variables (create from `.env.example`)
+- LLM API credentials (ENDPOINT, LLM_API_KEY, MODEL)
+- Frontend git operations (FRONTEND_GIT_REMOTE_URL, FRONTEND_GIT_BRANCH, FRONTEND_GIT_FRESH_APPROACH)
 
 **`config/settings.py`** - Hand-written user configuration
 - LLM API credentials (key, endpoint, model)
@@ -25,6 +66,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - Scraping settings (default delay, max parallel sites)
 - Job identification settings (resurrection threshold for treating reopened positions as new)
 - Stage 1 efficiency settings (consecutive known jobs threshold for early stopping)
+- Frontend git settings (remote URL, branch, fresh approach)
 - LLM prompts for data extraction
 
 **`config/scraper_rules.json`** - Hand-written per-site rules
@@ -58,6 +100,7 @@ Execute scraping stages on optimized schedules based on their speed:
   - Stage 2: Get job details for new listings
 - **Stage 3: Daily at 00:00** (slow - rechecks all alive jobs)
   - Stage 3: Re-check alive jobs to detect removed postings
+  - **After Stage 3**: Automatically copies databases to frontend/api and pushes to git (if configured)
 - Separate schedules optimize for each stage's performance characteristics
 - Database backup before each run (keeps last 3 days)
 - Error-only logging (weekly log files)
@@ -112,7 +155,19 @@ Copy both SQLite database files to frontend/api directory:
 - Useful for making databases accessible to the frontend
 - Shows file sizes during copy operation
 
-### 9. Database Rollback
+### 9. Push Frontend to Git (Copy DBs + Commit + Push)
+Copy databases to frontend and push to git repository (e.g., GitHub Pages):
+- Copies both databases to frontend/api directory
+- Initializes/updates git repository in frontend directory
+- Commits and pushes changes to remote repository
+- **Configuration required**: Set `FRONTEND_GIT_REMOTE_URL` in environment
+- **Two approaches**:
+  - **Fresh (default)**: Removes .git history and force pushes (keeps repo size small)
+  - **Incremental**: Preserves git history with regular commits
+- Interactive prompt for remote URL if not configured
+- **Automated deployment**: Stage 3 (daily at 00:00) automatically runs this after completion
+
+### 10. Database Rollback
 Restore databases from previous backups:
 - Select which database to restore (scrape.db or data.db)
 - View available backups with timestamps and sizes

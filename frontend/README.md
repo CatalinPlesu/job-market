@@ -78,6 +78,12 @@ The frontend is a static site that can be deployed to:
 
 Just copy the `frontend/` directory contents to your web server.
 
+**Note:** The API base path is automatically detected based on the deployment environment:
+- **Localhost**: Uses `/api` (e.g., `http://localhost:8000/api/data.db`)
+- **GitHub Pages**: Uses `/repo-name/api` (e.g., `https://username.github.io/Job-Market-Frontend/api/data.db`)
+
+The detection is handled automatically in `js/config.js` - no configuration needed!
+
 ## API Structure
 
 The SPA now uses SQLite databases loaded client-side for instant filtering and querying:

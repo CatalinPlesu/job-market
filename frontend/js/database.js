@@ -6,6 +6,34 @@ const DatabaseManager = {
     error: null,
     initPromise: null,
     
+    // Fetch LFS file using CORS proxy
+    // GitHub's raw endpoint blocks CORS, so we use a proxy to bypass this
+    async fetchLFSFile(owner, repo, branch, filePath, corsProxy) {
+        try {
+            console.log(`Fetching LFS file via CORS proxy: ${owner}/${repo}/${branch}/${filePath}`);
+            
+            // Original GitHub URL (without https://github.com/)
+            const githubPath = `${owner}/${repo}/raw/${branch}/${filePath}`;
+            
+            // Proxied URL pattern: https://proxy.catalinplesu.xyz/proxy/{githubPath}
+            const proxiedUrl = `${corsProxy}${githubPath}`;
+            console.log('Fetching from proxied URL:', proxiedUrl);
+            
+            const response = await fetch(proxiedUrl);
+            if (response.ok) {
+                const buffer = await response.arrayBuffer();
+                console.log(`LFS file downloaded via proxy: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+                return buffer;
+            }
+            
+            throw new Error(`Failed to fetch LFS file via proxy: ${response.status} ${response.statusText}`);
+            
+        } catch (error) {
+            console.error('LFS file fetch via proxy failed:', error);
+            throw error;
+        }
+    },
+    
     // Initialize SQL.js and load the database
     async init() {
         if (this.loaded) return this.db;
@@ -29,13 +57,31 @@ const DatabaseManager = {
                 
                 console.log('Loading database file...');
                 
-                // Load the database file
-                const response = await fetch(`${API_BASE}/data.db`);
-                if (!response.ok) {
-                    throw new Error(`Failed to load database: ${response.status} ${response.statusText}`);
+                let buffer;
+                
+                // Check if we need to use CORS proxy for LFS files
+                if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-proxy') {
+                    // Use CORS proxy to fetch LFS file from GitHub (bypasses CORS restrictions)
+                    buffer = await this.fetchLFSFile(
+                        API_BASE.owner,
+                        API_BASE.repo,
+                        API_BASE.branch,
+                        API_BASE.filePath,
+                        API_BASE.corsProxy
+                    );
+                } else {
+                    // Regular fetch for localhost or non-LFS files
+                    const dbUrl = `${API_BASE}/data.db`;
+                    console.log('Database URL:', dbUrl);
+                    
+                    const response = await fetch(dbUrl);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load database: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    buffer = await response.arrayBuffer();
                 }
                 
-                const buffer = await response.arrayBuffer();
                 console.log(`Database loaded: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
                 
                 // Create database instance

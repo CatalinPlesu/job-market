@@ -73,75 +73,22 @@ class StructureDataItem:
 
 class CopyDatabaseItem:
     def get_item_description(self):
-        return "Copy Database Files to Frontend API"
+        return "Copy Database Files to Frontend"
     
     def execute(self):
+        from src.frontend_operations import copy_databases_to_frontend
+        
         print("\n" + "="*80)
         print("DATABASE COPY")
         print("="*80)
-        print("\nThis will copy both database files to frontend/api:")
+        print("\nThis will copy both database files to frontend/public:")
         print("  • scrape.db (raw scraped data)")
         print("  • data.db (processed data)")
         print()
         
-        # Fixed destination directory
-        dest_dir = "frontend/api"
-        dest_path = Path(dest_dir)
-        
-        # Create destination directory if it doesn't exist
-        try:
-            dest_path.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            print(f"\n✗ Error creating destination directory: {e}")
-            return True
-        
-        print(f"Copying databases to {dest_dir}...")
-        print()
-        
-        # Copy both databases
-        try:
-            self._copy_db(Config.scrape_db_path, dest_path / "scrape.db")
-            self._copy_db(Config.data_db_path, dest_path / "data.db")
-            
-            print()
-            print(f"✓ Database files copied successfully to {dest_path}/")
-            print(f"  - {dest_path}/scrape.db")
-            print(f"  - {dest_path}/data.db")
-        
-        except Exception as e:
-            print(f"\n✗ Error: {e}")
-            import traceback
-            traceback.print_exc()
-        
+        # Use shared function from frontend_operations
+        copy_databases_to_frontend()
         return True
-    
-    def _copy_db(self, source, destination):
-        """Helper method to copy a database file.
-        
-        Args:
-            source (str/Path): Path to source database file
-            destination (str/Path): Path to destination file
-            
-        Raises:
-            FileNotFoundError: If source file doesn't exist
-            OSError: If copy operation fails
-        """
-        source_path = Path(source)
-        
-        if not source_path.exists():
-            raise FileNotFoundError(f"Database file not found: {source_path}")
-        
-        print(f"Copying {source_path.name}...")
-        shutil.copy2(source_path, destination)
-        
-        # Verify copy was successful by checking destination exists
-        dest_path = Path(destination)
-        if not dest_path.exists():
-            raise OSError(f"Failed to copy {source_path.name} to {destination}")
-        
-        # Show file size
-        size_mb = source_path.stat().st_size / (1024 * 1024)
-        print(f"✓ {source_path.name} copied ({size_mb:.2f} MB)")
 
 
 class DatabaseRollbackItem:
@@ -242,6 +189,120 @@ class DatabaseRollbackItem:
         return True
 
 
+class PushFrontendItem:
+    def get_item_description(self):
+        return "Push Frontend to Git (Copy DBs + Commit + Push)"
+    
+    def execute(self):
+        from src.frontend_operations import copy_databases_and_push
+        
+        print("\n" + "="*80)
+        print("PUSH FRONTEND TO GIT")
+        print("="*80)
+        print("\nThis will:")
+        print("  1. Copy database files to frontend/public")
+        print("  2. Initialize/update git repository in frontend with Git LFS")
+        print("  3. Commit and push changes to remote")
+        print()
+        
+        # Check if remote URL is configured
+        if not Config.frontend_git_remote_url:
+            print("⚠ Warning: No remote URL configured!")
+            print("Please set FRONTEND_GIT_REMOTE_URL in your environment or .env file")
+            print("Example: export FRONTEND_GIT_REMOTE_URL='https://github.com/user/repo.git'")
+            print()
+            
+            remote_url = input("Enter remote URL (or press Enter to skip): ").strip()
+            if not remote_url:
+                print("\nCancelled.")
+                return True
+        else:
+            remote_url = Config.frontend_git_remote_url
+            print(f"Remote URL: {remote_url}")
+            print(f"Branch: {Config.frontend_git_branch}")
+            print(f"Approach: {'Fresh (force push)' if Config.frontend_git_use_fresh_approach else 'Incremental'}")
+            print()
+        
+        confirm = input("Continue? (yes/no): ").strip().lower()
+        if confirm not in ("yes", "y"):
+            print("\nCancelled.")
+            return True
+        
+        print()
+        
+        # Execute the operation
+        try:
+            success = copy_databases_and_push(remote_url)
+            if success:
+                print("\n✓ Frontend pushed successfully!")
+            else:
+                print("\n✗ Failed to push frontend. Check logs for details.")
+        except Exception as e:
+            print(f"\n✗ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return True
+
+
+class GitCommitPushFrontendItem:
+    def get_item_description(self):
+        return "Git Commit & Push Frontend (without copying DBs)"
+    
+    def execute(self):
+        from src.frontend_operations import git_commit_and_push_only
+        
+        print("\n" + "="*80)
+        print("GIT COMMIT & PUSH FRONTEND")
+        print("="*80)
+        print("\nThis will:")
+        print("  1. Initialize/update git repository in frontend with Git LFS")
+        print("  2. Commit ALL changes in frontend directory")
+        print("  3. Push to remote")
+        print()
+        print("⚠ Note: This does NOT copy databases. Use option 9 to copy DBs first.")
+        print()
+        
+        # Check if remote URL is configured
+        if not Config.frontend_git_remote_url:
+            print("⚠ Warning: No remote URL configured!")
+            print("Please set FRONTEND_GIT_REMOTE_URL in your environment or .env file")
+            print("Example: export FRONTEND_GIT_REMOTE_URL='https://github.com/user/repo.git'")
+            print()
+            
+            remote_url = input("Enter remote URL (or press Enter to skip): ").strip()
+            if not remote_url:
+                print("\nCancelled.")
+                return True
+        else:
+            remote_url = Config.frontend_git_remote_url
+            print(f"Remote URL: {remote_url}")
+            print(f"Branch: {Config.frontend_git_branch}")
+            print(f"Approach: {'Fresh (force push)' if Config.frontend_git_use_fresh_approach else 'Incremental'}")
+            print()
+        
+        confirm = input("Continue? (yes/no): ").strip().lower()
+        if confirm not in ("yes", "y"):
+            print("\nCancelled.")
+            return True
+        
+        print()
+        
+        # Execute the operation
+        try:
+            success = git_commit_and_push_only(remote_url)
+            if success:
+                print("\n✓ Frontend committed and pushed successfully!")
+            else:
+                print("\n✗ Failed to push frontend. Check logs for details.")
+        except Exception as e:
+            print(f"\n✗ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return True
+
+
 class ScheduledScrapingItem:
     def get_item_description(self):
         return "Run Scheduled Scraping (Stages 1&2 hourly, Stage 3 daily)"
@@ -288,6 +349,8 @@ def run():
     menu.register_item(RecheckAllJobsItem())
     menu.register_item(StructureDataItem())
     menu.register_item(CopyDatabaseItem())
+    menu.register_item(PushFrontendItem())  # Copy databases and push to git
+    menu.register_item(GitCommitPushFrontendItem())  # Just commit and push frontend (no DB copy)
     menu.register_item(DatabaseRollbackItem())
     
     # Run the menu

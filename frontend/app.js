@@ -1263,7 +1263,7 @@ const HomePage = {
                 m('div', { class: 'max-w-md' }, [
                     m('h1', { class: 'text-5xl font-bold' }, 'Moldova Job Market'),
                     m('div', { class: 'alert alert-error mt-6' }, [
-                        m('span', 'Failed to load database. Please make sure data.db is available in /api/')
+                        m('span', 'Failed to load database. Please make sure data.db is available in /public/')
                     ])
                 ])
             ])
