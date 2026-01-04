@@ -30,7 +30,11 @@ const DatabaseManager = {
                 console.log('Loading database file...');
                 
                 // Load the database file
-                const response = await fetch(`${API_BASE}/data.db`);
+                // Use getDatabaseUrl() helper to get the correct URL for LFS files
+                const dbUrl = getDatabaseUrl('data.db');
+                console.log('Database URL:', dbUrl);
+                
+                const response = await fetch(dbUrl);
                 if (!response.ok) {
                     throw new Error(`Failed to load database: ${response.status} ${response.statusText}`);
                 }
