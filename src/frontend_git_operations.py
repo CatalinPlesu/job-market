@@ -99,7 +99,7 @@ class FrontendGitOperations:
     def init_repo(self, force: bool = False) -> Tuple[bool, str]:
         """
         Initialize a git repository in the frontend directory.
-        Sets up Git LFS for database files.
+        Note: Git LFS is NOT set up because GitHub Pages needs to serve the actual files.
         
         Args:
             force: If True, removes existing .git directory first
@@ -121,17 +121,13 @@ class FrontendGitOperations:
                 check=True
             )
             
-            # Set up Git LFS for database files
-            lfs_success, lfs_msg = self.setup_git_lfs()
-            if not lfs_success:
-                # Log warning but don't fail - LFS is optional
-                self.logger.error(f"Git LFS setup failed: {lfs_msg}")
-                return True, f"Git repository initialized (warning: {lfs_msg})"
+            # Note: We do NOT set up Git LFS because GitHub Pages can't serve LFS files
+            # The database files need to be committed directly so they can be served by GitHub Pages
             
-            return True, "Git repository initialized with LFS support"
+            return True, "Git repository initialized"
         
         except subprocess.CalledProcessError as e:
-            error_msg = f"Failed to initialize git repo: {e.stderr}"
+            error_msg = f"Failed to initialize git repo: {getattr(e, 'stderr', str(e))}"
             self.logger.error(error_msg)
             return False, error_msg
         except Exception as e:
