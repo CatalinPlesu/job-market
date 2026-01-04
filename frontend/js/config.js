@@ -1,11 +1,16 @@
 // API Configuration
-// For files >100MB: Use Git LFS + GitHub download URL from public folder
+// For files >100MB: Use Git LFS + GitHub API to get LFS download URL
 // GitHub won't accept files >100MB without LFS
-// GitHub Pages can't serve LFS files directly, so we use raw download URL
-// The 'public' folder helps avoid CORS restrictions
+// GitHub Pages can't serve LFS files directly, so we use GitHub API to get actual LFS URL
+// GitHub's LFS storage has proper CORS headers enabled
 
-// Set this to true (required for files >100MB with Git LFS)
-const USE_GITHUB_LFS = true;
+const API_CONFIG = {
+    type: "github-lfs-api",
+    owner: "CatalinPlesu",
+    repo: "Job-Market-Frontend",
+    branch: "master",
+    filePath: "public/data.db"
+};
 
 function getApiBase() {
     const hostname = window.location.hostname;
@@ -14,9 +19,8 @@ function getApiBase() {
     // Check if we're on GitHub Pages
     const isGitHubPages = hostname.endsWith('.github.io') || hostname.includes('githubusercontent.com');
     
-    if (isGitHubPages && USE_GITHUB_LFS) {
-        // For Git LFS files on GitHub Pages, use GitHub's download URL
-        // The 'public' folder is used to help with CORS
+    if (isGitHubPages) {
+        // For Git LFS files on GitHub Pages, use GitHub API approach
         const pathParts = pathname.split('/').filter(part => part.length > 0);
         
         if (pathParts.length > 0) {
@@ -24,21 +28,14 @@ function getApiBase() {
             const username = hostname.split('.')[0];
             const repoName = pathParts[0];
             
-            // Return metadata for constructing the download URL
+            // Return metadata for GitHub API LFS approach
             return {
-                type: 'github-lfs',
-                username: username,
+                type: 'github-lfs-api',
+                owner: username,
                 repo: repoName,
-                branch: 'master' // Change this if your branch is different (e.g., 'main')
+                branch: 'master', // Change this if your branch is different (e.g., 'main')
+                filePath: 'public/data.db'
             };
-        }
-    } else if (isGitHubPages) {
-        // Regular GitHub Pages (non-LFS, files <100MB)
-        const pathParts = pathname.split('/').filter(part => part.length > 0);
-        
-        if (pathParts.length > 0) {
-            const repoName = pathParts[0];
-            return `/${repoName}/public`;
         }
     }
     
@@ -48,25 +45,11 @@ function getApiBase() {
 
 const API_BASE = getApiBase();
 
-// Helper function to get the database URL
-// For LFS files, use GitHub's raw download URL with ?download= parameter
-function getDatabaseUrl(dbName) {
-    if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs') {
-        // Use GitHub's raw download URL with ?download= parameter for LFS files
-        // Files are in the 'public' folder to help with CORS
-        return `https://github.com/${API_BASE.username}/${API_BASE.repo}/raw/refs/heads/${API_BASE.branch}/public/${dbName}?download=`;
-    } else {
-        // Regular path for non-LFS or localhost
-        return `${API_BASE}/${dbName}`;
-    }
-}
-
 console.log('API_BASE configured as:', API_BASE);
-if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs') {
-    console.log('Using GitHub LFS download URL from public folder');
-    console.log('Example database URL:', getDatabaseUrl('data.db'));
+if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-api') {
+    console.log('Using GitHub API to fetch LFS file with proper CORS');
 } else {
-    console.log('Example database URL:', getDatabaseUrl('data.db'));
+    console.log('Using local path:', API_BASE);
 }
 
 // Constants for multi-select fields (many-to-many relationships and one-to-many like languages)
