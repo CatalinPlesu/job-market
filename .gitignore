@@ -1,5 +1,6 @@
 /frontend/api/*
 !frontend/api/.gitkeep
+!frontend/api/README.md
 # Python-generated files
 __pycache__/
 *.py[oc]
