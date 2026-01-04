@@ -7,6 +7,10 @@ const HomePage = {
             
             const metadata = await dbApi.getMetadata();
             state.jobsIndex = metadata;
+            
+            // Get count of predefined analyses
+            state.analysisCount = PredefinedAnalyses ? PredefinedAnalyses.length : 55;
+            
             state.dbLoading = false;
             m.redraw();
         } catch (error) {
@@ -69,7 +73,7 @@ const HomePage = {
                         m('div', { class: 'grid grid-cols-1 md:grid-cols-2 gap-4 my-6' }, [
                             m('div', { class: 'stat bg-base-100 rounded-lg shadow' }, [
                                 m('div', { class: 'stat-title' }, 'Premade Analyses'),
-                                m('div', { class: 'stat-value text-secondary' }, '55+'),
+                                m('div', { class: 'stat-value text-secondary' }, `${state.analysisCount || 55}+`),
                                 m('div', { class: 'stat-desc' }, 'Ready-to-explore insights')
                             ]),
                             m('div', { class: 'stat bg-base-100 rounded-lg shadow' }, [
