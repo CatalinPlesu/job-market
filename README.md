@@ -42,10 +42,12 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
    - **Install Git LFS** (required for large database files):
      - Ubuntu/Debian: `sudo apt-get install git-lfs`
      - macOS: `brew install git-lfs`
-   - `FRONTEND_GIT_REMOTE_URL`: Your frontend git repository URL (e.g., `https://github.com/user/frontend.git`)
+   - `FRONTEND_GIT_REMOTE_URL`: Your frontend git repository URL
+     - SSH format (recommended): `git@github.com:username/frontend-repo.git`
+     - HTTPS format: `https://github.com/username/frontend-repo.git`
    - `FRONTEND_GIT_BRANCH`: Branch to push to (default: `main`)
    - `FRONTEND_GIT_FRESH_APPROACH`: Use fresh repo approach (default: `true`)
-   - Database files in `frontend/api/` are automatically tracked with Git LFS
+   - Database files in `frontend/public/` are automatically tracked with Git LFS
 
 5. **Run the application:**
    ```bash

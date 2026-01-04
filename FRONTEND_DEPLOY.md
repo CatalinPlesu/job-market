@@ -61,7 +61,9 @@ Then configure:
 
 ```bash
 # REQUIRED: Your frontend git repository URL
-FRONTEND_GIT_REMOTE_URL=https://github.com/username/frontend-repo.git
+# SSH format (recommended): git@github.com:username/frontend-repo.git
+# HTTPS format: https://github.com/username/frontend-repo.git
+FRONTEND_GIT_REMOTE_URL=git@github.com:username/frontend-repo.git
 
 # OPTIONAL: Branch to push to (default: main)
 FRONTEND_GIT_BRANCH=main
@@ -121,7 +123,12 @@ FRONTEND_GIT_FRESH_APPROACH=true
 
 ```bash
 # In your .env file
-FRONTEND_GIT_REMOTE_URL=https://github.com/username/job-market-frontend.git
+# SSH format (recommended - no password needed with SSH keys)
+FRONTEND_GIT_REMOTE_URL=git@github.com:username/job-market-frontend.git
+
+# Or HTTPS format (requires personal access token)
+# FRONTEND_GIT_REMOTE_URL=https://github.com/username/job-market-frontend.git
+
 FRONTEND_GIT_BRANCH=main
 FRONTEND_GIT_FRESH_APPROACH=true
 ```
@@ -192,24 +199,33 @@ After installation, the system will automatically configure LFS for database fil
 
 **Solution**: Set `FRONTEND_GIT_REMOTE_URL` in your `.env` file
 
+**SSH format (recommended):**
+```bash
+FRONTEND_GIT_REMOTE_URL=git@github.com:username/repo.git
+```
+
+**HTTPS format:**
 ```bash
 FRONTEND_GIT_REMOTE_URL=https://github.com/username/repo.git
 ```
 
 ### Issue: Authentication failed when pushing
 
-**Solution**: Use a personal access token (PAT)
+**Solution Options:**
 
+**Option 1: Use SSH (recommended)**
+1. Set up SSH keys on your GitHub account
+2. Use SSH URL format:
+   ```bash
+   FRONTEND_GIT_REMOTE_URL=git@github.com:username/repo.git
+   ```
+
+**Option 2: Use Personal Access Token (PAT) with HTTPS**
 1. Generate a PAT on GitHub (Settings → Developer settings → Personal access tokens)
 2. Use it in the URL:
    ```bash
    FRONTEND_GIT_REMOTE_URL=https://USERNAME:TOKEN@github.com/username/repo.git
    ```
-
-Or use SSH instead:
-```bash
-FRONTEND_GIT_REMOTE_URL=git@github.com:username/repo.git
-```
 
 ### Issue: Force push rejected
 
