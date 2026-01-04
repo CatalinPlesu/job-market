@@ -153,3 +153,81 @@ def copy_databases_and_push(remote_url: str = None) -> bool:
         logger.exception(f"Failed to push frontend: {e}")
         print(f"✗ Error: {e}")
         return False
+
+
+def git_commit_and_push_only(remote_url: str = None) -> bool:
+    """
+    Commit and push frontend to git repository WITHOUT copying databases.
+    
+    This function:
+    1. Initializes/updates git repository in frontend
+    2. Commits all changes in frontend directory
+    3. Pushes changes to remote
+    
+    Args:
+        remote_url: Git remote URL (if None, uses Config.frontend_git_remote_url)
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    logger = get_logger()
+    
+    print("\n" + "="*80)
+    print("GIT COMMIT AND PUSH FRONTEND")
+    print("="*80)
+    print()
+    
+    # Use provided remote_url or fall back to config
+    if remote_url is None:
+        remote_url = Config.frontend_git_remote_url
+    
+    # Validate remote URL
+    if not remote_url:
+        logger.error("No remote URL configured for frontend git operations")
+        print("✗ No remote URL configured!")
+        print("Please set FRONTEND_GIT_REMOTE_URL in your environment")
+        return False
+    
+    # Git operations
+    print("Committing and pushing frontend to git...")
+    print(f"Remote: {remote_url}")
+    print(f"Branch: {Config.frontend_git_branch}")
+    print(f"Approach: {'Fresh (force push)' if Config.frontend_git_use_fresh_approach else 'Incremental'}")
+    print()
+    
+    try:
+        git_ops = FrontendGitOperations(frontend_dir="frontend")
+        
+        # Generate commit message with timestamp
+        commit_message = f"Update frontend - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        # Choose approach based on configuration
+        if Config.frontend_git_use_fresh_approach:
+            # Fresh approach: remove .git, init, add, commit, force push
+            print("Using fresh approach (smaller repo size)...")
+            success, message = git_ops.add_commit_push_fresh(
+                commit_message=commit_message,
+                remote_url=remote_url,
+                branch=Config.frontend_git_branch
+            )
+        else:
+            # Incremental approach: add, commit, push
+            print("Using incremental approach...")
+            success, message = git_ops.add_commit_push_incremental(
+                commit_message=commit_message,
+                remote_url=remote_url,
+                branch=Config.frontend_git_branch
+            )
+        
+        if success:
+            print(f"✓ {message}")
+            return True
+        else:
+            print(f"✗ {message}")
+            logger.error(f"Failed to push frontend: {message}")
+            return False
+    
+    except Exception as e:
+        logger.exception(f"Failed to push frontend: {e}")
+        print(f"✗ Error: {e}")
+        return False

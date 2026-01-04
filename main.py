@@ -245,6 +245,64 @@ class PushFrontendItem:
         return True
 
 
+class GitCommitPushFrontendItem:
+    def get_item_description(self):
+        return "Git Commit & Push Frontend (without copying DBs)"
+    
+    def execute(self):
+        from src.frontend_operations import git_commit_and_push_only
+        
+        print("\n" + "="*80)
+        print("GIT COMMIT & PUSH FRONTEND")
+        print("="*80)
+        print("\nThis will:")
+        print("  1. Initialize/update git repository in frontend")
+        print("  2. Commit ALL changes in frontend directory")
+        print("  3. Push to remote")
+        print()
+        print("⚠ Note: This does NOT copy databases. Use option 9 to copy DBs first.")
+        print()
+        
+        # Check if remote URL is configured
+        if not Config.frontend_git_remote_url:
+            print("⚠ Warning: No remote URL configured!")
+            print("Please set FRONTEND_GIT_REMOTE_URL in your environment or .env file")
+            print("Example: export FRONTEND_GIT_REMOTE_URL='https://github.com/user/repo.git'")
+            print()
+            
+            remote_url = input("Enter remote URL (or press Enter to skip): ").strip()
+            if not remote_url:
+                print("\nCancelled.")
+                return True
+        else:
+            remote_url = Config.frontend_git_remote_url
+            print(f"Remote URL: {remote_url}")
+            print(f"Branch: {Config.frontend_git_branch}")
+            print(f"Approach: {'Fresh (force push)' if Config.frontend_git_use_fresh_approach else 'Incremental'}")
+            print()
+        
+        confirm = input("Continue? (yes/no): ").strip().lower()
+        if confirm not in ("yes", "y"):
+            print("\nCancelled.")
+            return True
+        
+        print()
+        
+        # Execute the operation
+        try:
+            success = git_commit_and_push_only(remote_url)
+            if success:
+                print("\n✓ Frontend committed and pushed successfully!")
+            else:
+                print("\n✗ Failed to push frontend. Check logs for details.")
+        except Exception as e:
+            print(f"\n✗ Error: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        return True
+
+
 class ScheduledScrapingItem:
     def get_item_description(self):
         return "Run Scheduled Scraping (Stages 1&2 hourly, Stage 3 daily)"
@@ -292,6 +350,7 @@ def run():
     menu.register_item(StructureDataItem())
     menu.register_item(CopyDatabaseItem())
     menu.register_item(PushFrontendItem())  # Copy databases and push to git
+    menu.register_item(GitCommitPushFrontendItem())  # Just commit and push frontend (no DB copy)
     menu.register_item(DatabaseRollbackItem())
     
     # Run the menu
