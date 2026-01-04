@@ -1,6 +1,36 @@
 const Header = {
     view: () => m('div', { class: 'navbar bg-base-100 shadow-lg' }, [
         m('div', { class: 'navbar-start' }, [
+            // Mobile hamburger menu
+            m('div', { class: 'dropdown' }, [
+                m('label', { 
+                    tabindex: '0', 
+                    class: 'btn btn-ghost lg:hidden'
+                }, [
+                    m('svg', { 
+                        xmlns: 'http://www.w3.org/2000/svg', 
+                        class: 'h-5 w-5', 
+                        fill: 'none', 
+                        viewBox: '0 0 24 24', 
+                        stroke: 'currentColor' 
+                    }, [
+                        m('path', { 
+                            'stroke-linecap': 'round', 
+                            'stroke-linejoin': 'round', 
+                            'stroke-width': '2', 
+                            d: 'M4 6h16M4 12h8m-8 6h16' 
+                        })
+                    ])
+                ]),
+                m('ul', { 
+                    tabindex: '0', 
+                    class: 'menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52'
+                }, [
+                    m('li', m('a', { href: '#!/', oncreate: m.route.link }, 'Home')),
+                    m('li', m('a', { href: '#!/jobs', oncreate: m.route.link }, 'Jobs')),
+                    m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Analysis'))
+                ])
+            ]),
             m('a', { 
                 class: 'btn btn-ghost text-xl', 
                 href: '#!/',
