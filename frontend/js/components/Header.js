@@ -4,7 +4,7 @@ const Header = {
             // Mobile hamburger menu
             m('div', { class: 'dropdown' }, [
                 m('label', { 
-                    tabIndex: '0', 
+                    tabIndex: 0, 
                     class: 'btn btn-ghost lg:hidden'
                 }, [
                     m('svg', { 
@@ -23,7 +23,7 @@ const Header = {
                     ])
                 ]),
                 m('ul', { 
-                    tabIndex: '0', 
+                    tabIndex: 0, 
                     class: 'menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52'
                 }, [
                     m('li', m('a', { href: '#!/', oncreate: m.route.link }, 'Home')),
