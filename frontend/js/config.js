@@ -1,15 +1,17 @@
 // API Configuration
-// For files >100MB: Use Git LFS + GitHub API to get LFS download URL
+// For files >100MB: Use Git LFS + CORS Proxy
 // GitHub won't accept files >100MB without LFS
-// GitHub Pages can't serve LFS files directly, so we use GitHub API to get actual LFS URL
-// GitHub's LFS storage has proper CORS headers enabled
+// GitHub Pages can't serve LFS files directly (serves pointer files)
+// GitHub's raw endpoint blocks CORS requests
+// Solution: Use CORS proxy to access GitHub raw LFS files
 
 const API_CONFIG = {
-    type: "github-lfs-api",
+    type: "github-lfs-proxy",
     owner: "CatalinPlesu",
     repo: "Job-Market-Frontend",
     branch: "master",
-    filePath: "public/data.db"
+    filePath: "public/data.db",
+    corsProxy: "https://proxy.catalinplesu.xyz/proxy/"
 };
 
 function getApiBase() {
@@ -20,7 +22,7 @@ function getApiBase() {
     const isGitHubPages = hostname.endsWith('.github.io') || hostname.includes('githubusercontent.com');
     
     if (isGitHubPages) {
-        // For Git LFS files on GitHub Pages, use GitHub API approach
+        // For Git LFS files on GitHub Pages, use CORS proxy approach
         const pathParts = pathname.split('/').filter(part => part.length > 0);
         
         if (pathParts.length > 0) {
@@ -28,13 +30,14 @@ function getApiBase() {
             const username = hostname.split('.')[0];
             const repoName = pathParts[0];
             
-            // Return metadata for GitHub API LFS approach
+            // Return metadata for CORS proxy + GitHub LFS approach
             return {
-                type: 'github-lfs-api',
+                type: 'github-lfs-proxy',
                 owner: username,
                 repo: repoName,
                 branch: 'master', // Change this if your branch is different (e.g., 'main')
-                filePath: 'public/data.db'
+                filePath: 'public/data.db',
+                corsProxy: 'https://proxy.catalinplesu.xyz/proxy/'
             };
         }
     }
@@ -46,8 +49,8 @@ function getApiBase() {
 const API_BASE = getApiBase();
 
 console.log('API_BASE configured as:', API_BASE);
-if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-api') {
-    console.log('Using GitHub API to fetch LFS file with proper CORS');
+if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-proxy') {
+    console.log('Using CORS proxy to fetch LFS file from GitHub');
 } else {
     console.log('Using local path:', API_BASE);
 }

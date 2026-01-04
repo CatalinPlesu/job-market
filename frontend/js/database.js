@@ -6,27 +6,30 @@ const DatabaseManager = {
     error: null,
     initPromise: null,
     
-    // Fetch LFS file using GitHub API (has proper CORS headers)
-    async fetchLFSFile(owner, repo, branch, filePath) {
+    // Fetch LFS file using CORS proxy
+    // GitHub's raw endpoint blocks CORS, so we use a proxy to bypass this
+    async fetchLFSFile(owner, repo, branch, filePath, corsProxy) {
         try {
-            console.log(`Fetching LFS file via GitHub API: ${owner}/${repo}/${branch}/${filePath}`);
+            console.log(`Fetching LFS file via CORS proxy: ${owner}/${repo}/${branch}/${filePath}`);
             
-            // Step 1: Try to get file directly via raw endpoint
-            // GitHub's LFS storage has CORS enabled for raw file downloads
-            const rawUrl = `https://github.com/${owner}/${repo}/raw/${branch}/${filePath}`;
-            console.log('Attempting direct LFS download from:', rawUrl);
+            // Original GitHub URL (without https://github.com/)
+            const githubPath = `${owner}/${repo}/raw/${branch}/${filePath}`;
             
-            const response = await fetch(rawUrl);
+            // Proxied URL pattern: https://proxy.catalinplesu.xyz/proxy/{githubPath}
+            const proxiedUrl = `${corsProxy}${githubPath}`;
+            console.log('Fetching from proxied URL:', proxiedUrl);
+            
+            const response = await fetch(proxiedUrl);
             if (response.ok) {
                 const buffer = await response.arrayBuffer();
-                console.log(`LFS file downloaded: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+                console.log(`LFS file downloaded via proxy: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
                 return buffer;
             }
             
-            throw new Error(`Failed to fetch LFS file: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to fetch LFS file via proxy: ${response.status} ${response.statusText}`);
             
         } catch (error) {
-            console.error('LFS file fetch failed:', error);
+            console.error('LFS file fetch via proxy failed:', error);
             throw error;
         }
     },
@@ -56,14 +59,15 @@ const DatabaseManager = {
                 
                 let buffer;
                 
-                // Check if we need to use GitHub API for LFS files
-                if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-api') {
-                    // Use GitHub API to fetch LFS file (has proper CORS)
+                // Check if we need to use CORS proxy for LFS files
+                if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-proxy') {
+                    // Use CORS proxy to fetch LFS file from GitHub (bypasses CORS restrictions)
                     buffer = await this.fetchLFSFile(
                         API_BASE.owner,
                         API_BASE.repo,
                         API_BASE.branch,
-                        API_BASE.filePath
+                        API_BASE.filePath,
+                        API_BASE.corsProxy
                     );
                 } else {
                     // Regular fetch for localhost or non-LFS files
