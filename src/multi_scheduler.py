@@ -115,8 +115,11 @@ def run_improved_scheduler():
       * Process new jobs with LLM
       * Copy databases to frontend
       * Push to GitHub
+    
+    For testing, set DEBUG_RUN_STAGE3_NOW=true in .env to run Stage 3 immediately.
     """
     from src.scheduled_scraper import run_stages_1_and_2, run_stage_3_only
+    from config.settings import Config
     
     multi_scheduler = MultiScheduler()
     
@@ -132,19 +135,26 @@ def run_improved_scheduler():
         "Stages 1 & 2 (Hourly)"
     )
     
-    # Schedule Stage 3 to run daily at midnight (no immediate run)
+    # Schedule Stage 3 to run daily at midnight (or immediately if DEBUG_RUN_STAGE3_NOW is set)
     # Includes: recheck alive jobs, LLM processing, DB copy, and GitHub push
+    run_stage3_immediately = Config.debug_run_stage3_now
     daily_scheduler = Scheduler(
         schedule_time_hour=0,
         schedule_time_minute=0,
         state_file_name="scheduler_state_daily.json",
-        run_immediately=False  # Wait for scheduled time
+        run_immediately=run_stage3_immediately  # Run immediately if debug flag is set
     )
     multi_scheduler.add_schedule(
         daily_scheduler,
         run_stage_3_only,
         "Stage 3 + LLM + Deploy (Daily)"
     )
+    
+    # Display debug info if enabled
+    if run_stage3_immediately:
+        console = Console()
+        console.print("\n[yellow]⚠ DEBUG MODE: Stage 3 will run immediately![/yellow]")
+        console.print("[yellow]  Set DEBUG_RUN_STAGE3_NOW=false in .env to disable[/yellow]\n")
     
     # Start all schedulers
     multi_scheduler.start(check_interval=60)

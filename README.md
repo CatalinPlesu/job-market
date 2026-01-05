@@ -109,6 +109,7 @@ Execute scraping stages on optimized schedules based on their speed:
 - Daily reports with statistics per site
 - Fully autonomous - no manual intervention required
 - Simply select this option to start the scheduler with default settings
+- **Testing**: Set `DEBUG_RUN_STAGE3_NOW=true` in `.env` to run Stage 3 immediately instead of waiting for 00:00
 
 ### 2. Scrape Job Listings (Stage 1 - Smart Mode)
 Collect job URLs from listing pages with intelligent early termination:
