@@ -110,7 +110,7 @@ Execute scraping stages on optimized schedules based on their speed:
   - Stage 2: Get job details for new listings
 - **Stage 3: Daily at 00:00** (slow - rechecks all alive jobs)
   - Stage 3: Re-check alive jobs to detect removed postings
-  - **After Stage 3**: Automatically copies databases to frontend/api and pushes to git (if configured)
+  - **After Stage 3**: Automatically uploads databases to server and pushes frontend to git (if configured)
 - Separate schedules optimize for each stage's performance characteristics
 - Database backup before each run (keeps last 3 days)
 - Error-only logging (weekly log files)
@@ -158,34 +158,26 @@ Process raw job descriptions with LLM:
 - Parse structured JSON response
 - Store normalized data in `data.db` with proper relationships
 
-### 8. Copy Database Files to Frontend API
-Copy both SQLite database files to frontend/api directory:
-- Automatically copies scrape.db and data.db to frontend/api
-- Creates frontend/api directory if it doesn't exist
-- Useful for making databases accessible to the frontend
-- Shows file sizes during copy operation
-
-### 9. Upload Database Files to Server
+### 8. Upload Database Files to Server
 Upload databases to your custom server:
 - Uploads both scrape.db and data.db to configured server
 - **Configuration required**: Set `DB_SERVER_URL` and `DB_SERVER_PASSWORD` in environment
 - Password-protected upload endpoint
-- **Recommended for large files (>100MB)** - better browser compatibility than GitHub Pages
+- **Recommended approach** - better browser compatibility than GitHub Pages
 - See [DB_SERVER_SETUP.md](DB_SERVER_SETUP.md) for server setup instructions
 
-### 10. Push Frontend to Git (Copy DBs + Commit + Push)
-Copy databases to frontend and push to git repository (e.g., GitHub Pages):
-- Copies both databases to frontend/api directory
+### 9. Push Frontend to Git
+Push frontend changes to git repository (e.g., GitHub Pages):
 - Initializes/updates git repository in frontend directory
 - Commits and pushes changes to remote repository
+- **Does NOT include database files** - databases are uploaded separately to server
 - **Configuration required**: Set `FRONTEND_GIT_REMOTE_URL` in environment
 - **Two approaches**:
   - **Fresh (default)**: Removes .git history and force pushes (keeps repo size small)
   - **Incremental**: Preserves git history with regular commits
 - Interactive prompt for remote URL if not configured
-- **Automated deployment**: Stage 3 (daily at 00:00) automatically runs this after completion
 
-### 11. Database Rollback
+### 10. Database Rollback
 Restore databases from previous backups:
 - Select which database to restore (scrape.db or data.db)
 - View available backups with timestamps and sizes

@@ -16,7 +16,6 @@ from src.scrape_job_recheck import recheck_site_jobs
 from src.reporting import DailyReport, Stage1Stats, Stage2Stats, Stage3Stats
 from src.error_logger import get_logger
 from src.database_backup import backup_all_databases
-from src.frontend_operations import copy_databases_and_push
 from datetime import date, datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -113,8 +112,34 @@ def run_stage_3_only():
         report.save()
         print(f"\n✓ Report saved to: {report.report_file}")
         
-        # Copy databases to frontend and push to git
-        copy_databases_and_push()
+        # Upload databases to server and push frontend to git
+        try:
+            from src.db_upload import upload_databases_to_server
+            from src.frontend_operations import git_commit_and_push_only
+            
+            print("\n" + "="*80)
+            print("POST-STAGE 3 OPERATIONS")
+            print("="*80)
+            
+            # Upload databases to server
+            print("\n1. Uploading databases to server...")
+            upload_success = upload_databases_to_server()
+            if upload_success:
+                print("✓ Databases uploaded successfully")
+            else:
+                print("⚠ Database upload failed (check configuration)")
+            
+            # Push frontend to git (without database files)
+            print("\n2. Pushing frontend to git...")
+            push_success = git_commit_and_push_only()
+            if push_success:
+                print("✓ Frontend pushed successfully")
+            else:
+                print("⚠ Frontend push failed")
+                
+        except Exception as e:
+            logger.exception(f"Post-stage 3 operations failed: {e}")
+            print(f"\n⚠ Post-stage 3 operations encountered errors: {e}")
         
     except Exception as e:
         logger.exception(f"Stage 3 failed: {e}")
