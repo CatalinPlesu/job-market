@@ -42,9 +42,10 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 4. **Optional - Custom database server (recommended for large files >100MB):**
    - **`db_server.py` is standalone with zero external dependencies!**
    - See [DB_SERVER_SETUP.md](DB_SERVER_SETUP.md) for complete setup guide
-   - Simply copy `db_server.py` to your server and run it with Python 3.6+
-   - `DB_SERVER_URL`: Your database server URL (e.g., `https://db.example.com`)
-   - `DB_SERVER_PASSWORD`: Password for uploading databases
+   - Configuration via `.env` files to prevent mismatches:
+     - Client `.env`: `DB_SERVER_URL=https://database.catalinplesu.xyz`
+     - Server `.env`: Use `.env.server.example` as template
+   - Copy subset of `.env` to VPS and source it manually
    - Provides better browser compatibility than GitHub Pages + LFS
    
 5. **Optional - Automated frontend deployment:**

@@ -5,18 +5,27 @@ This guide explains how to set up and use the custom database server for hosting
 ## Quick Start (TL;DR)
 
 ```bash
-# 1. Copy db_server.py to your server (no dependencies needed!)
-scp db_server.py your-server:~/
+# 1. Copy files to your VPS
+scp db_server.py .env.server.example your-server:~/
 
-# 2. On your server, run it
-export DB_UPLOAD_PASSWORD="your_secure_password"
-export DB_FILES_DIR="./db_files"
+# 2. On your VPS, configure environment
+cd ~
+cp .env.server.example .env
+nano .env  # Edit with your password and settings
+source .env
+
+# 3. Run the server
 python3 db_server.py
 
-# 3. Put Caddy on top (see Caddyfile) - that's it!
+# 4. Put Caddy on top (see Caddyfile) - that's it!
 ```
 
 The server has **zero external dependencies** - it uses only Python standard library.
+
+**Configuration:** All settings are in `.env` files to avoid mismatches:
+- `.env` on your main machine (client config: `DB_SERVER_URL`, `DB_SERVER_PASSWORD`)
+- `.env` on your VPS (server config: `DB_UPLOAD_PASSWORD`, `CORS_ALLOW_ORIGIN`)
+
 
 ## Overview
 
@@ -81,27 +90,41 @@ Note: You can also upload files manually using `curl` without any Python depende
 
 ### 2. Configure Environment Variables
 
-Create or update your `.env` file:
+#### Client Configuration (on your main machine/scraper)
+
+Edit your main `.env` file (use `.env.example` as template):
 
 ```bash
 # Custom Database Server Configuration
-DB_SERVER_URL=https://db.example.com
+DB_SERVER_URL=https://database.catalinplesu.xyz
 DB_SERVER_PASSWORD=your_secure_password_here
+```
 
-# Server-side configuration (on the server hosting the databases)
+#### Server Configuration (on your VPS)
+
+Copy `.env.server.example` to your VPS and rename it to `.env`:
+
+```bash
+# On your local machine
+scp .env.server.example your-vps:~/.env
+
+# On your VPS
+nano ~/.env  # Edit the file
+```
+
+Example VPS `.env` content:
+```bash
 DB_SERVER_HOST=0.0.0.0
 DB_SERVER_PORT=8081
 DB_FILES_DIR=/var/db_files
 DB_UPLOAD_PASSWORD=your_secure_password_here
-
-# CORS configuration (optional, defaults to "*" for development)
-# For production, set to your frontend domain
-CORS_ALLOW_ORIGIN=https://yourdomain.com
+CORS_ALLOW_ORIGIN=https://catalinplesu.github.io
 ```
 
 **Important:** 
-- Use the same password for both `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server).
-- For production, set `CORS_ALLOW_ORIGIN` to your specific domain instead of "*"
+- `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server) must match!
+- Set `CORS_ALLOW_ORIGIN` to your frontend domain (e.g., GitHub Pages URL)
+- The `.env` approach prevents configuration mismatches between client and server
 
 ### 3. Deploy the Server
 

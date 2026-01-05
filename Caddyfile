@@ -2,7 +2,11 @@
 # This server provides:
 # - Password-protected POST endpoint for uploading database files
 # - Public GET endpoint for serving database files
+#
+# For production deployment on database.catalinplesu.xyz:
+# Replace ":8080" with "database.catalinplesu.xyz" to enable automatic HTTPS
 
+# Development configuration (local testing)
 :8080 {
     # Enable CORS for all origins
     header Access-Control-Allow-Origin *
@@ -45,3 +49,43 @@
         respond "Database File Server" 200
     }
 }
+
+# Production configuration (uncomment and use this on VPS)
+# database.catalinplesu.xyz {
+#     # CORS headers for frontend
+#     header Access-Control-Allow-Origin https://catalinplesu.github.io
+#     header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+#     header Access-Control-Allow-Headers "Content-Type, Authorization"
+#     
+#     # Handle preflight requests
+#     @options {
+#         method OPTIONS
+#     }
+#     handle @options {
+#         respond 200
+#     }
+#     
+#     # Public GET endpoint for database files
+#     handle /db/* {
+#         method GET
+#         root * /var/db_files
+#         rewrite /db/* /
+#         file_server
+#     }
+#     
+#     # Password-protected POST endpoint
+#     handle /upload {
+#         method POST
+#         reverse_proxy localhost:8081
+#     }
+#     
+#     # Health check endpoint
+#     handle /health {
+#         respond "OK" 200
+#     }
+#     
+#     # Default response
+#     handle {
+#         respond "Database File Server" 200
+#     }
+# }

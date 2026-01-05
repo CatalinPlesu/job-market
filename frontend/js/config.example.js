@@ -5,19 +5,19 @@ const API_CONFIG = {
     // Use "custom-server" type to fetch from your own database server
     type: "custom-server",
     
-    // Custom server configuration
+    // Custom server configuration for database.catalinplesu.xyz
     customServer: {
-        url: "https://db.yourserver.com",  // Replace with your server URL
+        url: "https://database.catalinplesu.xyz",  // Your database server URL
         path: "/db"  // API endpoint path (default: /db)
     },
     
     // GitHub LFS + CORS proxy configuration (keep this for reference)
     githubLFS: {
-        owner: "YourUsername",
-        repo: "YourRepo",
+        owner: "CatalinPlesu",
+        repo: "Job-Market-Frontend",
         branch: "master",
         filePath: "public/data.db",
-        corsProxy: "https://proxy.example.com/proxy/"
+        corsProxy: "https://proxy.catalinplesu.xyz/proxy/"
     }
 };
 

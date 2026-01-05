@@ -4,19 +4,29 @@ The `db_server.py` is completely standalone with **zero external dependencies**.
 
 ## Running the Server (3 Simple Steps)
 
-### 1. Copy the file to your server
+### 1. Copy files to your VPS
 ```bash
-scp db_server.py your-server:~/
+scp db_server.py .env.server.example your-server:~/
 ```
 
-### 2. Run it
+### 2. Configure and run it
 ```bash
-# Set environment variables
-export DB_UPLOAD_PASSWORD="your_secure_password"
-export DB_FILES_DIR="./db_files"  # or /var/db_files
+# On your VPS
+cp .env.server.example .env
+nano .env  # Edit: set DB_UPLOAD_PASSWORD and CORS_ALLOW_ORIGIN
 
-# Run the server (Python 3.6+ required)
+# Source the config and run (Python 3.6+ required)
+source .env
 python3 db_server.py
+```
+
+Example `.env` for database.catalinplesu.xyz:
+```bash
+DB_SERVER_HOST=0.0.0.0
+DB_SERVER_PORT=8081
+DB_FILES_DIR=/var/db_files
+DB_UPLOAD_PASSWORD=your_secure_password
+CORS_ALLOW_ORIGIN=https://catalinplesu.github.io
 ```
 
 ### 3. Put Caddy on top (optional but recommended)
@@ -26,6 +36,14 @@ caddy run
 ```
 
 That's it! No pip install, no virtualenv, no requirements.txt needed.
+
+## Configuration Files
+
+All configuration is in `.env` files to prevent mismatches:
+- **Client `.env`**: `DB_SERVER_URL=https://database.catalinplesu.xyz` and `DB_SERVER_PASSWORD`
+- **Server `.env`**: `DB_UPLOAD_PASSWORD`, `CORS_ALLOW_ORIGIN`, and other server settings
+
+The passwords must match between client and server!
 
 ## What's Included
 
