@@ -6,6 +6,27 @@ const DatabaseManager = {
     error: null,
     initPromise: null,
     
+    // Fetch database from custom server
+    async fetchFromCustomServer(url, path) {
+        try {
+            const dbUrl = `${url}${path}/data.db`;
+            console.log(`Fetching database from custom server: ${dbUrl}`);
+            
+            const response = await fetch(dbUrl);
+            if (response.ok) {
+                const buffer = await response.arrayBuffer();
+                console.log(`Database downloaded from custom server: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+                return buffer;
+            }
+            
+            throw new Error(`Failed to fetch database from custom server: ${response.status} ${response.statusText}`);
+            
+        } catch (error) {
+            console.error('Custom server fetch failed:', error);
+            throw error;
+        }
+    },
+    
     // Fetch LFS file using CORS proxy
     // GitHub's raw endpoint blocks CORS, so we use a proxy to bypass this
     async fetchLFSFile(owner, repo, branch, filePath, corsProxy) {
@@ -59,8 +80,13 @@ const DatabaseManager = {
                 
                 let buffer;
                 
+                // Check if we're using custom server
+                if (typeof API_BASE === 'object' && API_BASE.type === 'custom-server') {
+                    // Use custom server to fetch database
+                    buffer = await this.fetchFromCustomServer(API_BASE.url, API_BASE.path);
+                }
                 // Check if we need to use CORS proxy for LFS files
-                if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-proxy') {
+                else if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-proxy') {
                     // Use CORS proxy to fetch LFS file from GitHub (bypasses CORS restrictions)
                     buffer = await this.fetchLFSFile(
                         API_BASE.owner,
