@@ -29,6 +29,10 @@ SERVER_PORT = int(os.getenv("DB_SERVER_PORT", "8081"))
 DB_FILES_DIR = os.getenv("DB_FILES_DIR", "/var/db_files")
 UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD")
 # CORS origin - use "*" to allow all origins (GitHub Pages can be at various URLs)
+# Note: CORS "*" is safe here because:
+# - Database GET endpoints are intentionally public (read-only access)
+# - Only POST /upload is password-protected
+# - GitHub Pages can be at different URLs (with/without repo name, custom domains)
 CORS_ORIGIN = os.getenv("CORS_ALLOW_ORIGIN", "*")
 
 # Validate password is set
