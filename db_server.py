@@ -27,7 +27,8 @@ from datetime import datetime
 SERVER_HOST = os.getenv("DB_SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("DB_SERVER_PORT", "8081"))
 DB_FILES_DIR = os.getenv("DB_FILES_DIR", "/var/db_files")
-UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD")
+# Strip whitespace from password to prevent authentication issues
+UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD", "").strip() if os.getenv("DB_UPLOAD_PASSWORD") else None
 # CORS origin - use "*" to allow all origins (GitHub Pages can be at various URLs)
 # Note: CORS "*" is safe here because:
 # - Database GET endpoints are intentionally public (read-only access)
@@ -149,12 +150,14 @@ class DBFileHandler(BaseHTTPRequestHandler):
         # Check authentication
         auth_header = self.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
+            self.log_message("Authentication failed: missing or invalid Authorization header format")
             self._send_json_response(401, {"error": "Missing or invalid authorization header"})
             return
         
-        token = auth_header[7:]  # Remove 'Bearer ' prefix
+        token = auth_header[7:].strip()  # Remove 'Bearer ' prefix and strip whitespace
         if token != UPLOAD_PASSWORD:
-            self.log_message("Authentication failed: invalid password")
+            # Log password length for debugging (without revealing the password)
+            self.log_message(f"Authentication failed: invalid password (received length: {len(token)}, expected length: {len(UPLOAD_PASSWORD)})")
             self._send_json_response(403, {"error": "Invalid password"})
             return
         

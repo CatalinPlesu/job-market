@@ -124,7 +124,10 @@ CORS_ALLOW_ORIGIN=*
 ```
 
 **Important:** 
-- `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server) must match!
+- `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server) must match **exactly**!
+- **No quotes needed** in `.env` files - use `PASSWORD=mypassword` not `PASSWORD="mypassword"`
+- Whitespace is automatically trimmed from passwords to prevent authentication issues
+- If authentication fails, check the server logs for password length comparison
 - `CORS_ALLOW_ORIGIN=*` allows access from any origin (needed for GitHub Pages which can be at different URLs)
   - Works with `https://catalinplesu.github.io`
   - Works with `https://catalinplesu.github.io/Job-Market-Frontend`
@@ -343,12 +346,39 @@ Response:
 
 ## Troubleshooting
 
+### Authentication Failed: Invalid Password
+
+If you see `Authentication failed: invalid password` in the server logs:
+
+1. **Check password length in logs**: The server now logs password lengths for debugging
+   ```
+   [2026-01-05 19:28:28] Authentication failed: invalid password (received length: 15, expected length: 14)
+   ```
+
+2. **Common causes**:
+   - **Quotes in .env file**: Don't use quotes! Use `PASSWORD=mypass` not `PASSWORD="mypass"`
+   - **Trailing whitespace**: Check for spaces after the password in your `.env` file
+   - **Different passwords**: Ensure `DB_SERVER_PASSWORD` (client) matches `DB_UPLOAD_PASSWORD` (server)
+   - **Not sourced**: Remember to `source .env` on the VPS before running `db_server.py`
+
+3. **Verification steps**:
+   ```bash
+   # On client machine
+   echo "Password length: ${#DB_SERVER_PASSWORD}"
+   
+   # On VPS
+   echo "Password length: ${#DB_UPLOAD_PASSWORD}"
+   ```
+   Both should show the same length!
+
+4. **Client output**: Check for "Password configured: X characters" in upload output
+
 ### Connection Refused
 - Check if services are running: `systemctl status db-server caddy`
 - Check firewall: `sudo ufw allow 80 && sudo ufw allow 443`
 
 ### Upload Fails
-- Verify password matches between client and server
+- Verify password matches between client and server (see above)
 - Check server logs: `journalctl -u db-server -f`
 - Verify file is a valid SQLite database
 

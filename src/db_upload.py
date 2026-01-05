@@ -35,6 +35,12 @@ def upload_databases_to_server(server_url: str = None, password: str = None) -> 
     if password is None:
         password = getattr(Config, 'db_server_password', os.getenv('DB_SERVER_PASSWORD', ''))
     
+    # Strip whitespace from configuration to prevent authentication issues
+    if server_url:
+        server_url = server_url.strip()
+    if password:
+        password = password.strip()
+    
     # Validate configuration
     if not server_url:
         logger.error("No server URL configured for database upload")
@@ -51,6 +57,7 @@ def upload_databases_to_server(server_url: str = None, password: str = None) -> 
         return False
     
     print(f"Server URL: {server_url}")
+    print(f"Password configured: {len(password)} characters")
     print()
     
     # Prepare database files for upload
