@@ -84,7 +84,7 @@ def run_stage_3_only():
     """
     Run Stage 3 (recheck alive jobs) only.
     Scheduled separately as this is the slowest stage.
-    After completion, copies databases to frontend and pushes to git.
+    After completion, processes new jobs with LLM, copies databases to frontend and pushes to git.
     """
     logger = get_logger()
     report = DailyReport()
@@ -109,12 +109,24 @@ def run_stage_3_only():
             report.add_stage3_stats(stats)
         print(f"✓ Stage 3 completed - {sum(s.total_checked for s in stage3_stats)} jobs rechecked\n")
         
+        # Process new jobs with LLM
+        print("="*80)
+        print("LLM PROCESSING: Structuring Data")
+        print("="*80)
+        from src.structure_data_with_llm import structure_data_with_llm
+        structure_data_with_llm()
+        print("✓ LLM processing completed\n")
+        
         # Save report
         report.save()
         print(f"\n✓ Report saved to: {report.report_file}")
         
         # Copy databases to frontend and push to git
+        print("="*80)
+        print("DEPLOYMENT: Copying DBs and Pushing to Git")
+        print("="*80)
         copy_databases_and_push()
+        print("✓ Deployment completed\n")
         
     except Exception as e:
         logger.exception(f"Stage 3 failed: {e}")

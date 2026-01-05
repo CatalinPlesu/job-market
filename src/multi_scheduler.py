@@ -110,7 +110,11 @@ def run_improved_scheduler():
     """
     Run the improved scheduler with separate schedules for different stages.
     - Stage 1 & 2: Every hour (fast with early stopping) - runs immediately on first startup
-    - Stage 3: Once daily at midnight (slow)
+    - Stage 3: Once daily at midnight - complete workflow:
+      * Recheck alive jobs
+      * Process new jobs with LLM
+      * Copy databases to frontend
+      * Push to GitHub
     """
     from src.scheduled_scraper import run_stages_1_and_2, run_stage_3_only
     
@@ -129,6 +133,7 @@ def run_improved_scheduler():
     )
     
     # Schedule Stage 3 to run daily at midnight (no immediate run)
+    # Includes: recheck alive jobs, LLM processing, DB copy, and GitHub push
     daily_scheduler = Scheduler(
         schedule_time_hour=0,
         schedule_time_minute=0,
@@ -138,7 +143,7 @@ def run_improved_scheduler():
     multi_scheduler.add_schedule(
         daily_scheduler,
         run_stage_3_only,
-        "Stage 3 (Daily)"
+        "Stage 3 + LLM + Deploy (Daily)"
     )
     
     # Start all schedulers
