@@ -116,27 +116,42 @@ def run_improved_scheduler():
       * Copy databases to frontend
       * Push to GitHub
     
-    For testing, set DEBUG_RUN_STAGE3_NOW=true in .env to run Stage 3 immediately.
+    Debug flags:
+    - DEBUG_RUN_STAGE3_NOW=true: Run Stage 3 immediately instead of waiting for 00:00
+    - DEBUG_SKIP_SCRAPING=true: Skip Stage 1 & 2 entirely, only run LLM processing + deployment
     """
-    from src.scheduled_scraper import run_stages_1_and_2, run_stage_3_only
+    from src.scheduled_scraper import run_stages_1_and_2, run_stage_3_only, run_llm_and_deploy_only
     from config.settings import Config
     
     multi_scheduler = MultiScheduler()
     
-    # Schedule Stage 1 & 2 to run every hour, with immediate first run
-    hourly_scheduler = Scheduler(
-        interval_minutes=60,
-        state_file_name="scheduler_state_hourly.json",
-        run_immediately=True  # Run stages 1 & 2 immediately on startup
-    )
-    multi_scheduler.add_schedule(
-        hourly_scheduler,
-        run_stages_1_and_2,
-        "Stages 1 & 2 (Hourly)"
-    )
+    # Check if scraping should be skipped
+    skip_scraping = Config.debug_skip_scraping
+    
+    # Only schedule Stage 1 & 2 if scraping is not skipped
+    if not skip_scraping:
+        # Schedule Stage 1 & 2 to run every hour, with immediate first run
+        hourly_scheduler = Scheduler(
+            interval_minutes=60,
+            state_file_name="scheduler_state_hourly.json",
+            run_immediately=True  # Run stages 1 & 2 immediately on startup
+        )
+        multi_scheduler.add_schedule(
+            hourly_scheduler,
+            run_stages_1_and_2,
+            "Stages 1 & 2 (Hourly)"
+        )
+    
+    # Determine which task to run for the daily schedule
+    # If scraping is skipped, run LLM + deploy only; otherwise run full Stage 3
+    if skip_scraping:
+        daily_task = run_llm_and_deploy_only
+        daily_task_name = "LLM + Deploy Only (Daily)"
+    else:
+        daily_task = run_stage_3_only
+        daily_task_name = "Stage 3 + LLM + Deploy (Daily)"
     
     # Schedule Stage 3 to run daily at midnight (or immediately if DEBUG_RUN_STAGE3_NOW is set)
-    # Includes: recheck alive jobs, LLM processing, DB copy, and GitHub push
     run_stage3_immediately = Config.debug_run_stage3_now
     daily_scheduler = Scheduler(
         schedule_time_hour=0,
@@ -146,11 +161,16 @@ def run_improved_scheduler():
     )
     multi_scheduler.add_schedule(
         daily_scheduler,
-        run_stage_3_only,
-        "Stage 3 + LLM + Deploy (Daily)"
+        daily_task,
+        daily_task_name
     )
     
     # Display debug info if enabled (before starting the scheduler)
+    if skip_scraping:
+        multi_scheduler.console.print("\n[yellow]⚠ DEBUG MODE: Skipping scraping stages (1 & 2)![/yellow]")
+        multi_scheduler.console.print("[yellow]  Only LLM processing and deployment will run.[/yellow]")
+        multi_scheduler.console.print("[yellow]  Set DEBUG_SKIP_SCRAPING=false in .env to enable scraping[/yellow]\n")
+    
     if run_stage3_immediately:
         multi_scheduler.console.print("\n[yellow]⚠ DEBUG MODE: Stage 3 will run immediately![/yellow]")
         multi_scheduler.console.print("[yellow]  Set DEBUG_RUN_STAGE3_NOW=false in .env to disable[/yellow]\n")

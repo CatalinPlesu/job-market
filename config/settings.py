@@ -61,6 +61,10 @@ class Config:
     # Run Stage 3 (daily workflow) immediately instead of waiting for 00:00
     # Useful for testing the complete workflow without waiting
     debug_run_stage3_now = os.getenv("DEBUG_RUN_STAGE3_NOW", "false").lower() == "true"
+    
+    # Skip scraping stages (1 & 2) and jump directly to LLM processing and deployment
+    # Useful when you already have scraped data and want to test LLM + deployment only
+    debug_skip_scraping = os.getenv("DEBUG_SKIP_SCRAPING", "false").lower() == "true"
 
     job_to_db_prompt = """
     Extract job posting data as JSON. Translate descriptive text to English; keep proper nouns original.

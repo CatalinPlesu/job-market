@@ -134,6 +134,55 @@ def run_stage_3_only():
         raise
 
 
+def run_llm_and_deploy_only():
+    """
+    Run LLM processing and deployment only, skipping all scraping stages.
+    Useful for testing when you already have scraped data.
+    
+    This function:
+    - Processes new jobs with LLM (structure data from scrape.db to data.db)
+    - Copies databases to frontend
+    - Pushes to GitHub
+    """
+    logger = get_logger()
+    report = DailyReport()
+    
+    print("\n" + "="*80)
+    print("RUNNING LLM + DEPLOYMENT ONLY (Debug Mode)")
+    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*80 + "\n")
+    
+    try:
+        # Create database backups before starting
+        print("Creating database backups...")
+        backup_all_databases(keep_days=3)
+        print("✓ Database backups created\n")
+        
+        # Process new jobs with LLM
+        print("="*80)
+        print("LLM PROCESSING: Structuring Data")
+        print("="*80)
+        from src.structure_data_with_llm import structure_data_with_llm
+        structure_data_with_llm()
+        print("✓ LLM processing completed\n")
+        
+        # Save report
+        report.save()
+        print(f"\n✓ Report saved to: {report.report_file}")
+        
+        # Copy databases to frontend and push to git
+        print("="*80)
+        print("DEPLOYMENT: Copying DBs and Pushing to Git")
+        print("="*80)
+        copy_databases_and_push()
+        print("✓ Deployment completed\n")
+        
+    except Exception as e:
+        logger.exception(f"LLM + Deployment failed: {e}")
+        print(f"\n✗ ERROR: {e}")
+        raise
+
+
 def run_stage1_with_stats():
     """
     Run Stage 1 (scrape job listings) and collect statistics.
