@@ -52,8 +52,9 @@
 
 # Production configuration (uncomment and use this on VPS)
 # database.catalinplesu.xyz {
-#     # CORS headers for frontend
-#     header Access-Control-Allow-Origin https://catalinplesu.github.io
+#     # CORS headers - allow all origins for public database access
+#     # This allows GitHub Pages to work from any URL pattern (with or without repo name)
+#     header Access-Control-Allow-Origin *
 #     header Access-Control-Allow-Methods "GET, POST, OPTIONS"
 #     header Access-Control-Allow-Headers "Content-Type, Authorization"
 #     

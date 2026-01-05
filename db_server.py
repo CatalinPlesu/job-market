@@ -28,7 +28,7 @@ SERVER_HOST = os.getenv("DB_SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("DB_SERVER_PORT", "8081"))
 DB_FILES_DIR = os.getenv("DB_FILES_DIR", "/var/db_files")
 UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD")
-# CORS origin - use "*" for development, specific origin for production
+# CORS origin - use "*" to allow all origins (GitHub Pages can be at various URLs)
 CORS_ORIGIN = os.getenv("CORS_ALLOW_ORIGIN", "*")
 
 # Validate password is set
@@ -37,13 +37,6 @@ if not UPLOAD_PASSWORD:
     print("Using insecure default password 'change_me_in_production'")
     print("Set DB_UPLOAD_PASSWORD before deploying to production!")
     UPLOAD_PASSWORD = "change_me_in_production"
-
-# CORS warning for production
-if CORS_ORIGIN == "*":
-    print("WARNING: CORS is set to allow all origins (*)")
-    print("For production, set CORS_ALLOW_ORIGIN to your specific domain")
-    print("Example: export CORS_ALLOW_ORIGIN='https://yourdomain.com'")
-    print()
 
 # Ensure DB files directory exists
 Path(DB_FILES_DIR).mkdir(parents=True, exist_ok=True)

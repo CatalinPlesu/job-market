@@ -5,16 +5,20 @@ This guide explains how to set up and use the custom database server for hosting
 ## Quick Start (TL;DR)
 
 ```bash
-# 1. Copy files to your VPS
-scp db_server.py .env.server.example your-server:~/
+# 1. Copy db_server.py to your VPS
+scp db_server.py your-server:~/
 
-# 2. On your VPS, configure environment
-cd ~
-cp .env.server.example .env
-nano .env  # Edit with your password and settings
+# 2. On your VPS, create .env file
+cat > .env << 'EOF'
+DB_SERVER_HOST=0.0.0.0
+DB_SERVER_PORT=8081
+DB_FILES_DIR=/var/db_files
+DB_UPLOAD_PASSWORD=your_secure_password_here
+CORS_ALLOW_ORIGIN=*
+EOF
+
+# 3. Source config and run the server
 source .env
-
-# 3. Run the server
 python3 db_server.py
 
 # 4. Put Caddy on top (see Caddyfile) - that's it!
@@ -24,7 +28,8 @@ The server has **zero external dependencies** - it uses only Python standard lib
 
 **Configuration:** All settings are in `.env` files to avoid mismatches:
 - `.env` on your main machine (client config: `DB_SERVER_URL`, `DB_SERVER_PASSWORD`)
-- `.env` on your VPS (server config: `DB_UPLOAD_PASSWORD`, `CORS_ALLOW_ORIGIN`)
+- `.env` on your VPS (server config: `DB_UPLOAD_PASSWORD`, `CORS_ALLOW_ORIGIN=*`)
+- CORS is set to `*` to allow GitHub Pages from any URL pattern
 
 
 ## Overview
@@ -102,14 +107,11 @@ DB_SERVER_PASSWORD=your_secure_password_here
 
 #### Server Configuration (on your VPS)
 
-Copy `.env.server.example` to your VPS and rename it to `.env`:
+Create a `.env` file on your VPS with the server configuration:
 
 ```bash
-# On your local machine
-scp .env.server.example your-vps:~/.env
-
 # On your VPS
-nano ~/.env  # Edit the file
+nano ~/.env  # Create and edit the file
 ```
 
 Example VPS `.env` content:
@@ -118,12 +120,15 @@ DB_SERVER_HOST=0.0.0.0
 DB_SERVER_PORT=8081
 DB_FILES_DIR=/var/db_files
 DB_UPLOAD_PASSWORD=your_secure_password_here
-CORS_ALLOW_ORIGIN=https://catalinplesu.github.io
+CORS_ALLOW_ORIGIN=*
 ```
 
 **Important:** 
 - `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server) must match!
-- Set `CORS_ALLOW_ORIGIN` to your frontend domain (e.g., GitHub Pages URL)
+- `CORS_ALLOW_ORIGIN=*` allows access from any origin (needed for GitHub Pages which can be at different URLs)
+  - Works with `https://catalinplesu.github.io`
+  - Works with `https://catalinplesu.github.io/Job-Market-Frontend`
+  - Works with custom domains
 - The `.env` approach prevents configuration mismatches between client and server
 
 ### 3. Deploy the Server

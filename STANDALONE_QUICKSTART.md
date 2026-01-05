@@ -4,30 +4,34 @@ The `db_server.py` is completely standalone with **zero external dependencies**.
 
 ## Running the Server (3 Simple Steps)
 
-### 1. Copy files to your VPS
+### 1. Copy db_server.py to your VPS
 ```bash
-scp db_server.py .env.server.example your-server:~/
+scp db_server.py your-server:~/
 ```
 
 ### 2. Configure and run it
 ```bash
-# On your VPS
-cp .env.server.example .env
-nano .env  # Edit: set DB_UPLOAD_PASSWORD and CORS_ALLOW_ORIGIN
+# On your VPS, create .env file
+cat > .env << 'EOF'
+DB_SERVER_HOST=0.0.0.0
+DB_SERVER_PORT=8081
+DB_FILES_DIR=/var/db_files
+DB_UPLOAD_PASSWORD=your_secure_password
+CORS_ALLOW_ORIGIN=*
+EOF
 
 # Source the config and run (Python 3.6+ required)
 source .env
 python3 db_server.py
 ```
 
-Example `.env` for database.catalinplesu.xyz:
-```bash
-DB_SERVER_HOST=0.0.0.0
-DB_SERVER_PORT=8081
-DB_FILES_DIR=/var/db_files
-DB_UPLOAD_PASSWORD=your_secure_password
-CORS_ALLOW_ORIGIN=https://catalinplesu.github.io
-```
+**Why `CORS_ALLOW_ORIGIN=*`?**
+- Allows access from any origin
+- GitHub Pages can be at different URLs:
+  - `https://catalinplesu.github.io`
+  - `https://catalinplesu.github.io/Job-Market-Frontend`
+  - Custom domains
+- Database is public (read-only), so CORS `*` is safe
 
 ### 3. Put Caddy on top (optional but recommended)
 ```bash
@@ -41,7 +45,9 @@ That's it! No pip install, no virtualenv, no requirements.txt needed.
 
 All configuration is in `.env` files to prevent mismatches:
 - **Client `.env`**: `DB_SERVER_URL=https://database.catalinplesu.xyz` and `DB_SERVER_PASSWORD`
-- **Server `.env`**: `DB_UPLOAD_PASSWORD`, `CORS_ALLOW_ORIGIN`, and other server settings
+- **Server `.env`**: `DB_UPLOAD_PASSWORD` and `CORS_ALLOW_ORIGIN=*`
+
+CORS is set to `*` to allow GitHub Pages from any URL (with or without repo name).
 
 The passwords must match between client and server!
 
