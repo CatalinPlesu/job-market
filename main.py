@@ -189,6 +189,9 @@ class PushFrontendItem:
             traceback.print_exc()
         
         return True
+
+
+class DatabaseRollbackItem:
     def get_item_description(self):
         return "Database Rollback"
     
