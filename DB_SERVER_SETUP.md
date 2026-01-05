@@ -133,28 +133,7 @@ CORS_ALLOW_ORIGIN=*
 
 ### 3. Deploy the Server
 
-#### Option A: Local Testing
-
-1. Create the database files directory:
-```bash
-mkdir -p /tmp/db_files
-```
-
-2. Start the Python server:
-```bash
-export DB_FILES_DIR=/tmp/db_files
-export DB_UPLOAD_PASSWORD=test_password
-python db_server.py
-```
-
-3. In a new terminal, start Caddy:
-```bash
-caddy run --config Caddyfile
-```
-
-The server will be available at `http://localhost:8080`
-
-#### Option B: Production Deployment
+#### Production Deployment on database.catalinplesu.xyz
 
 1. Create the database files directory on your server:
 ```bash
