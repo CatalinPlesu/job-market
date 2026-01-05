@@ -276,10 +276,21 @@ Response:
 ## Security Considerations
 
 1. **Password Protection**: The upload endpoint requires a password via the `Authorization: Bearer` header
-2. **File Validation**: Only valid SQLite database files are accepted
-3. **File Size Limit**: Maximum file size is 500 MB (configurable)
-4. **Allowed Files**: Only `data.db` and `scrape.db` are accepted
-5. **HTTPS**: Use HTTPS in production (Caddy provides automatic HTTPS)
+2. **Mandatory Password**: The server warns if DB_UPLOAD_PASSWORD is not set and uses an insecure default. Always set a strong password in production.
+3. **File Validation**: Only valid SQLite database files are accepted
+4. **File Size Limit**: Maximum file size is 500 MB (configurable)
+5. **Allowed Files**: Only `data.db` and `scrape.db` are accepted
+6. **HTTPS**: Use HTTPS in production (Caddy provides automatic HTTPS)
+7. **Multipart Parsing**: The current implementation uses simplified multipart parsing. For production, consider using `python-multipart` library for better robustness.
+
+## Production Deployment Notes
+
+1. **Always set DB_UPLOAD_PASSWORD**: Never rely on the default password in production
+2. **Use HTTPS**: Configure Caddy with a proper domain for automatic HTTPS
+3. **Firewall**: Restrict access to port 8081 (only allow localhost)
+4. **Rate Limiting**: Consider adding rate limiting in Caddy for the upload endpoint
+5. **Monitoring**: Set up monitoring for disk space and server health
+6. **Backups**: Regularly backup the database files directory
 
 ## Troubleshooting
 

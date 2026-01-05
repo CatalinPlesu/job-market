@@ -76,30 +76,34 @@ def upload_databases_to_server(server_url: str = None, password: str = None) -> 
     try:
         print("Uploading database files...")
         
-        # Prepare multipart form data
-        files = []
-        for name, path in db_files:
-            files.append(('files', (name, open(path, 'rb'), 'application/octet-stream')))
-        
-        # Prepare headers with authentication
-        headers = {
-            'Authorization': f'Bearer {password}'
-        }
-        
-        # Make the upload request
-        upload_url = f"{server_url.rstrip('/')}/upload"
-        print(f"Uploading to: {upload_url}")
-        
-        response = requests.post(
-            upload_url,
-            files=files,
-            headers=headers,
-            timeout=300  # 5 minutes timeout for large files
-        )
-        
-        # Close file handles
-        for _, (_, file_handle, _) in files:
-            file_handle.close()
+        # Prepare multipart form data with context managers
+        files_to_upload = []
+        try:
+            for name, path in db_files:
+                files_to_upload.append(('files', (name, open(path, 'rb'), 'application/octet-stream')))
+            
+            # Prepare headers with authentication
+            headers = {
+                'Authorization': f'Bearer {password}'
+            }
+            
+            # Make the upload request
+            upload_url = f"{server_url.rstrip('/')}/upload"
+            print(f"Uploading to: {upload_url}")
+            
+            response = requests.post(
+                upload_url,
+                files=files_to_upload,
+                headers=headers,
+                timeout=300  # 5 minutes timeout for large files
+            )
+        finally:
+            # Close file handles
+            for _, (_, file_handle, _) in files_to_upload:
+                try:
+                    file_handle.close()
+                except:
+                    pass
         
         # Check response
         if response.status_code == 200:
@@ -114,7 +118,16 @@ def upload_databases_to_server(server_url: str = None, password: str = None) -> 
             
             return True
         else:
-            error_msg = response.json().get('error', 'Unknown error') if response.headers.get('content-type', '').startswith('application/json') else response.text
+            # Try to parse JSON error message
+            content_type = response.headers.get('content-type', '')
+            if content_type.startswith('application/json'):
+                try:
+                    error_msg = response.json().get('error', 'Unknown error')
+                except:
+                    error_msg = response.text
+            else:
+                error_msg = response.text
+                
             logger.error(f"Upload failed: HTTP {response.status_code} - {error_msg}")
             print(f"\n✗ Upload failed: HTTP {response.status_code}")
             print(f"Error: {error_msg}")

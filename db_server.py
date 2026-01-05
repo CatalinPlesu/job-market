@@ -21,7 +21,14 @@ from datetime import datetime
 SERVER_HOST = os.getenv("DB_SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("DB_SERVER_PORT", "8081"))
 DB_FILES_DIR = os.getenv("DB_FILES_DIR", "/var/db_files")
-UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD", "change_me_in_production")
+UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD")
+
+# Validate password is set
+if not UPLOAD_PASSWORD:
+    print("WARNING: DB_UPLOAD_PASSWORD environment variable is not set!")
+    print("Using insecure default password 'change_me_in_production'")
+    print("Set DB_UPLOAD_PASSWORD before deploying to production!")
+    UPLOAD_PASSWORD = "change_me_in_production"
 
 # Ensure DB files directory exists
 Path(DB_FILES_DIR).mkdir(parents=True, exist_ok=True)
@@ -145,6 +152,17 @@ class DBFileHandler(BaseHTTPRequestHandler):
             self._send_json_response(400, {"error": "Content-Type must be multipart/form-data"})
             return
         
+        # Extract boundary from Content-Type
+        if "boundary=" not in content_type:
+            self._send_json_response(400, {"error": "Missing boundary in Content-Type header"})
+            return
+        
+        try:
+            boundary = content_type.split("boundary=")[1].encode()
+        except IndexError:
+            self._send_json_response(400, {"error": "Invalid Content-Type header format"})
+            return
+        
         # Parse multipart form data
         try:
             content_length = int(self.headers.get("Content-Length", 0))
@@ -156,9 +174,8 @@ class DBFileHandler(BaseHTTPRequestHandler):
             # Read the body
             body = self.rfile.read(content_length)
             
-            # Extract boundary from Content-Type
-            boundary = content_type.split("boundary=")[1].encode()
-            
+            # Note: This is a simplified multipart form parser
+            # For production use, consider using python-multipart library for better robustness
             # Split body by boundary
             parts = body.split(b"--" + boundary)
             

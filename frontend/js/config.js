@@ -16,7 +16,7 @@ const API_CONFIG = {
     
     // Custom server configuration (used when type = "custom-server")
     customServer: {
-        url: "https://db.example.com",  // Your database server URL
+        url: "https://db.yourserver.com",  // Replace with your database server URL
         path: "/db"  // Path to database endpoint
     },
     
