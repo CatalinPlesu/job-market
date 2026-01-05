@@ -8,7 +8,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 - 🤖 **LLM Processing**: Structured data extraction from raw job postings
 - 📊 **Analytics**: Market insights and salary analysis
 - 🌐 **Web Interface**: Interactive SPA for browsing jobs and analytics
-- 💾 **Database Copy**: Copy SQLite databases to frontend/api directory
+- 💾 **Database Hosting**: Custom server for large database files (>100MB)
 - 🔄 **Automation**: Scheduled scraping with intelligent optimization
 - 🚀 **Auto-Deploy**: Automatic git push to frontend repository (e.g., GitHub Pages) after daily scraping
 
@@ -16,6 +16,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
 
 - [Frontend Documentation](frontend/README.md) - Interactive web interface
 - [Deployment Guide](DEPLOYMENT.md) - Deploy to GitHub Pages, Netlify, etc.
+- [Database Server Setup](DB_SERVER_SETUP.md) - Host large databases on your own server
 - [Analytics Specification](ANALYTICS_SPEC.md) - Planned analytics features
 
 ## Setup
@@ -38,7 +39,13 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
    - `LLM_API_KEY`: Your LLM API key
    - `MODEL`: LLM model name
    
-4. **Optional - Automated frontend deployment:**
+4. **Optional - Custom database server (recommended for large files >100MB):**
+   - See [DB_SERVER_SETUP.md](DB_SERVER_SETUP.md) for complete setup guide
+   - `DB_SERVER_URL`: Your database server URL (e.g., `https://db.example.com`)
+   - `DB_SERVER_PASSWORD`: Password for uploading databases
+   - Provides better browser compatibility than GitHub Pages + LFS
+   
+5. **Optional - Automated frontend deployment:**
    - **Install Git LFS** (required for large database files):
      - Ubuntu/Debian: `sudo apt-get install git-lfs`
      - macOS: `brew install git-lfs`
@@ -49,7 +56,7 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
    - `FRONTEND_GIT_FRESH_APPROACH`: Use fresh repo approach (default: `true`)
    - Database files in `frontend/public/` are automatically tracked with Git LFS
 
-5. **Run the application:**
+6. **Run the application:**
    ```bash
    python main.py
    ```
@@ -155,7 +162,15 @@ Copy both SQLite database files to frontend/api directory:
 - Useful for making databases accessible to the frontend
 - Shows file sizes during copy operation
 
-### 9. Push Frontend to Git (Copy DBs + Commit + Push)
+### 9. Upload Database Files to Server
+Upload databases to your custom server:
+- Uploads both scrape.db and data.db to configured server
+- **Configuration required**: Set `DB_SERVER_URL` and `DB_SERVER_PASSWORD` in environment
+- Password-protected upload endpoint
+- **Recommended for large files (>100MB)** - better browser compatibility than GitHub Pages
+- See [DB_SERVER_SETUP.md](DB_SERVER_SETUP.md) for server setup instructions
+
+### 10. Push Frontend to Git (Copy DBs + Commit + Push)
 Copy databases to frontend and push to git repository (e.g., GitHub Pages):
 - Copies both databases to frontend/api directory
 - Initializes/updates git repository in frontend directory
@@ -167,7 +182,7 @@ Copy databases to frontend and push to git repository (e.g., GitHub Pages):
 - Interactive prompt for remote URL if not configured
 - **Automated deployment**: Stage 3 (daily at 00:00) automatically runs this after completion
 
-### 10. Database Rollback
+### 11. Database Rollback
 Restore databases from previous backups:
 - Select which database to restore (scrape.db or data.db)
 - View available backups with timestamps and sizes
