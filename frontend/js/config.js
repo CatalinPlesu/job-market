@@ -1,56 +1,38 @@
 // API Configuration
-// For files >100MB: Use Git LFS + CORS Proxy
-// GitHub won't accept files >100MB without LFS
-// GitHub Pages can't serve LFS files directly (serves pointer files)
-// GitHub's raw endpoint blocks CORS requests
-// Solution: Use CORS proxy to access GitHub raw LFS files
+// Database is served from custom server at database.catalinplesu.xyz
 
 const API_CONFIG = {
-    type: "github-lfs-proxy",
-    owner: "CatalinPlesu",
-    repo: "Job-Market-Frontend",
-    branch: "master",
-    filePath: "public/data.db",
-    corsProxy: "https://proxy.catalinplesu.xyz/proxy/"
+    // Using custom database server
+    type: "custom-server",
+    
+    // Custom server configuration
+    customServer: {
+        url: "https://database.catalinplesu.xyz",  // Your database server URL
+        path: "/db"  // Path to database endpoint
+    }
 };
 
 function getApiBase() {
-    const hostname = window.location.hostname;
-    const pathname = window.location.pathname;
-    
-    // Check if we're on GitHub Pages
-    const isGitHubPages = hostname.endsWith('.github.io') || hostname.includes('githubusercontent.com');
-    
-    if (isGitHubPages) {
-        // For Git LFS files on GitHub Pages, use CORS proxy approach
-        const pathParts = pathname.split('/').filter(part => part.length > 0);
-        
-        if (pathParts.length > 0) {
-            // Extract username from hostname (username.github.io)
-            const username = hostname.split('.')[0];
-            const repoName = pathParts[0];
-            
-            // Return metadata for CORS proxy + GitHub LFS approach
-            return {
-                type: 'github-lfs-proxy',
-                owner: username,
-                repo: repoName,
-                branch: 'master', // Change this if your branch is different (e.g., 'main')
-                filePath: 'public/data.db',
-                corsProxy: 'https://proxy.catalinplesu.xyz/proxy/'
-            };
-        }
+    // Always use custom server for production
+    if (API_CONFIG.type === "custom-server") {
+        return {
+            type: 'custom-server',
+            url: API_CONFIG.customServer.url,
+            path: API_CONFIG.customServer.path
+        };
     }
     
-    // Default to /public for localhost
+    // Default to /public for localhost development
     return '/public';
 }
 
 const API_BASE = getApiBase();
 
 console.log('API_BASE configured as:', API_BASE);
-if (typeof API_BASE === 'object' && API_BASE.type === 'github-lfs-proxy') {
-    console.log('Using CORS proxy to fetch LFS file from GitHub');
+if (typeof API_BASE === 'object') {
+    if (API_BASE.type === 'custom-server') {
+        console.log('Using custom server:', API_BASE.url);
+    }
 } else {
     console.log('Using local path:', API_BASE);
 }

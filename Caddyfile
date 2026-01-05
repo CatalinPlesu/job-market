@@ -1,0 +1,50 @@
+# Caddy configuration for DB file hosting server
+# Production deployment on database.catalinplesu.xyz
+# This server provides:
+# - Password-protected POST endpoint for uploading database files
+# - Public GET endpoint for serving database files
+# - Automatic HTTPS via Caddy
+
+database.catalinplesu.xyz {
+    # CORS headers - allow all origins for public database access
+    # This allows GitHub Pages to work from any URL pattern (with or without repo name)
+    header Access-Control-Allow-Origin *
+    header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    header Access-Control-Allow-Headers "Content-Type, Authorization"
+    
+    # Handle preflight requests
+    @options {
+        method OPTIONS
+    }
+    handle @options {
+        respond 200
+    }
+    
+    # Public GET endpoint for database files
+    # Usage: GET /db/data.db or GET /db/scrape.db
+    handle /db/* {
+        method GET
+        root * /var/db_files
+        rewrite /db/* /
+        file_server
+    }
+    
+    # Password-protected POST endpoint for uploading database files
+    # Usage: POST /upload with Authorization header
+    handle /upload {
+        method POST
+        # Forward to Python server for authentication and file handling
+        reverse_proxy localhost:8081
+    }
+    
+    # Health check endpoint
+    handle /health {
+        respond "OK" 200
+    }
+    
+    # Default response
+    handle {
+        respond "Database File Server" 200
+    }
+}
+
