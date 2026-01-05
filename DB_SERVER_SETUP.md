@@ -93,9 +93,15 @@ DB_SERVER_HOST=0.0.0.0
 DB_SERVER_PORT=8081
 DB_FILES_DIR=/var/db_files
 DB_UPLOAD_PASSWORD=your_secure_password_here
+
+# CORS configuration (optional, defaults to "*" for development)
+# For production, set to your frontend domain
+CORS_ALLOW_ORIGIN=https://yourdomain.com
 ```
 
-**Important:** Use the same password for both `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server).
+**Important:** 
+- Use the same password for both `DB_SERVER_PASSWORD` (client) and `DB_UPLOAD_PASSWORD` (server).
+- For production, set `CORS_ALLOW_ORIGIN` to your specific domain instead of "*"
 
 ### 3. Deploy the Server
 

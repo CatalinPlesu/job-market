@@ -17,7 +17,6 @@ Usage:
 """
 
 import os
-import hashlib
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
@@ -29,6 +28,8 @@ SERVER_HOST = os.getenv("DB_SERVER_HOST", "0.0.0.0")
 SERVER_PORT = int(os.getenv("DB_SERVER_PORT", "8081"))
 DB_FILES_DIR = os.getenv("DB_FILES_DIR", "/var/db_files")
 UPLOAD_PASSWORD = os.getenv("DB_UPLOAD_PASSWORD")
+# CORS origin - use "*" for development, specific origin for production
+CORS_ORIGIN = os.getenv("CORS_ALLOW_ORIGIN", "*")
 
 # Validate password is set
 if not UPLOAD_PASSWORD:
@@ -36,6 +37,13 @@ if not UPLOAD_PASSWORD:
     print("Using insecure default password 'change_me_in_production'")
     print("Set DB_UPLOAD_PASSWORD before deploying to production!")
     UPLOAD_PASSWORD = "change_me_in_production"
+
+# CORS warning for production
+if CORS_ORIGIN == "*":
+    print("WARNING: CORS is set to allow all origins (*)")
+    print("For production, set CORS_ALLOW_ORIGIN to your specific domain")
+    print("Example: export CORS_ALLOW_ORIGIN='https://yourdomain.com'")
+    print()
 
 # Ensure DB files directory exists
 Path(DB_FILES_DIR).mkdir(parents=True, exist_ok=True)
@@ -55,7 +63,7 @@ class DBFileHandler(BaseHTTPRequestHandler):
     
     def _send_cors_headers(self):
         """Send CORS headers for cross-origin requests"""
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", CORS_ORIGIN)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     
@@ -214,7 +222,12 @@ class DBFileHandler(BaseHTTPRequestHandler):
                     continue
                 
                 # Extract file content (after double CRLF)
-                content_start = part.find(b"\r\n\r\n") + 4
+                content_start_pos = part.find(b"\r\n\r\n")
+                if content_start_pos == -1:
+                    self.log_message(f"Rejected upload: {filename} - malformed multipart data (missing separator)")
+                    continue
+                
+                content_start = content_start_pos + 4
                 content_end = len(part) - 2  # Remove trailing CRLF
                 file_content = part[content_start:content_end]
                 

@@ -45,6 +45,7 @@ All imports are from Python standard library:
 curl http://localhost:8081/health
 
 # Upload a database (from another machine)
+# Note: Replace "your_password" with your actual DB_UPLOAD_PASSWORD
 curl -X POST \
   -H "Authorization: ******" \
   -F "files=@data.db" \
