@@ -2,6 +2,22 @@
 
 This guide explains how to set up and use the custom database server for hosting large SQLite database files.
 
+## Quick Start (TL;DR)
+
+```bash
+# 1. Copy db_server.py to your server (no dependencies needed!)
+scp db_server.py your-server:~/
+
+# 2. On your server, run it
+export DB_UPLOAD_PASSWORD="your_secure_password"
+export DB_FILES_DIR="./db_files"
+python3 db_server.py
+
+# 3. Put Caddy on top (see Caddyfile) - that's it!
+```
+
+The server has **zero external dependencies** - it uses only Python standard library.
+
 ## Overview
 
 The custom database server provides:
@@ -9,6 +25,9 @@ The custom database server provides:
 - **Public GET endpoint** for serving database files to the frontend
 - **CORS support** for cross-origin requests
 - **File validation** to ensure only valid SQLite databases are uploaded
+- **Zero external dependencies** - uses only Python standard library
+
+**`db_server.py` is completely standalone!** Just copy it to your server and run it with Python 3.6+. No pip install needed for the server itself.
 
 This solution works around GitHub Pages limitations with large files (>100MB) and browser CORS restrictions in Chrome/Edge.
 
@@ -38,10 +57,27 @@ brew install caddy
 # Or download from https://caddyserver.com/download
 ```
 
-#### Python Dependencies
+#### Python Server Dependencies
+
+**`db_server.py` has NO external dependencies!** It uses only Python standard library modules.
+
+Simply copy `db_server.py` to your server and run it:
 ```bash
-pip install requests
+# Copy the file
+scp db_server.py your-server:~/
+
+# Run it (Python 3.6+ required)
+python3 db_server.py
 ```
+
+#### Python Client Dependencies (optional - only needed for uploading from scraper)
+
+If you want to use the Python upload client (`src/db_upload.py`) from the scraper:
+```bash
+pip install requests python-dotenv
+```
+
+Note: You can also upload files manually using `curl` without any Python dependencies.
 
 ### 2. Configure Environment Variables
 

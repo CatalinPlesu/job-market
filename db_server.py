@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-Database File Server
+Database File Server - Standalone, Zero Dependencies
 
 A lightweight server for receiving and serving database files.
+
 Features:
 - POST endpoint with password authentication for uploading DB files
 - GET endpoint for public access to DB files
 - File validation and secure storage
+- Uses ONLY Python standard library - no pip install required!
+
+Usage:
+    export DB_UPLOAD_PASSWORD="your_password"
+    export DB_FILES_DIR="./db_files"
+    python3 db_server.py
 """
 
 import os

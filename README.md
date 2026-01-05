@@ -40,7 +40,9 @@ A comprehensive job scraping and analysis tool for the Moldovan job market acros
    - `MODEL`: LLM model name
    
 4. **Optional - Custom database server (recommended for large files >100MB):**
+   - **`db_server.py` is standalone with zero external dependencies!**
    - See [DB_SERVER_SETUP.md](DB_SERVER_SETUP.md) for complete setup guide
+   - Simply copy `db_server.py` to your server and run it with Python 3.6+
    - `DB_SERVER_URL`: Your database server URL (e.g., `https://db.example.com`)
    - `DB_SERVER_PASSWORD`: Password for uploading databases
    - Provides better browser compatibility than GitHub Pages + LFS

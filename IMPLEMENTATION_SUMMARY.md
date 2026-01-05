@@ -51,13 +51,15 @@ A custom database server with:
 - Routes POST requests to Python server
 - Automatic HTTPS in production
 
-### 2. db_server.py
-- Lightweight HTTP server (Python standard library)
+### 2. db_server.py (Standalone - Zero Dependencies!)
+- **Uses ONLY Python standard library - no pip install required**
+- Lightweight HTTP server (http.server module)
 - Password-protected POST /upload endpoint
 - Public GET /db/* endpoints for file serving
 - File validation (SQLite format check)
 - Configurable file size limits (500MB default)
 - Health check endpoint
+- Simply copy and run with Python 3.6+
 
 ### 3. src/db_upload.py
 - Python client for uploading databases
