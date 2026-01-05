@@ -150,11 +150,10 @@ def run_improved_scheduler():
         "Stage 3 + LLM + Deploy (Daily)"
     )
     
-    # Display debug info if enabled
+    # Display debug info if enabled (before starting the scheduler)
     if run_stage3_immediately:
-        console = Console()
-        console.print("\n[yellow]⚠ DEBUG MODE: Stage 3 will run immediately![/yellow]")
-        console.print("[yellow]  Set DEBUG_RUN_STAGE3_NOW=false in .env to disable[/yellow]\n")
+        multi_scheduler.console.print("\n[yellow]⚠ DEBUG MODE: Stage 3 will run immediately![/yellow]")
+        multi_scheduler.console.print("[yellow]  Set DEBUG_RUN_STAGE3_NOW=false in .env to disable[/yellow]\n")
     
     # Start all schedulers
     multi_scheduler.start(check_interval=60)
