@@ -108,14 +108,20 @@ Execute scraping stages on optimized schedules based on their speed:
 - **Stage 1 & 2: Every HOUR** (fast with early stopping at 100+ consecutive existing jobs)
   - Stage 1: Scrape job listings from all sites
   - Stage 2: Get job details for new listings
-- **Stage 3: Daily at 00:00** (slow - rechecks all alive jobs)
-  - Stage 3: Re-check alive jobs to detect removed postings
-  - **After Stage 3**: Automatically uploads databases to server and pushes frontend to git (if configured)
+- **Stage 3: Daily at 00:00** (complete autonomous workflow)
+  - Stage 3a: Re-check alive jobs to detect removed postings
+  - Stage 3b: Process new jobs with LLM (structure data)
+  - Stage 3c: Copy databases to frontend/public
+  - Stage 3d: Push to GitHub (if configured)
 - Separate schedules optimize for each stage's performance characteristics
 - Database backup before each run (keeps last 3 days)
 - Error-only logging (weekly log files)
 - Daily reports with statistics per site
+- Fully autonomous - no manual intervention required
 - Simply select this option to start the scheduler with default settings
+- **Testing Options**:
+  - Set `DEBUG_RUN_STAGE3_NOW=true` in `.env` to run Stage 3 immediately instead of waiting for 00:00
+  - Set `DEBUG_SKIP_SCRAPING=true` in `.env` to skip scraping stages and jump directly to LLM processing + deployment (useful when you already have scraped data)
 
 ### 2. Scrape Job Listings (Stage 1 - Smart Mode)
 Collect job URLs from listing pages with intelligent early termination:
