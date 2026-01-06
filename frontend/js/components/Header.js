@@ -28,7 +28,13 @@ const Header = {
                 }, [
                     m('li', m('a', { href: '#!/', oncreate: m.route.link }, 'Home')),
                     m('li', m('a', { href: '#!/jobs', oncreate: m.route.link }, 'Jobs')),
-                    m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Analysis'))
+                    m('li', [
+                        m('span', 'Analysis'),
+                        m('ul', { class: 'p-2' }, [
+                            m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Custom SQL')),
+                            m('li', m('a', { href: '#!/analysis-filtered', oncreate: m.route.link }, 'Filtered Analysis'))
+                        ])
+                    ])
                 ])
             ]),
             m('a', { 
@@ -41,7 +47,15 @@ const Header = {
             m('ul', { class: 'menu menu-horizontal px-1' }, [
                 m('li', m('a', { href: '#!/', oncreate: m.route.link }, 'Home')),
                 m('li', m('a', { href: '#!/jobs', oncreate: m.route.link }, 'Jobs')),
-                m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Analysis'))
+                m('li', [
+                    m('details', [
+                        m('summary', 'Analysis'),
+                        m('ul', { class: 'p-2' }, [
+                            m('li', m('a', { href: '#!/analysis', oncreate: m.route.link }, 'Custom SQL')),
+                            m('li', m('a', { href: '#!/analysis-filtered', oncreate: m.route.link }, 'Filtered Analysis'))
+                        ])
+                    ])
+                ])
             ])
         ]),
         m('div', { class: 'navbar-end' }, [

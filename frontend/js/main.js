@@ -20,6 +20,9 @@ m.route(document.getElementById('app'), '/', {
     '/analysis': {
         render: () => m(Layout, m(AnalysisPage))
     },
+    '/analysis-filtered': {
+        render: () => m(Layout, m(FilteredAnalysisPage))
+    },
     '/analysis/:id': {
         render: (vnode) => m(Layout, m(AnalysisDetailPage, { id: vnode.attrs.id }))
     }
