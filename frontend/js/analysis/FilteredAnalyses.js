@@ -110,9 +110,9 @@ const FilteredAnalyses = [
             LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
             LEFT JOIN regions reg ON jd.region_id = reg.id
             LEFT JOIN countries cou ON jd.country_id = cou.id
-            WHERE jd.max_salary IS NOT NULL AND ci.name IS NOT NULL
+            WHERE ci.name IS NOT NULL
             GROUP BY ci.name
-            HAVING job_count >= 10
+            HAVING COUNT(DISTINCT jd.id) >= 10
             ORDER BY job_count DESC
             LIMIT 15`,
         chartType: 'bar'
@@ -145,9 +145,8 @@ const FilteredAnalyses = [
             LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
             LEFT JOIN regions reg ON jd.region_id = reg.id
             LEFT JOIN countries cou ON jd.country_id = cou.id
-            WHERE jd.max_salary IS NOT NULL
             GROUP BY industry
-            HAVING job_count >= 10
+            HAVING COUNT(DISTINCT jd.id) >= 10
             ORDER BY job_count DESC
             LIMIT 15`,
         chartType: 'bar'
@@ -181,10 +180,9 @@ const FilteredAnalyses = [
             LEFT JOIN regions reg ON jd.region_id = reg.id
             LEFT JOIN countries cou ON jd.country_id = cou.id
             WHERE (jd.experience_years <= 1 OR jd.experience_years IS NULL)
-              AND jd.max_salary IS NOT NULL
               AND t.name IS NOT NULL
             GROUP BY t.name
-            HAVING job_count >= 3
+            HAVING COUNT(DISTINCT jd.id) >= 3
             ORDER BY job_count DESC
             LIMIT 20`,
         chartType: 'bar'
@@ -250,9 +248,9 @@ const FilteredAnalyses = [
             LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
             LEFT JOIN regions reg ON jd.region_id = reg.id
             LEFT JOIN countries cou ON jd.country_id = cou.id
-            WHERE jd.max_salary IS NOT NULL AND c.name IS NOT NULL
+            WHERE c.name IS NOT NULL
             GROUP BY c.name
-            HAVING job_count >= 5
+            HAVING COUNT(DISTINCT jd.id) >= 5
             ORDER BY job_count DESC
             LIMIT 20`,
         chartType: 'bar'
