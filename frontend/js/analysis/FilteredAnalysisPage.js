@@ -229,9 +229,9 @@ const FilteredAnalysisPage = {
                 label: valueKey,
                 data: values,
                 backgroundColor: ['line', 'radar'].includes(chartType) 
-                    ? colors[idx].replace('0.7', '0.2')
+                    ? colors[idx].replace('0.8', '0.2')
                     : (finalValueKeys.length === 1 ? ChartHelpers.generateColors(values.length) : colors[idx]),
-                borderColor: colors[idx].replace('0.7', '1'),
+                borderColor: colors[idx].replace('0.8', '1'),
                 borderWidth: 2,
                 fill: ['line', 'radar'].includes(chartType),
                 tension: 0

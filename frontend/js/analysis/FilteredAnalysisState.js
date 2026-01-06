@@ -161,8 +161,10 @@ const FilteredAnalysisState = {
                 
                 if (whereIndex !== -1) {
                     // Already has WHERE, combine with AND
+                    // Extract just the condition part (without the "WHERE" keyword)
+                    const filterCondition = whereClause.substring(6); // Remove "WHERE "
                     const insertPoint = whereIndex + 5; // After "WHERE"
-                    sql = sql.substring(0, insertPoint) + ' (' + whereClause.substring(6) + ') AND' + sql.substring(insertPoint);
+                    sql = sql.substring(0, insertPoint) + ' (' + filterCondition + ') AND' + sql.substring(insertPoint);
                 } else {
                     // No WHERE clause, find insertion point
                     let insertPoint = sql.length;

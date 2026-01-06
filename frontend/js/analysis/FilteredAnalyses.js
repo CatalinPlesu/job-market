@@ -80,7 +80,7 @@ const FilteredAnalyses = [
             LEFT JOIN countries cou ON jd.country_id = cou.id
             GROUP BY work_arrangement
             ORDER BY job_count DESC`,
-        chartType: 'doughnut'
+        chartType: 'pie'
     },
     {
         name: 'Job Opportunities by Location',
@@ -220,7 +220,7 @@ const FilteredAnalyses = [
             WHERE jd.max_salary IS NOT NULL
             GROUP BY employment_type
             ORDER BY job_count DESC`,
-        chartType: 'doughnut'
+        chartType: 'pie'
     },
     {
         name: 'Top Hiring Companies',
@@ -369,6 +369,6 @@ const FilteredAnalyses = [
             WHERE jd.max_salary IS NOT NULL
             GROUP BY company_size
             ORDER BY job_count DESC`,
-        chartType: 'doughnut'
+        chartType: 'pie'
     }
 ];
