@@ -200,5 +200,61 @@ const FilteredAnalysisState = {
             };
             m.redraw();
         }
-    }
+    },
+    
+    // Load filtered jobs for display
+    loadFilteredJobs: async () => {
+        try {
+            await DatabaseManager.init();
+            
+            // Build WHERE clause with OR logic
+            const { whereClause, params } = FilteredAnalysisState.buildOrWhereClause();
+            
+            // Query to get all matching jobs with details
+            const sql = `
+                SELECT 
+                    jd.id,
+                    t.name as title,
+                    c.name as company,
+                    ci.name as city,
+                    jd.max_salary,
+                    jd.posting_date
+                FROM job_details jd
+                LEFT JOIN titles t ON jd.title_id = t.id
+                LEFT JOIN companies c ON jd.company_name_id = c.id
+                LEFT JOIN cities ci ON jd.city_id = ci.id
+                LEFT JOIN job_functions jf ON jd.job_function_id = jf.id
+                LEFT JOIN seniority_levels sl ON jd.seniority_level_id = sl.id
+                LEFT JOIN remote_work_options rw ON jd.remote_work_id = rw.id
+                LEFT JOIN industries ind ON jd.industry_id = ind.id
+                LEFT JOIN employment_types et ON jd.employment_type_id = et.id
+                LEFT JOIN contract_types ct ON jd.contract_type_id = ct.id
+                LEFT JOIN departments d ON jd.department_id = d.id
+                LEFT JOIN specializations sp ON jd.specialization_id = sp.id
+                LEFT JOIN education_levels el ON jd.required_education_id = el.id
+                LEFT JOIN company_sizes cs ON jd.company_size_id = cs.id
+                LEFT JOIN job_families jf2 ON jd.job_family_id = jf2.id
+                LEFT JOIN work_schedules ws ON jd.work_schedule_id = ws.id
+                LEFT JOIN shift_details sd ON jd.shift_details_id = sd.id
+                LEFT JOIN travel_requirements tr ON jd.travel_required_id = tr.id
+                LEFT JOIN regions reg ON jd.region_id = reg.id
+                LEFT JOIN countries cou ON jd.country_id = cou.id
+                ${whereClause}
+                ORDER BY jd.posting_date DESC
+                LIMIT 100
+            `;
+            
+            const jobs = DatabaseManager.queryObjects(sql, params);
+            
+            FilteredAnalysisState.filteredJobs = jobs;
+            m.redraw();
+        } catch (error) {
+            console.error('Error loading filtered jobs:', error);
+            FilteredAnalysisState.filteredJobs = [];
+            m.redraw();
+        }
+    },
+    
+    // Store filtered jobs list
+    filteredJobs: []
 };

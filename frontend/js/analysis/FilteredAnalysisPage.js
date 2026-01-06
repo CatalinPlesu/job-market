@@ -1,5 +1,8 @@
 // Filtered Analysis Page - Uses OR logic for filters
 const FilteredAnalysisPage = {
+    // Tab state: 'analysis' or 'jobs'
+    activeTab: 'analysis',
+    
     oninit: () => {
         // Initialize database
         DatabaseManager.init().catch(err => {
@@ -13,6 +16,9 @@ const FilteredAnalysisPage = {
                 m.redraw();
             });
         }
+        
+        // Reset to analysis tab
+        FilteredAnalysisPage.activeTab = 'analysis';
     },
     
     view: () => m('div', { class: 'container mx-auto px-4 py-8' }, [
@@ -28,12 +34,34 @@ const FilteredAnalysisPage = {
                 m(FilteredAnalysisFilterPanel)
             ]),
             
-            // Main Content Area - Predefined Analyses + Results
+            // Main Content Area - Tabs + Content
             m('div', { class: 'flex-1' }, [
                 // Active Filters Display (as namespace tags)
                 m(ActiveFiltersDisplay),
                 
-                // Query Results
+                // Tab Navigation (only show if filters are active)
+                FilteredAnalysisState.getActiveFilterCount() > 0 && m('div', { class: 'tabs tabs-boxed mb-4' }, [
+                    m('a', { 
+                        class: `tab ${FilteredAnalysisPage.activeTab === 'analysis' ? 'tab-active' : ''}`,
+                        onclick: () => {
+                            FilteredAnalysisPage.activeTab = 'analysis';
+                            m.redraw();
+                        }
+                    }, '📊 Analysis'),
+                    m('a', { 
+                        class: `tab ${FilteredAnalysisPage.activeTab === 'jobs' ? 'tab-active' : ''}`,
+                        onclick: () => {
+                            FilteredAnalysisPage.activeTab = 'jobs';
+                            // Load filtered jobs when switching to jobs tab
+                            FilteredAnalysisState.loadFilteredJobs();
+                            m.redraw();
+                        }
+                    }, '📋 Job List')
+                ]),
+                
+                // Tab Content
+                FilteredAnalysisPage.activeTab === 'analysis' ? [
+                    // Query Results (Analysis Tab)
                 FilteredAnalysisState.queryResult && m('div', { class: 'card bg-base-100 shadow-xl mb-6' }, [
                     m('div', { class: 'card-body' }, [
                         FilteredAnalysisState.queryResult.success ? [
@@ -111,7 +139,7 @@ const FilteredAnalysisPage = {
                     ])
                 ]),
                 
-                // Predefined Filtered Analyses
+                // Predefined Filtered Analyses (Analysis Tab)
                 m('div', { class: 'card bg-base-100 shadow-xl' }, [
                     m('div', { class: 'card-body' }, [
                         m('h2', { class: 'card-title mb-4' }, 'Predefined Analyses'),
@@ -136,6 +164,32 @@ const FilteredAnalysisPage = {
                         )
                     ])
                 ])
+                ] : [
+                    // Job List Tab Content
+                    m('div', { class: 'card bg-base-100 shadow-xl' }, [
+                        m('div', { class: 'card-body' }, [
+                            m('h2', { class: 'card-title mb-4' }, [
+                                'Matching Jobs',
+                                FilteredAnalysisState.filteredJobs.length > 0 && 
+                                    m('span', { class: 'badge badge-info' }, FilteredAnalysisState.filteredJobs.length)
+                            ]),
+                            
+                            // Job list
+                            FilteredAnalysisState.filteredJobs.length > 0 ? 
+                                m('div', { class: 'border border-base-300 rounded' },
+                                    FilteredAnalysisState.filteredJobs.map((job, index) => 
+                                        m(JobListItem, { job: job, index: index + 1 })
+                                    )
+                                ) : 
+                                m('div', { class: 'alert alert-info' }, [
+                                    m('svg', { xmlns: 'http://www.w3.org/2000/svg', fill: 'none', viewBox: '0 0 24 24', class: 'stroke-current shrink-0 w-6 h-6' }, [
+                                        m('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' })
+                                    ]),
+                                    m('span', 'No jobs found matching your filters. Try adjusting your filters or switch to the Analysis tab.')
+                                ])
+                        ])
+                    ])
+                ]
             ])
         ])
     ]),

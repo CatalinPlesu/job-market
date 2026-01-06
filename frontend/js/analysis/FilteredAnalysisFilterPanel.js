@@ -176,9 +176,19 @@ const FilteredAnalysisFilterPanel = {
                                 }, 300);
                                 m.redraw();
                             },
+                            onkeypress: (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    // Add first suggestion if available
+                                    const suggestions = FilteredAnalysisFilterPanel.suggestions;
+                                    if (suggestions.length > 0) {
+                                        applySearchAsFilter(suggestions[0]);
+                                    }
+                                }
+                            },
                             onfocus: (e) => {
                                 if (!FilteredAnalysisFilterPanel.searchTerm) {
-                                    e.target.placeholder = 'Type and click suggestion to add as filter...';
+                                    e.target.placeholder = 'Type and press Enter or click suggestion...';
                                 }
                             },
                             onblur: (e) => {
