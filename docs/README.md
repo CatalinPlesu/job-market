@@ -67,7 +67,8 @@ Rezumat detaliat al lucrării de cercetare în limba rusă, care descrie starea 
 ## О проекте / Despre proiect
 
 **Название / Titlu:**
-Автоматизированная система анализа и классификации вакансий с рынка труда Республики Молдова с использованием больших языковых моделей (LLM) / Sistem automat de analiză și clasificare a vacanselor de pe piața muncii din Republica Moldova utilizând modele de limbaj (LLM)
+- **RU:** Автоматизированная система анализа и классификации вакансий с рынка труда Республики Молдова с использованием больших языковых моделей (LLM)
+- **RO:** Sistem automat de analiză și clasificare a vacanselor de pe piața muncii din Republica Moldova utilizând modele de limbaj (LLM)
 
 **Технологии / Tehnologii:**
 - Backend: Python (requests, aiohttp, BeautifulSoup4, SQLAlchemy)
