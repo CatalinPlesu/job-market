@@ -106,7 +106,13 @@ const FilteredAnalysisFilterPanel = {
                 return b.count - a.count;
             });
             
-            FilteredAnalysisFilterPanel.suggestions = suggestions.slice(0, 10);
+            // Filter out already selected values
+            const filteredSuggestions = suggestions.filter(suggestion => {
+                const activeFilters = FilteredAnalysisState.filters[suggestion.field] || [];
+                return !activeFilters.some(f => f.value === suggestion.value);
+            });
+            
+            FilteredAnalysisFilterPanel.suggestions = filteredSuggestions.slice(0, 10);
             m.redraw();
         } catch (error) {
             console.error('Error fetching suggestions:', error);

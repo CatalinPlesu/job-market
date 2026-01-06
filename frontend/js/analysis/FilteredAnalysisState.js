@@ -23,20 +23,15 @@ const FilteredAnalysisState = {
             FilteredAnalysisState.filters[field] = [];
         }
         
-        // For multi-select fields (arrays in MULTI_SELECT_FIELDS)
-        if (MULTI_SELECT_FIELDS.includes(field)) {
-            if (!FilteredAnalysisState.filters[field].includes(value)) {
-                FilteredAnalysisState.filters[field].push({
-                    value: value,
-                    label: fieldLabel || field
-                });
-            }
-        } else {
-            // For single-select fields, replace
-            FilteredAnalysisState.filters[field] = [{
+        // For filtered analysis, ALWAYS use OR logic - add to array, never replace
+        // Check if this exact value is already in the filters
+        const alreadyExists = FilteredAnalysisState.filters[field].some(f => f.value === value);
+        
+        if (!alreadyExists) {
+            FilteredAnalysisState.filters[field].push({
                 value: value,
                 label: fieldLabel || field
-            }];
+            });
         }
     },
     
